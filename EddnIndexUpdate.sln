@@ -1,0 +1,43 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36310.24
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EddnIndexUpdate", "EddnIndexUpdate\EddnIndexUpdate.csproj", "{5A0375D8-AE1C-4A87-98D3-70970888A9F9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EddnIndexUpdate.Migrations_MariaDB", "Migrations_MariaDB\EddnIndexUpdate.Migrations_MariaDB.csproj", "{5702A876-7D22-4BAF-9E58-942955FF3484}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EddnIndexUpdate.Migrations_SqlServer", "Migrations_SqlServer\EddnIndexUpdate.Migrations_SqlServer.csproj", "{556A3F66-4353-46DF-B26B-59D3D177DA1E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EddnIndexUpdate.Migrations_Sqlite", "Migrations_Sqlite\EddnIndexUpdate.Migrations_Sqlite.csproj", "{F334487F-E37C-4165-8709-4A0C0B1C7D1E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5A0375D8-AE1C-4A87-98D3-70970888A9F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5A0375D8-AE1C-4A87-98D3-70970888A9F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5A0375D8-AE1C-4A87-98D3-70970888A9F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5A0375D8-AE1C-4A87-98D3-70970888A9F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5702A876-7D22-4BAF-9E58-942955FF3484}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5702A876-7D22-4BAF-9E58-942955FF3484}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5702A876-7D22-4BAF-9E58-942955FF3484}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5702A876-7D22-4BAF-9E58-942955FF3484}.Release|Any CPU.Build.0 = Release|Any CPU
+		{556A3F66-4353-46DF-B26B-59D3D177DA1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{556A3F66-4353-46DF-B26B-59D3D177DA1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{556A3F66-4353-46DF-B26B-59D3D177DA1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{556A3F66-4353-46DF-B26B-59D3D177DA1E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F334487F-E37C-4165-8709-4A0C0B1C7D1E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F334487F-E37C-4165-8709-4A0C0B1C7D1E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F334487F-E37C-4165-8709-4A0C0B1C7D1E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F334487F-E37C-4165-8709-4A0C0B1C7D1E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2C6B344D-C6C2-4080-B4F2-064EBF51FBB9}
+	EndGlobalSection
+EndGlobal
