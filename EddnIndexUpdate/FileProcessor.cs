@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 
@@ -62,6 +63,19 @@ namespace EddnIndexUpdate
         private string MessageTypesFile => Path.Combine(Settings.BaseDir, Settings.MessageTypesFile);
 
         private static readonly int Version = 1;
+
+        public void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] string? message = null, object? extraData = null)
+        {
+            if (!condition)
+            {
+                if (Debugger.IsAttached)
+                {
+                    Debugger.Break();
+                }
+
+                throw new InvalidOperationException(message);
+            }
+        }
 
         private static string? GetCsvField(ICsvLine line, string name)
         {
@@ -1059,7 +1073,7 @@ namespace EddnIndexUpdate
             {
                 var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
                 var checkSuffix = Models.System.GetPGSuffix(boxelid);
-                Debug.Assert(name.EndsWith(checkSuffix));
+                Assert(name.EndsWith(checkSuffix), extraData: new { name, checkSuffix });
 
                 var sector = GetOrAddSector(sectorName);
 
@@ -1539,7 +1553,8 @@ namespace EddnIndexUpdate
 
             var nameid = GetOrAddSystemName(name);
             var modsysaddr = Models.System.SystemAddressToModSystemAddress(systemAddress);
-            Debug.Assert(systemAddress == Models.System.ModSystemAddressToSystemAddress(modsysaddr));
+            var revsysaddr = Models.System.ModSystemAddressToSystemAddress(modsysaddr);
+            Assert(systemAddress == revsysaddr, extraData: new { modsysaddr, systemAddress, revsysaddr });
             var namemodsysaddr = TryGetNameModSystemAddress(nameid);
 
             DateTime? validFrom = null;
@@ -1587,7 +1602,7 @@ namespace EddnIndexUpdate
 
             var namesysaddr = Models.System.ModSystemAddressToSystemAddress(namemodsysaddr);
             var revnamemodsysaddr = Models.System.SystemAddressToModSystemAddress(namesysaddr);
-            Debug.Assert(namemodsysaddr == revnamemodsysaddr);
+            Assert(namemodsysaddr == revnamemodsysaddr, extraData: new { namemodsysaddr, namesysaddr, revnamemodsysaddr });
 
             systemAddress ??= namesysaddr;
 
@@ -1669,7 +1684,7 @@ namespace EddnIndexUpdate
             return (sbyte)(dv * DecimalRecipPow10(log10) <= 1 - error / 2 ? log10 + 1 : log10);
         }
 
-        private static bool TryGetMatchingBody(
+        private bool TryGetMatchingBody(
                 List<Models.Body> bodiesList,
                 decimal? argOfPeriapsis,
                 decimal? inclination,
@@ -1699,12 +1714,8 @@ namespace EddnIndexUpdate
 
                 if (incdiff < -2 || incdiff > 2) continue;
 
-                Debug.Assert(body == null);
-
-                if (incdiff < -0.00001m || incdiff > 0.00001m || aopdiff < -0.00001m || aopdiff > 0.00001m || smadiff < -0.00001m || smadiff > 0.00001m)
-                {
-                    Debugger.Break();
-                }
+                Assert(body == null, extraData: bodiesList);
+                Assert(incdiff >= -0.00001m && incdiff <= 0.00001m && aopdiff >= -0.00001m && aopdiff <= 0.00001m && smadiff >= -0.00001m && smadiff <= 0.00001m);
 
                 body = item;
             }
@@ -2864,9 +2875,9 @@ namespace EddnIndexUpdate
 
                 foreach (var _ent in newLines.Values)
                 {
-                    Debug.Assert(_ent.Software?.Id != 0);
-                    Debug.Assert(_ent.GameVersion?.Id != 0);
-                    Debug.Assert(_ent.System?.Id != 0);
+                    Assert(_ent.Software?.Id != 0);
+                    Assert(_ent.GameVersion?.Id != 0);
+                    Assert(_ent.System?.Id != 0);
 
                     var ent = _ent with
                     {
@@ -2913,7 +2924,7 @@ namespace EddnIndexUpdate
 
                     if (ent.System != null)
                     {
-                        Debug.Assert(ctx.Entry(ent.System).State != EntityState.Detached);
+                        Assert(ctx.Entry(ent.System).State != EntityState.Detached);
 
                         if (ent.System.FirstSeen == null || ent.GatewayTimestamp < ent.System.FirstSeen)
                         {
@@ -2945,12 +2956,12 @@ namespace EddnIndexUpdate
 
                 foreach (var _ent in newBodyLines.Values)
                 {
-                    Debug.Assert(_ent.Body != null);
-                    Debug.Assert(_ent.Body.Id != 0);
+                    Assert(_ent.Body != null);
+                    Assert(_ent.Body.Id != 0);
 
                     var ent = _ent with { BodyId = _ent.Body.Id };
 
-                    Debug.Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
+                    Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
 
                     if (ent.Body.FirstSeen == null || ent.Body.FirstSeen > ent.GatewayTimestamp)
                     {
@@ -2977,8 +2988,8 @@ namespace EddnIndexUpdate
 
                 foreach (var _ent in newStationLines.Values)
                 {
-                    Debug.Assert(_ent.Station != null);
-                    Debug.Assert(_ent.Station.Id != 0);
+                    Assert(_ent.Station != null);
+                    Assert(_ent.Station.Id != 0);
 
                     var ent = _ent with { StationId = _ent.Station.Id };
 
@@ -3012,12 +3023,12 @@ namespace EddnIndexUpdate
 
                 foreach (var _ent in newNavRouteEntries.Values)
                 {
-                    Debug.Assert(_ent.System != null);
-                    Debug.Assert(_ent.System.Id != 0);
+                    Assert(_ent.System != null);
+                    Assert(_ent.System.Id != 0);
 
                     var ent = _ent with { SystemId = _ent.System.Id };
 
-                    Debug.Assert(ctx.Entry(ent.System).State != EntityState.Detached);
+                    Assert(ctx.Entry(ent.System).State != EntityState.Detached);
 
                     if (ent.System.FirstSeen == null || ent.GatewayTimestamp < ent.System.FirstSeen)
                     {
@@ -3044,14 +3055,14 @@ namespace EddnIndexUpdate
 
                 foreach (var _ent in newSignalEntries.Values)
                 {
-                    Debug.Assert(_ent.SignalInfoSet != null);
-                    Debug.Assert(_ent.SignalInfoSet.Id != 0);
+                    Assert(_ent.SignalInfoSet != null);
+                    Assert(_ent.SignalInfoSet.Id != 0);
 
                     var ent = _ent with { SignalSetId = _ent.SignalInfoSet.Id, SystemId = _ent.System?.Id };
 
                     if (ent.System != null)
                     {
-                        Debug.Assert(ctx.Entry(ent.System).State != EntityState.Detached);
+                        Assert(ctx.Entry(ent.System).State != EntityState.Detached);
                     }
 
                     foreach (var sig in ent.SignalInfoSet.SignalSetItems)
@@ -3086,14 +3097,14 @@ namespace EddnIndexUpdate
 
                 foreach (var _ent in newBodySignalEntries.Values)
                 {
-                    Debug.Assert(_ent.Signal != null);
-                    Debug.Assert(_ent.Signal.Id != 0);
+                    Assert(_ent.Signal != null);
+                    Assert(_ent.Signal.Id != 0);
 
                     var ent = _ent with { BodySignalId = _ent.Signal.Id, BodyId = _ent.Body?.Id };
 
                     if (ent.Body != null)
                     {
-                        Debug.Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
+                        Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
                     }
 
                     if (ctx.Entry(ent.Signal).State == EntityState.Detached)
