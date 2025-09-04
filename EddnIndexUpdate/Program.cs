@@ -27,12 +27,21 @@ var processor = svcprov.GetRequiredService<FileProcessor>();
 
 foreach (var arg in args)
 {
-    foreach (var filename in Directory.EnumerateFiles(arg, "*.jsonl.bz2", SearchOption.AllDirectories))
-    {
-        processor.ProcessFile(filename);
-    }
+    List<string> filenames = [
+        .. Directory.EnumerateFiles(arg, "*.jsonl.bz2", SearchOption.AllDirectories),
+        .. Directory.EnumerateFiles(arg, "*.jsonl", SearchOption.AllDirectories)
+    ];
 
-    foreach (var filename in Directory.EnumerateFiles(arg, "*.jsonl", SearchOption.AllDirectories))
+    filenames = [..
+        filenames
+            .Select(e => (Parts: Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
+            .OrderBy(e => e.Parts[^3])
+            .ThenBy(e => e.Parts[^2])
+            .ThenBy(e => e.Parts[^1])
+            .Select(e => e.Name)];
+
+
+    foreach (var filename in filenames)
     {
         processor.ProcessFile(filename);
     }
