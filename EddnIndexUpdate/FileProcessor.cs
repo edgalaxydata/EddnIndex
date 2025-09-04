@@ -53,13 +53,13 @@ namespace EddnIndexUpdate
 
         private readonly HttpClient HttpClient = new();
 
-        private string BodyOverridesFile => Settings.BodyOverridesFile ?? "body-name-overrides.jsonl";
+        private string BodyOverridesFile => Path.Combine(Settings.BaseDir, Settings.BodyOverridesFile);
 
-        private string SystemOverridesFile => Settings.SystemOverridesFile ?? "system-name-overrides.jsonl";
+        private string SystemOverridesFile => Path.Combine(Settings.BaseDir, Settings.SystemOverridesFile);
 
-        private string GameVersionDatesFile => Settings.GameVersionDatesFile ?? "game-version-dates.jsonl";
+        private string GameVersionDatesFile => Path.Combine(Settings.BaseDir, Settings.GameVersionDatesFile);
 
-        private string MessageTypesFile => Settings.MessageTypesFile ?? "msgtypes.txt";
+        private string MessageTypesFile => Path.Combine(Settings.BaseDir, Settings.MessageTypesFile);
 
         private static readonly int Version = 1;
 

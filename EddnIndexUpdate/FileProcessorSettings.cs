@@ -81,9 +81,10 @@ namespace EddnIndexUpdate
 
         public OverridesURISettings<GameVersionDatesCsvFieldSettings> GameVersionDatesCsv { get; set; } = new();
 
-        public string? BodyOverridesFile { get; set; }
-        public string? SystemOverridesFile { get; set; }
-        public string? GameVersionDatesFile { get; set; }
-        public string? MessageTypesFile { get; set; }
+        public string BodyOverridesFile { get; set; } = "body-name-overrides.jsonl";
+        public string SystemOverridesFile { get; set; } = "system-name-overrides.jsonl";
+        public string GameVersionDatesFile { get; set; } = "game-version-dates.jsonl";
+        public string MessageTypesFile { get; set; } = "msgtypes.txt";
+        public string BaseDir { get; set; } = AppDomain.CurrentDomain.BaseDirectory;
     }
 }
