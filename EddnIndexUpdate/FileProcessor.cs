@@ -490,6 +490,8 @@ namespace EddnIndexUpdate
 
             if (SchemasByFilePrefix.Count == 0)
             {
+                Logger.LogInformation("Loading message types");
+
                 foreach (var schema in ctx.Set<Models.FilePrefixSchema>().AsNoTracking())
                 {
                     SchemasByFilePrefix[schema.FilenamePrefix] = schema;
@@ -497,6 +499,8 @@ namespace EddnIndexUpdate
 
                 if (File.Exists(MessageTypesFile))
                 {
+                    Logger.LogInformation("Process message types file");
+
                     foreach (var line in File.ReadLines(MessageTypesFile))
                     {
                         if (line.Trim().Split('\t') is [string schema, string prefix] && !SchemasByFilePrefix.ContainsKey(prefix))
@@ -529,6 +533,8 @@ namespace EddnIndexUpdate
 
             if (GameVersionDates.Count == 0)
             {
+                Logger.LogInformation("Loading game version dates");
+
                 foreach (var ent in ctx.Set<Models.GameVersionDate>())
                 {
                     GameVersionDates[ent.Version] = ent;
@@ -536,6 +542,8 @@ namespace EddnIndexUpdate
 
                 if (!File.Exists(GameVersionDatesFile))
                 {
+                    Logger.LogInformation("Retrieving game version dates");
+
                     DownloadGameVersions(GameVersionDatesFile);
                 }
 
@@ -565,6 +573,8 @@ namespace EddnIndexUpdate
 
             if (Sectors.Count == 0 || SectorsById.Count == 0)
             {
+                Logger.LogInformation("Loading sectors");
+
                 foreach (var sector in ctx.Set<Models.Sector>().AsNoTracking())
                 {
                     Sectors[sector.Name] = sector;
@@ -676,6 +686,8 @@ namespace EddnIndexUpdate
 
             if (SystemNameOverrides.Count == 0)
             {
+                Logger.LogInformation("Loading system name overrides");
+
                 foreach (var ent in ctx.Set<Models.SystemNameOverride>().AsNoTracking())
                 {
                     if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
@@ -688,6 +700,8 @@ namespace EddnIndexUpdate
 
                 if (!File.Exists(SystemOverridesFile))
                 {
+                    Logger.LogInformation("Retrieving system name overrides");
+
                     DownloadSystemNameOverrides(SystemOverridesFile);
                 }
 
@@ -722,6 +736,8 @@ namespace EddnIndexUpdate
 
             if (BodyNameOverrides.Count == 0)
             {
+                Logger.LogInformation("Loading body name overrides");
+
                 var bysysaddr = new Dictionary<long, List<Models.BodyNameOverride>>();
 
                 foreach (var ent in ctx.Set<Models.BodyNameOverride>().AsNoTracking())
@@ -742,6 +758,7 @@ namespace EddnIndexUpdate
 
                 if (!File.Exists(BodyOverridesFile))
                 {
+                    Logger.LogInformation("Retrieving body overrides");
                     DownloadBodyNameOverrides(BodyOverridesFile);
                 }
 
@@ -827,6 +844,8 @@ namespace EddnIndexUpdate
 
             if (Files.Count == 0)
             {
+                Logger.LogInformation("Loading file info");
+
                 foreach (var file in ctx.Set<Models.File>().AsNoTracking())
                 {
                     Files[file.FileName] = file;
@@ -835,6 +854,8 @@ namespace EddnIndexUpdate
 
             if (BodyNames.Count == 0)
             {
+                Logger.LogInformation("Loading body names");
+
                 foreach (var bodyname in ctx.Set<Models.BodyName>().AsNoTracking())
                 {
                     BodyNames[bodyname.Name] = bodyname;
@@ -843,6 +864,8 @@ namespace EddnIndexUpdate
 
             if (BodyDesignations.Count == 0)
             {
+                Logger.LogInformation("Loading body designations");
+
                 foreach (var desig in ctx.Set<Models.BodyDesignation>().AsNoTracking())
                 {
                     BodyDesignations[desig.Designation] = desig;
@@ -860,6 +883,8 @@ namespace EddnIndexUpdate
 
             if (Software.Count == 0)
             {
+                Logger.LogInformation("Loading software versions");
+
                 foreach (var sw in ctx.Set<Models.SoftwareInfo>().AsNoTracking())
                 {
                     Software[(sw.SoftwareName, sw.SoftwareVersion)] = sw;
@@ -868,6 +893,8 @@ namespace EddnIndexUpdate
 
             if (GameVersions.Count == 0)
             {
+                Logger.LogInformation("Loading game versions");
+
                 foreach (var gv in ctx.Set<Models.GameVersionInfo>().AsNoTracking())
                 {
                     GameVersions[(gv.GameVersion, gv.GameBuild, gv.IsOdyssey, gv.IsHorizons)] = gv;
@@ -876,6 +903,7 @@ namespace EddnIndexUpdate
 
             if (Signals.Count == 0)
             {
+                Logger.LogInformation("Loading signals");
                 foreach (var s in ctx.Set<Models.SignalInfo>().AsNoTracking())
                 {
                     Signals[(s.SignalName, s.SignalType, s.IsStation)] = s;
@@ -884,6 +912,8 @@ namespace EddnIndexUpdate
 
             if (BodySignals.Count == 0)
             {
+                Logger.LogInformation("Loading body signals");
+
                 foreach (var s in ctx.Set<Models.BodySignalInfo>().AsNoTracking())
                 {
                     BodySignals[(s.SignalType, s.SignalCount, s.Category, s.SubCategory, s.Region, s.EntryID)] = s;
@@ -892,6 +922,8 @@ namespace EddnIndexUpdate
 
             if (Stations.Count == 0)
             {
+                Logger.LogInformation("Loading stations");
+
                 foreach (var s in ctx.Set<Models.Station>().AsNoTracking())
                 {
                     if (!Stations.TryGetValue((s.StationName, s.MarketId, s.StationType, s.SystemName, s.SystemAddress, s.BodyName), out var stnlist))
@@ -905,6 +937,8 @@ namespace EddnIndexUpdate
 
             if (ParentSets.Count == 0)
             {
+                Logger.LogInformation("Loading parent sets");
+
                 foreach (var ps in ctx.Set<Models.ParentSet>().AsNoTracking())
                 {
                     ParentSets[(ps.BodyID, ps.BodyType, ps.ParentJson)] = ps;
