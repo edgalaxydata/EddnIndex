@@ -1553,6 +1553,11 @@ namespace EddnIndexUpdate
             y = RoundCoords(y);
             z = RoundCoords(z);
 
+            if (x <= -100000 || x >= 100000 || y <= -100000 || y >= 100000 || z <= -100000 || z >= 100000)
+            {
+                x = y = z = null;
+            }
+
             if (SystemCache.TryGetValue((name, systemAddress, x, y, z), out var system))
             {
                 return system;
@@ -2204,15 +2209,12 @@ namespace EddnIndexUpdate
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.Number);
                             Assert(reader.TryGetDecimal(out var xv));
-                            Assert(xv > -100000 && xv < 100000);
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.Number);
                             Assert(reader.TryGetDecimal(out var yv));
-                            Assert(yv > -100000 && yv < 100000);
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.Number);
                             Assert(reader.TryGetDecimal(out var zv));
-                            Assert(zv > -100000 && zv < 100000);
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.EndArray);
                             x = xv;
@@ -2493,15 +2495,12 @@ namespace EddnIndexUpdate
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.Number);
                             Assert(reader.TryGetDecimal(out var xv));
-                            Assert(xv > -100000 && xv < 100000);
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.Number);
                             Assert(reader.TryGetDecimal(out var yv));
-                            Assert(yv > -100000 && yv < 100000);
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.Number);
                             Assert(reader.TryGetDecimal(out var zv));
-                            Assert(zv > -100000 && zv < 100000);
                             Assert(reader.Read());
                             Assert(reader.TokenType == JsonTokenType.EndArray);
                             x = xv;
