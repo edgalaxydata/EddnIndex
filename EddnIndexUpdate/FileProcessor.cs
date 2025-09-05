@@ -1712,18 +1712,22 @@ namespace EddnIndexUpdate
 
             foreach (var item in bodiesList)
             {
-                var smadiff = item.SemiMajorAxis - semiMajorAxis * DecimalRecipPow10(item.SemiMajorAxisScale);
+                if (item.SemiMajorAxis.HasValue != semiMajorAxis.HasValue) continue;
+                if (item.ArgOfPeriapsis.HasValue != argOfPeriapsis.HasValue) continue;
+                if (item.Inclination.HasValue != inclination.HasValue) continue;
+
+                var smadiff = (item.SemiMajorAxis ?? 0) - (semiMajorAxis ?? 0) * DecimalRecipPow10(item.SemiMajorAxisScale);
 
                 if (smadiff <= -0.05m || smadiff > 0.05m) continue;
 
-                var aopdiff = item.ArgOfPeriapsis - argOfPeriapsis;
+                var aopdiff = (item.ArgOfPeriapsis ?? 0) - (argOfPeriapsis ?? 0);
 
                 while (aopdiff <= -180) aopdiff += 360;
                 while (aopdiff > 180) aopdiff -= 360;
 
                 if (aopdiff < -2 || aopdiff > 2) continue;
 
-                var incdiff = item.Inclination - inclination;
+                var incdiff = (item.Inclination ?? 0) - (inclination ?? 0);
 
                 while (incdiff <= -180) incdiff += 360;
                 while (incdiff > 180) incdiff -= 360;
