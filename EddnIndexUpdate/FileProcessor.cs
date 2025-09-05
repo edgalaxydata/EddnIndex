@@ -2448,6 +2448,12 @@ namespace EddnIndexUpdate
                         case ("SemiMajorAxis", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
                             semiMajorAxis = dv;
                             break;
+                        case ("StarType", JsonTokenType.String):
+                            bodyType ??= "Star";
+                            break;
+                        case ("PlanetClass", JsonTokenType.String):
+                            bodyType ??= "Planet";
+                            break;
                         case ("SystemAddress", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
                             systemAddress = dv;
                             break;
@@ -2541,6 +2547,23 @@ namespace EddnIndexUpdate
 
                 if (bodyName != null)
                 {
+                    if (bodyType == null)
+                    {
+                        bodyType = bodyName.Split(' ') switch
+                        {
+                            [.. _, _, "A" or "B" or "C" or "D", "Belt"] => BodyType.StellarRing.ToString(),
+                            [.. _, _, "A" or "B" or "C" or "D", "Ring"] => BodyType.PlanetaryRing.ToString(),
+                            [.. _, _, "A" or "B" or "C" or "D", "Belt", "Cluster", string n] when int.TryParse(n, out _) => BodyType.AsteroidCluster.ToString(),
+                            [.. _, _, "Comet", string n] when int.TryParse(n, out _) => BodyType.SmallBody.ToString(),
+                            _ => null
+                        };
+                    }
+
+                    if (bodyType == null && stationType == "SurfaceStation")
+                    {
+                        bodyType = "Planet";
+                    }
+
                     var (body, smaerror, incerror, aoperror) = GetOrAddBody(bodyName, systemName, bodyId, bodyType, parentsJson, argOfPeriapsis, inclination, semiMajorAxis, data.Timestamp, data.GameVersion, system);
                     data.Body = body;
                     data.SemiMajorAxisError = smaerror;
