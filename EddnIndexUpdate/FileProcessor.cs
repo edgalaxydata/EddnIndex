@@ -2147,9 +2147,9 @@ namespace EddnIndexUpdate
                 }
             }
 
-            Assert(softwareName != null && softwareVersion != null);
+            //Assert(softwareName != null && softwareVersion != null);
 
-            data.Software = GetOrAddSoftware(softwareName, softwareVersion);
+            data.Software = GetOrAddSoftware(softwareName ?? "", softwareVersion ?? "");
 
             return true;
         }
