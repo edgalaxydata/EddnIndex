@@ -49,7 +49,7 @@ namespace EddnIndexUpdate
         private readonly Dictionary<(string SignalName, string? SignalType, bool? IsStation), Models.SignalInfo> Signals = [];
         private readonly Dictionary<(string Type, int? Count, string? Category, string? SubCategory, string? Region, long? EntryID), Models.BodySignalInfo> BodySignals = [];
         private readonly Dictionary<(string? StationName, long? MarketId, string? StationType, string? SystemName, long? SystemAddress, string? BodyName), List<Models.Station>> Stations = [];
-        private readonly Dictionary<(int BodyID, string? BodyType, string? ParentJson), Models.ParentSet> ParentSets = [];
+        private readonly Dictionary<(int? BodyID, string? BodyType, string? ParentJson), Models.ParentSet> ParentSets = [];
         private readonly Dictionary<string, Models.FilePrefixSchema> SchemasByFilePrefix = [];
         private readonly Dictionary<string, List<Models.BodyNameOverride>> BodyNameOverrides = [];
         private readonly Dictionary<string, List<Models.SystemNameOverride>> SystemNameOverrides = [];
@@ -1454,14 +1454,14 @@ namespace EddnIndexUpdate
 
         private int? GetOrAddParentSet(int? bodyId, string? bodyType, string? parentJson)
         {
-            if (bodyId is not int bid) return null;
+            if (bodyId == null && bodyType == null && parentJson == null) return null;
 
             if (parentJson != null)
             {
                 parentJson = parentJson.Replace("}, {", "},{").Replace("\": ", "\":");
             }
 
-            if (ParentSets.TryGetValue((bid, bodyType, parentJson), out var parentSet))
+            if (ParentSets.TryGetValue((bodyId, bodyType, parentJson), out var parentSet))
             {
                 return parentSet.Id;
             }
@@ -1490,7 +1490,7 @@ namespace EddnIndexUpdate
 
             var set = new Models.ParentSet
             {
-                BodyID = bid,
+                BodyID = bodyId,
                 BodyType = bodyType,
                 ParentJson = parentJson,
                 ParentSetId = parentSetId
@@ -1499,7 +1499,7 @@ namespace EddnIndexUpdate
             ctx.Add(set);
             ctx.SaveChanges();
 
-            ParentSets[(bid, bodyType, parentJson)] = set;
+            ParentSets[(bodyId, bodyType, parentJson)] = set;
 
             return set.Id;
         }

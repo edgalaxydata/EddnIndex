@@ -3,7 +3,7 @@
     public record class ParentSet
     {
         public int Id { get; init; }
-        public required int BodyID { get; init; }
+        public int? BodyID { get; init; }
         public string? BodyType { get; init; }
         public int? ParentSetId { get; init; }
         public string? ParentJson { get; init; }

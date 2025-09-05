@@ -665,7 +665,7 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("BodyID")
+                    b.Property<int?>("BodyID")
                         .HasColumnType("int");
 
                     b.Property<string>("BodyType")

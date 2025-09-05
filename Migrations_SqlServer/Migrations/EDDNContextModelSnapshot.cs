@@ -666,7 +666,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("BodyID")
+                    b.Property<int?>("BodyID")
                         .HasColumnType("int");
 
                     b.Property<string>("BodyType")
