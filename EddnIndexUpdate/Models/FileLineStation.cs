@@ -6,6 +6,8 @@
         public int LineNo { get; init; }
         public int StationId { get; init; }
         public DateTime? GatewayTimestamp { get; init; }
+        public short? LatitudeError { get; init; }
+        public short? LongitudeError { get; init; }
 
         public Station? Station { get; init; }
     }

@@ -8,7 +8,7 @@ namespace EddnIndexUpdate
         private Dictionary<int, Models.SignalInfo> _signals;
         private Dictionary<int, Models.BodySignalInfo> _bodySignals;
         private Dictionary<int, (string Name, decimal? innerRadius, decimal? outerRadius)> _ringData;
-        private Dictionary<int, Models.Body> _subBodies;
+        private Dictionary<int, (Models.Body body, short? smadiff, short? aopdiff, short? incdiff)> _subBodies;
         private Dictionary<(string Name, JsonTokenType TokenType), int> _messageKeyCounts;
 
         public Models.File File { get; set; }
@@ -26,11 +26,14 @@ namespace EddnIndexUpdate
         public DateTime? GatewayTimestamp { get; set; }
         public Models.System? System { get; set; }
         public Models.Body? Body { get; set; }
+        public short? SemiMajorAxisError { get; set; }
+        public short? ArgOfPeriapsisError { get; set; }
+        public short? InclinationError { get; set; }
         public Models.Station? Station { get; set; }
         public Models.SoftwareInfo? Software { get; set; }
         public Models.GameVersionInfo? GameVersionInfo { get; set; }
         public Dictionary<int, (string Name, decimal? innerRadius, decimal? outerRadius)> RingData => _ringData ??= [];
-        public Dictionary<int, Models.Body> SubBodies => _subBodies ??= [];
+        public Dictionary<int, (Models.Body body, short? smaerror, short? aoperror, short? incerror)> SubBodies => _subBodies ??= [];
         public Dictionary<int, Models.System> NavRouteSystems => _navRouteSystems ??= [];
         public Dictionary<int, Models.SignalInfo> Signals => _signals ??= [];
         public Dictionary<int, Models.BodySignalInfo> BodySignals => _bodySignals ??= [];

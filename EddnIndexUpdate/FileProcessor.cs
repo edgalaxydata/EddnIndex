@@ -1707,10 +1707,16 @@ namespace EddnIndexUpdate
                 decimal? argOfPeriapsis,
                 decimal? inclination,
                 decimal? semiMajorAxis,
-                [NotNullWhen(true)] out Models.Body? body
+                [NotNullWhen(true)] out Models.Body? body,
+                out short? semiMajorAxisError,
+                out short? inclinationError,
+                out short? argOfPeriapsisError
             )
         {
             body = null;
+            argOfPeriapsisError = null;
+            inclinationError = null;
+            semiMajorAxisError = null;
 
             foreach (var item in bodiesList)
             {
@@ -1718,31 +1724,34 @@ namespace EddnIndexUpdate
                 if (item.ArgOfPeriapsis.HasValue != argOfPeriapsis.HasValue) continue;
                 if (item.Inclination.HasValue != inclination.HasValue) continue;
 
-                var smadiff = (item.SemiMajorAxis ?? 0) - (semiMajorAxis ?? 0) * DecimalRecipPow10(item.SemiMajorAxisScale);
+                var smadiff = (semiMajorAxis ?? 0) * DecimalRecipPow10(item.SemiMajorAxisScale) - (item.SemiMajorAxis ?? 0);
 
-                if (smadiff <= -0.001m || smadiff > 0.001m) continue;
+                if (smadiff <= -0.001m || smadiff >= 0.001m) continue;
+                semiMajorAxisError = (short)Math.Round(smadiff * 1000000);
 
-                var aopdiff = (item.ArgOfPeriapsis ?? 0) - (argOfPeriapsis ?? 0);
+                var aopdiff = (argOfPeriapsis ?? 0) - (item.ArgOfPeriapsis ?? 0);
 
                 while (aopdiff <= -180) aopdiff += 360;
                 while (aopdiff > 180) aopdiff -= 360;
 
-                if (aopdiff < -2 || aopdiff > 2) continue;
+                if (aopdiff <= -0.001m || aopdiff >= 0.001m) continue;
+                argOfPeriapsisError = (short)Math.Round(aopdiff * 1000000);
 
-                var incdiff = (item.Inclination ?? 0) - (inclination ?? 0);
+                var incdiff = (inclination ?? 0) - (item.Inclination ?? 0);
 
                 while (incdiff <= -180) incdiff += 360;
                 while (incdiff > 180) incdiff -= 360;
 
-                if (incdiff < -2 || incdiff > 2) continue;
+                if (incdiff <= -0.001m || incdiff >= 0.001m) continue;
+                inclinationError = (short)Math.Round(incdiff * 1000000);
 
                 Assert(body == null, extraData: bodiesList);
-                Assert(incdiff >= -0.00001m
-                    && incdiff <= 0.00001m
-                    && aopdiff >= -0.00001m
-                    && aopdiff <= 0.00001m
-                    && smadiff >= -0.00001m
-                    && smadiff <= 0.00001m,
+                Assert(incdiff >= -0.001m
+                    && incdiff <= 0.001m
+                    && aopdiff >= -0.001m
+                    && aopdiff <= 0.001m
+                    && smadiff >= -0.001m
+                    && smadiff <= 0.001m,
                     extraData: new
                     {
                         Current = new
@@ -1770,7 +1779,7 @@ namespace EddnIndexUpdate
             return body != null;
         }
 
-        private Models.Body GetOrAddBody(
+        private (Models.Body body, short? smaerror, short? aoperror, short? incerror) GetOrAddBody(
                 string? name,
                 string? systemName,
                 int? bodyId,
@@ -1796,9 +1805,9 @@ namespace EddnIndexUpdate
                 BodyCache[(name, bodyId, bodyType, parentJson, system.SystemNameId, system.ModSystemAddress, system.X, system.Y, system.Z)] = bodyList = [];
             }
             
-            if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out var body))
+            if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out var body, out var smaerror, out var incerror, out var aoperror))
             {
-                return body;
+                return (body, smaerror, aoperror, incerror);
             }
 
             var bodyNameId = GetOrAddBodyName(name, systemName, system, bodyId, bodyType, argOfPeriapsis, inclination, out var sysNameId);
@@ -1828,9 +1837,9 @@ namespace EddnIndexUpdate
                        })
                 );
 
-                if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out body))
+                if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out body, out smaerror, out incerror, out aoperror))
                 {
-                    return body;
+                    return (body, smaerror, incerror, aoperror);
                 }
             }
 
@@ -1904,7 +1913,7 @@ namespace EddnIndexUpdate
 
             bodyList.Add(body);
 
-            return body;
+            return (body, null, null, null);
         }
 
         private Models.SoftwareInfo GetOrAddSoftware(string softwareName, string softwareVersion)
@@ -1972,8 +1981,8 @@ namespace EddnIndexUpdate
 
             foreach (var stn in stnlist)
             {
-                if (stn.Latitude <= latitude - 0.0001m || stn.Latitude >= latitude + 0.0001m) continue;
-                if (stn.Longitude <= longitude - 0.0001m || stn.Longitude >= longitude + 0.0001m) continue;
+                if (stn.Latitude <= latitude - 0.001m || stn.Latitude >= latitude + 0.001m) continue;
+                if (stn.Longitude <= longitude - 0.001m || stn.Longitude >= longitude + 0.001m) continue;
 
                 return stn;
             }
@@ -2505,7 +2514,11 @@ namespace EddnIndexUpdate
 
                 if (bodyName != null)
                 {
-                    data.Body = GetOrAddBody(bodyName, systemName, bodyId, bodyType, parentsJson, argOfPeriapsis, inclination, semiMajorAxis, data.Timestamp, data.GameVersion, system);
+                    var (body, smaerror, incerror, aoperror) = GetOrAddBody(bodyName, systemName, bodyId, bodyType, parentsJson, argOfPeriapsis, inclination, semiMajorAxis, data.Timestamp, data.GameVersion, system);
+                    data.Body = body;
+                    data.SemiMajorAxisError = smaerror;
+                    data.InclinationError = incerror;
+                    data.ArgOfPeriapsisError = aoperror;
                 }
 
                 foreach (var (itemnum, (name, innerRad, outerRad)) in data.RingData)
@@ -2833,11 +2846,14 @@ namespace EddnIndexUpdate
                         LineNo = data.LineNo,
                         EntryNum = 0,
                         GatewayTimestamp = data.GatewayTimestamp,
-                        Body = data.Body
+                        Body = data.Body,
+                        SemiMajorAxisError = data.SemiMajorAxisError,
+                        InclinationError = data.InclinationError,
+                        ArgOfPeriapsisError = data.ArgOfPeriapsisError
                     };
                 }
 
-                foreach (var (entrynum, body) in data.SubBodies)
+                foreach (var (entrynum, (body, smaerror, incerror, aoperror)) in data.SubBodies)
                 {
                     newBodyLines[(data.LineNo, entrynum)] = new Models.FileLineBody
                     {
@@ -2845,7 +2861,10 @@ namespace EddnIndexUpdate
                         LineNo = data.LineNo,
                         EntryNum = entrynum,
                         GatewayTimestamp = data.GatewayTimestamp,
-                        Body = body
+                        Body = body,
+                        SemiMajorAxisError = smaerror,
+                        InclinationError = incerror,
+                        ArgOfPeriapsisError = aoperror
                     };
                 }
 
@@ -2856,7 +2875,9 @@ namespace EddnIndexUpdate
                         FileId = file.Id,
                         LineNo = data.LineNo,
                         GatewayTimestamp = data.GatewayTimestamp,
-                        Station = data.Station
+                        Station = data.Station,
+                        LatitudeError = data.Latitude == data.Station.Latitude ? null : (short)Math.Round((data.Latitude - data.Station.Latitude) * 1000000 ?? 0),
+                        LongitudeError = data.Longitude == data.Station.Longitude ? null : (short)Math.Round((data.Longitude - data.Station.Longitude) * 1000000 ?? 0)
                     };
                 }
 

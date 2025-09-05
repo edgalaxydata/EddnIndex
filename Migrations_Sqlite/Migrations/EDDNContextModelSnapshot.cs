@@ -347,12 +347,21 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Property<int>("EntryNum")
                         .HasColumnType("INTEGER");
 
+                    b.Property<short?>("ArgOfPeriapsisError")
+                        .HasColumnType("INTEGER");
+
                     b.Property<long>("BodyId")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
                         .HasColumnType("TEXT");
+
+                    b.Property<short?>("InclinationError")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<short?>("SemiMajorAxisError")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
@@ -507,6 +516,12 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
                         .HasColumnType("TEXT");
+
+                    b.Property<short?>("LatitudeError")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<short?>("LongitudeError")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("StationId")
                         .HasColumnType("INTEGER");

@@ -364,12 +364,21 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Property<int>("EntryNum")
                         .HasColumnType("int");
 
+                    b.Property<short?>("ArgOfPeriapsisError")
+                        .HasColumnType("smallint");
+
                     b.Property<long>("BodyId")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
                         .HasColumnType("datetime(6)");
+
+                    b.Property<short?>("InclinationError")
+                        .HasColumnType("smallint");
+
+                    b.Property<short?>("SemiMajorAxisError")
+                        .HasColumnType("smallint");
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
@@ -524,6 +533,12 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
                         .HasColumnType("datetime(6)");
+
+                    b.Property<short?>("LatitudeError")
+                        .HasColumnType("smallint");
+
+                    b.Property<short?>("LongitudeError")
+                        .HasColumnType("smallint");
 
                     b.Property<int>("StationId")
                         .HasColumnType("int");
