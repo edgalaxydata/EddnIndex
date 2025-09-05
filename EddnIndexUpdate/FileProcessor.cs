@@ -2752,12 +2752,18 @@ namespace EddnIndexUpdate
                 {
                     if (!TryProcessLine(line, ref data))
                     {
+                        Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", filepath, lineCount);
+                        Environment.Exit(1);
+
                         data.IsBad = true;
                         errorCount++;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
+                    Environment.Exit(1);
+
                     data.IsBad = true;
                     errorCount++;
                 }
