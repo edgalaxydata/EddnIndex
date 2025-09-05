@@ -2762,6 +2762,18 @@ namespace EddnIndexUpdate
                     errorCount++;
                 }
 
+
+                if (data.System == null
+                    && data.Body == null
+                    && data.Station == null
+                    && data.Signals.Count == 0
+                    && data.BodySignals.Count == 0
+                    && data.NavRouteSystems.Count == 0)
+                {
+                    Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", filepath, lineCount);
+                    Environment.Exit(1);
+                }
+
                 newLines[data.LineNo] = new Models.FileLineInfo
                 {
                     FileId = file.Id,
