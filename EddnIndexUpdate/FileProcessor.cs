@@ -2451,10 +2451,10 @@ namespace EddnIndexUpdate
                             stationType = reader.GetString();
                             break;
                         case ("Latitude", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                            latitude = dv;
+                            latitude = Math.Round(dv, 6);
                             break;
                         case ("Longitude", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                            longitude = dv;
+                            longitude = Math.Round(dv, 6);
                             break;
                         case ("Name", JsonTokenType.String) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/codexentry/1") == true):
                             codexName = reader.GetString();
@@ -2555,6 +2555,8 @@ namespace EddnIndexUpdate
             if (stationName != null || marketId != null)
             {
                 data.Station = GetOrAddStation(stationName, marketId, stationType, systemName, systemAddress, bodyName, latitude, longitude);
+                data.Latitude = latitude;
+                data.Longitude = longitude;
             }
 
             return true;
@@ -2847,9 +2849,9 @@ namespace EddnIndexUpdate
                         EntryNum = 0,
                         GatewayTimestamp = data.GatewayTimestamp,
                         Body = data.Body,
-                        SemiMajorAxisError = data.SemiMajorAxisError,
-                        InclinationError = data.InclinationError,
-                        ArgOfPeriapsisError = data.ArgOfPeriapsisError
+                        SemiMajorAxisError = data.SemiMajorAxisError == 0 ? null : data.SemiMajorAxisError,
+                        InclinationError = data.InclinationError == 0 ? null : data.InclinationError,
+                        ArgOfPeriapsisError = data.ArgOfPeriapsisError == 0 ? null : data.ArgOfPeriapsisError
                     };
                 }
 
@@ -2862,9 +2864,9 @@ namespace EddnIndexUpdate
                         EntryNum = entrynum,
                         GatewayTimestamp = data.GatewayTimestamp,
                         Body = body,
-                        SemiMajorAxisError = smaerror,
-                        InclinationError = incerror,
-                        ArgOfPeriapsisError = aoperror
+                        SemiMajorAxisError = smaerror == 0 ? null : smaerror,
+                        InclinationError = incerror == 0 ? null : incerror,
+                        ArgOfPeriapsisError = aoperror == 0 ? null : aoperror
                     };
                 }
 
