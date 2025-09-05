@@ -2661,8 +2661,7 @@ namespace EddnIndexUpdate
                     Date = date,
                     PrimarySchema = primarySchema?.PrimarySchema,
                     EventType = primarySchema?.EventType ?? eventType,
-                    IsTest = primarySchema?.IsTest == true || test,
-                    CompressedSize = fileinfo.Length
+                    IsTest = primarySchema?.IsTest == true || test
                 };
 
                 ctx.Add(file);
@@ -2681,6 +2680,16 @@ namespace EddnIndexUpdate
             }
 
             Logger.LogInformation("Processing {Filename}", filename);
+            Logger.LogInformation(
+                "Current: S:{CurLength} U:{CurUncLen} L:{CurLineCount} E:{CurErrorCount} V:{CurVersion} -> S:{UpdLength} V:{UpdVersion}",
+                file.CompressedSize,
+                file.UncompressedSize,
+                file.LineCount,
+                file.ErrorCount,
+                file.ProcessedVersion,
+                fileinfo.Length,
+                Version
+            );
 
             FillCacheForFile(file.Id);
 
@@ -3165,6 +3174,7 @@ namespace EddnIndexUpdate
 
                 var fileEntry = ctx.Attach(file);
                 fileEntry.Property(e => e.LineCount).CurrentValue = lineCount;
+                fileEntry.Property(e => e.CompressedSize).CurrentValue = fileinfo.Length;
                 fileEntry.Property(e => e.UncompressedSize).CurrentValue = reader.Position;
                 fileEntry.Property(e => e.SystemLineCount).CurrentValue = systemLineCount;
                 fileEntry.Property(e => e.StationLineCount).CurrentValue = stationLineCount;
