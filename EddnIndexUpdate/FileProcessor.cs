@@ -2611,7 +2611,7 @@ namespace EddnIndexUpdate
                             gotHeader = true;
                             break;
                         case ("message", JsonTokenType.StartObject):
-                            Assert(!TryProcessLineMessage(ref reader, line, ref data));
+                            Assert(TryProcessLineMessage(ref reader, line, ref data));
                             gotMessage = true;
                             break;
                         default:
