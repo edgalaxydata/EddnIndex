@@ -1720,7 +1720,7 @@ namespace EddnIndexUpdate
 
                 var smadiff = (item.SemiMajorAxis ?? 0) - (semiMajorAxis ?? 0) * DecimalRecipPow10(item.SemiMajorAxisScale);
 
-                if (smadiff <= -0.05m || smadiff > 0.05m) continue;
+                if (smadiff <= -0.01m || smadiff > 0.01m) continue;
 
                 var aopdiff = (item.ArgOfPeriapsis ?? 0) - (argOfPeriapsis ?? 0);
 
