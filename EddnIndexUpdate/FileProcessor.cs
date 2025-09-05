@@ -1735,7 +1735,32 @@ namespace EddnIndexUpdate
                 if (incdiff < -2 || incdiff > 2) continue;
 
                 Assert(body == null, extraData: bodiesList);
-                Assert(incdiff >= -0.00001m && incdiff <= 0.00001m && aopdiff >= -0.00001m && aopdiff <= 0.00001m && smadiff >= -0.00001m && smadiff <= 0.00001m);
+                Assert(incdiff >= -0.00001m
+                    && incdiff <= 0.00001m
+                    && aopdiff >= -0.00001m
+                    && aopdiff <= 0.00001m
+                    && smadiff >= -0.00001m
+                    && smadiff <= 0.00001m,
+                    extraData: new
+                    {
+                        Current = new
+                        {
+                            item.SemiMajorAxis,
+                            item.SemiMajorAxisScale,
+                            item.ArgOfPeriapsis,
+                            item.Inclination
+                        },
+                        Updated = new
+                        {
+                            semiMajorAxis,
+                            argOfPeriapsis,
+                            inclination
+                        },
+                        smadiff,
+                        aopdiff,
+                        incdiff
+                    }
+                );
 
                 body = item;
             }
