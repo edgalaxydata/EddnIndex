@@ -73,6 +73,8 @@ namespace EddnIndexUpdate
         {
             if (!condition)
             {
+                Logger.LogError("Assert failure:\n{message}\nExtraData={ExtraData}", message, JsonConvert.SerializeObject(extraData));
+
                 if (Debugger.IsAttached)
                 {
                     Debugger.Break();
