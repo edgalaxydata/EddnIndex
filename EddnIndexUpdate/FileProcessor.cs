@@ -25,8 +25,11 @@ namespace EddnIndexUpdate
         private readonly FileProcessorSettings Settings = options.Value;
 
         private readonly Dictionary<(string? SystemName, long? SystemAddress, decimal? X, decimal? Y, decimal? Z), Models.System> SystemCache = [];
+        private readonly Dictionary<int, Models.System> SystemCacheById = [];
         private readonly Dictionary<(string? BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.Body>> BodyCache = [];
+        private readonly Dictionary<long, Models.Body> BodyCacheById = [];
         private readonly Dictionary<string, Models.SignalInfoSet> SignalInfoSetCache = [];
+        private readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
         private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
         private readonly Dictionary<(int FileId, int LineNo), Models.FileLineInfo> LineInfoCache = [];
         private readonly Dictionary<(int FileId, int LineNo), Models.FileLineStation> StationInfoCache = [];
@@ -1619,6 +1622,13 @@ namespace EddnIndexUpdate
 
             if (system != null)
             {
+                if (!SystemCacheById.TryGetValue(system.Id, out var byid))
+                {
+                    SystemCacheById[system.Id] = byid = system;
+                }
+
+                system = byid;
+
                 SystemCache.Add((name, systemAddress, x, y, z), system);
 
                 if (systemAddress != null && modsysaddr == namemodsysaddr)
@@ -1769,6 +1779,16 @@ namespace EddnIndexUpdate
                             && e.SystemNameId == sysNameId
                             && e.ParentSetId == parentSetId
                        )
+                       .AsEnumerable()
+                       .Select(e =>
+                       {
+                           if (!BodyCacheById.TryGetValue(e.Id, out var byid))
+                           {
+                               BodyCacheById[e.Id] = byid = e;
+                           }
+
+                           return byid;
+                       })
                 );
 
                 if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out body))
@@ -1988,8 +2008,13 @@ namespace EddnIndexUpdate
 
             if (signalSet != null)
             {
-                SignalInfoSetCache[signalIdsJson] = signalSet;
-                return signalSet;
+                if (!SignalInfoSetCacheById.TryGetValue(signalSet.Id, out var byid))
+                {
+                    SignalInfoSetCacheById[signalSet.Id] = byid = signalSet;
+                }
+
+                SignalInfoSetCache[signalIdsJson] = byid;
+                return byid;
             }
 
             signalSet = new Models.SignalInfoSet
@@ -2855,7 +2880,7 @@ namespace EddnIndexUpdate
                 {
                     foreach (var sig in ent.SignalSetItems)
                     {
-                        if (sig.Signal != null)
+                        if (sig.Signal != null && ctx.Entry(sig.Signal).State == EntityState.Detached)
                         {
                             ctx.Attach(sig.Signal);
                         }
@@ -3154,13 +3179,19 @@ namespace EddnIndexUpdate
             }
 
             SystemCache.Clear();
+            SystemCacheById.Clear();
+
             BodyCache.Clear();
+            BodyCacheById.Clear();
+
+            SignalInfoSetCache.Clear();
+            SignalInfoSetCacheById.Clear();
+
             LineInfoCache.Clear();
             BodyInfoCache.Clear();
             StationInfoCache.Clear();
             NavRouteCache.Clear();
             SignalInfoCache.Clear();
-            SignalInfoSetCache.Clear();
             BodySignalInfoCache.Clear();
         }
     }
