@@ -69,18 +69,24 @@ namespace EddnIndexUpdate
 
         private bool InitComplete = false;
 
+        [DoesNotReturn]
+        public void Fail(string? message, object? extraData = null)
+        {
+            Logger.LogError("Assert failure:\n{message}\nExtraData={ExtraData}", message, JsonConvert.SerializeObject(extraData));
+
+            if (Debugger.IsAttached)
+            {
+                Debugger.Break();
+            }
+
+            throw new InvalidOperationException(message);
+        }
+
         public void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] string? message = null, object? extraData = null)
         {
             if (!condition)
             {
-                Logger.LogError("Assert failure:\n{message}\nExtraData={ExtraData}", message, JsonConvert.SerializeObject(extraData));
-
-                if (Debugger.IsAttached)
-                {
-                    Debugger.Break();
-                }
-
-                throw new InvalidOperationException(message);
+                Fail(message, extraData);
             }
         }
 
@@ -1121,16 +1127,6 @@ namespace EddnIndexUpdate
                 [NotNullWhen(true)] out Models.BodyDesignation? desig
             )
         {
-            if (suffix.Contains("Comet", StringComparison.OrdinalIgnoreCase))
-            {
-
-            }
-         
-            if (suffix.EndsWith("I") || suffix.EndsWith("V") || suffix.EndsWith("X"))
-            {
-                Debugger.Break();
-            }
-
             var suffixstr = suffix.ToString();
 
             desig = new Models.BodyDesignation
@@ -2120,7 +2116,7 @@ namespace EddnIndexUpdate
 
                     while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
                     {
-                        if (!reader.Read()) return false;
+                        Assert(reader.Read());
                     }
 
                     switch ((name, reader.TokenType))
@@ -2142,13 +2138,16 @@ namespace EddnIndexUpdate
                             break;
                         case ("uploaderID", JsonTokenType.String):
                             break;
+                        case ("manuallyApproved", JsonTokenType.False or JsonTokenType.True):
+                            break;
                         default:
-                            return false;
+                            Fail($"Unknown header field {name}");
+                            break;
                     }
                 }
             }
 
-            if (softwareName == null || softwareVersion == null) return false;
+            Assert(softwareName != null && softwareVersion != null);
 
             data.Software = GetOrAddSoftware(softwareName, softwareVersion);
 
@@ -2179,10 +2178,7 @@ namespace EddnIndexUpdate
 
                 if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3)
                 {
-                    if (systemName == null)
-                    {
-                        Debugger.Break();
-                    }
+                    Assert(systemName != null);
 
                     data.NavRouteSystems[itemnum] = GetOrAddSystem(systemName, systemAddress, x, y, z);
                 }
@@ -2191,7 +2187,10 @@ namespace EddnIndexUpdate
                 {
                     var propname = reader.GetString();
 
-                    if (!reader.Read()) return false;
+                    while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                    {
+                        Assert(reader.Read());
+                    }
 
                     switch ((propname, reader.TokenType))
                     {
@@ -2202,10 +2201,17 @@ namespace EddnIndexUpdate
                             systemName = reader.GetString();
                             break;
                         case ("StarPos", JsonTokenType.StartArray):
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.Number || !reader.TryGetDecimal(out var xv)) return false;
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.Number || !reader.TryGetDecimal(out var yv)) return false;
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.Number || !reader.TryGetDecimal(out var zv)) return false;
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray) return false;
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.Number);
+                            Assert(reader.TryGetDecimal(out var xv));
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.Number);
+                            Assert(reader.TryGetDecimal(out var yv));
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.Number);
+                            Assert(reader.TryGetDecimal(out var zv));
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.EndArray);
                             x = xv;
                             y = yv;
                             z = zv;
@@ -2247,7 +2253,10 @@ namespace EddnIndexUpdate
                 {
                     var propname = reader.GetString();
 
-                    if (!reader.Read()) return false;
+                    while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                    {
+                        Assert(reader.Read());
+                    }
 
                     switch ((propname, reader.TokenType))
                     {
@@ -2295,7 +2304,10 @@ namespace EddnIndexUpdate
                 {
                     var propname = reader.GetString();
 
-                    if (!reader.Read()) return false;
+                    while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                    {
+                        Assert(reader.Read());
+                    }
 
                     switch ((propname, reader.TokenType))
                     {
@@ -2312,7 +2324,7 @@ namespace EddnIndexUpdate
             return true;
         }
 
-        private static bool TryProcessRings(ref Utf8JsonReader reader, ref FileLineData data)
+        private bool TryProcessRings(ref Utf8JsonReader reader, ref FileLineData data)
         {
             string? ringName = null;
             decimal? innerRadius = null;
@@ -2340,7 +2352,10 @@ namespace EddnIndexUpdate
                 {
                     var propname = reader.GetString();
 
-                    if (!reader.Read()) return false;
+                    while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                    {
+                        Assert(reader.Read());
+                    }
 
                     switch ((propname, reader.TokenType))
                     {
@@ -2393,11 +2408,11 @@ namespace EddnIndexUpdate
                 {
                     var propname = reader.GetString();
 
-                    if (propname == null) return false;
+                    Assert(propname != null);
 
                     while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
                     {
-                        if (!reader.Read()) return false;
+                        Assert(reader.Read());
                     }
 
                     data.MessageKeyCounts[(propname, reader.TokenType)] = data.MessageKeyCounts.GetValueOrDefault((propname, reader.TokenType)) + 1;
@@ -2472,25 +2487,32 @@ namespace EddnIndexUpdate
                             codexEntryId = dv;
                             break;
                         case ("StarPos", JsonTokenType.StartArray):
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.Number || !reader.TryGetDecimal(out var xv)) return false;
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.Number || !reader.TryGetDecimal(out var yv)) return false;
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.Number || !reader.TryGetDecimal(out var zv)) return false;
-                            if (!reader.Read() || reader.TokenType != JsonTokenType.EndArray) return false;
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.Number);
+                            Assert(reader.TryGetDecimal(out var xv));
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.Number);
+                            Assert(reader.TryGetDecimal(out var yv));
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.Number);
+                            Assert(reader.TryGetDecimal(out var zv));
+                            Assert(reader.Read());
+                            Assert(reader.TokenType == JsonTokenType.EndArray);
                             x = xv;
                             y = yv;
                             z = zv;
                             break;
                         case ("signals", JsonTokenType.StartArray) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == true):
-                            if (!TryProcessSignals(ref reader, ref data)) return false;
+                            Assert(TryProcessSignals(ref reader, ref data));
                             break;
                         case ("Signals", JsonTokenType.StartArray) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == false):
-                            if (!TryProcessBodySignals(ref reader, ref data)) return false;
+                            Assert(TryProcessBodySignals(ref reader, ref data));
                             break;
                         case ("Route", JsonTokenType.StartArray):
-                            if (!TryProcessNavRoute(ref reader, ref data)) return false;
+                            Assert(TryProcessNavRoute(ref reader, ref data));
                             break;
                         case ("Rings", JsonTokenType.StartArray):
-                            if (!TryProcessRings(ref reader, ref data)) return false;
+                            Assert(TryProcessRings(ref reader, ref data));;
                             break;
                         case ("odyssey", JsonTokenType.True or JsonTokenType.False):
                             data.IsOdyssey = reader.GetBoolean();
@@ -2528,7 +2550,7 @@ namespace EddnIndexUpdate
             }
             else if (bodyName != null)
             {
-                Debugger.Break();
+                Fail("Body Name without System Name");
             }
             else if (stationName != null)
             {
@@ -2537,12 +2559,8 @@ namespace EddnIndexUpdate
                     && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/dockinggranted/1") != true
                     && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials_journal/1") != true)
                 {
-                    Debugger.Break();
+                    Fail($"Unknown schema {data.Schema}");
                 }
-            }
-            else if (data.NavRouteSystems.Count == 0)
-            {
-                Debugger.Break();
             }
 
             if (codexName != null && data.BodySignals.Count == 0)
@@ -2579,7 +2597,7 @@ namespace EddnIndexUpdate
 
                     while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
                     {
-                        if (!reader.Read()) return false;
+                        Assert(reader.Read());
                     }
 
                     switch ((name, reader.TokenType))
@@ -2589,13 +2607,11 @@ namespace EddnIndexUpdate
                             gotSchema = true;
                             break;
                         case ("header", JsonTokenType.StartObject):
-                            if (!TryProcessLineHeader(ref reader, ref data))
-                                return false;
+                            Assert(TryProcessLineHeader(ref reader, ref data));
                             gotHeader = true;
                             break;
                         case ("message", JsonTokenType.StartObject):
-                            if (!TryProcessLineMessage(ref reader, line, ref data))
-                                return false;
+                            Assert(!TryProcessLineMessage(ref reader, line, ref data));
                             gotMessage = true;
                             break;
                         default:
