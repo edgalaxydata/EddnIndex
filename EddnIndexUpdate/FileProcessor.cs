@@ -67,6 +67,8 @@ namespace EddnIndexUpdate
 
         private static readonly int Version = 1;
 
+        private bool InitComplete = false;
+
         public void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] string? message = null, object? extraData = null)
         {
             if (!condition)
@@ -503,6 +505,8 @@ namespace EddnIndexUpdate
 
         private void Init()
         {
+            if (InitComplete) return;
+
             using var ctx = ContextFactory.CreateDbContext();
 
             if (SchemasByFilePrefix.Count == 0)
@@ -961,6 +965,8 @@ namespace EddnIndexUpdate
                     ParentSets[(ps.BodyID, ps.BodyType, ps.ParentJson)] = ps;
                 }
             }
+
+            InitComplete = true;
         }
 
         private static bool TrySplitProcgenName(ReadOnlySpan<char> systemname, [NotNullWhen(true)] out string? sectorname, out int mid, out int n2, out int masscode)
