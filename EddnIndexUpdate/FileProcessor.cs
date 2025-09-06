@@ -2838,36 +2838,42 @@ namespace EddnIndexUpdate
 
                 data.Clear(file, lineCount, line.Length);
 
-                try
+                if (line.Length < 2)
                 {
-                    if (!TryProcessLine(line, ref data))
+                    data.IsBad = true;
+                }
+                else
+                {
+                    try
                     {
-                        Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", filepath, lineCount);
+                        if (!TryProcessLine(line, ref data))
+                        {
+                            Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", filepath, lineCount);
+                            Environment.Exit(1);
+
+                            data.IsBad = true;
+                            errorCount++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
                         Environment.Exit(1);
 
                         data.IsBad = true;
                         errorCount++;
                     }
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
-                    Environment.Exit(1);
 
-                    data.IsBad = true;
-                    errorCount++;
-                }
-
-
-                if (data.System == null
-                    && data.Body == null
-                    && data.Station == null
-                    && data.Signals.Count == 0
-                    && data.BodySignals.Count == 0
-                    && data.NavRouteSystems.Count == 0)
-                {
-                    Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", filepath, lineCount);
-                    Environment.Exit(1);
+                    if (data.System == null
+                        && data.Body == null
+                        && data.Station == null
+                        && data.Signals.Count == 0
+                        && data.BodySignals.Count == 0
+                        && data.NavRouteSystems.Count == 0)
+                    {
+                        Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", filepath, lineCount);
+                        Environment.Exit(1);
+                    }
                 }
 
                 newLines[data.LineNo] = new Models.FileLineInfo
