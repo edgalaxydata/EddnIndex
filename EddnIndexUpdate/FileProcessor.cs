@@ -2547,17 +2547,14 @@ namespace EddnIndexUpdate
 
                 if (bodyName != null)
                 {
-                    if (bodyType == null)
+                    bodyType ??= bodyName.Split(' ') switch
                     {
-                        bodyType = bodyName.Split(' ') switch
-                        {
-                            [.. _, _, "A" or "B" or "C" or "D", "Belt"] => BodyType.StellarRing.ToString(),
-                            [.. _, _, "A" or "B" or "C" or "D", "Ring"] => BodyType.PlanetaryRing.ToString(),
-                            [.. _, _, "A" or "B" or "C" or "D", "Belt", "Cluster", string n] when int.TryParse(n, out _) => BodyType.AsteroidCluster.ToString(),
-                            [.. _, _, "Comet", string n] when int.TryParse(n, out _) => BodyType.SmallBody.ToString(),
-                            _ => null
-                        };
-                    }
+                        [.. _, _, "A" or "B" or "C" or "D", "Belt"] => BodyType.StellarRing.ToString(),
+                        [.. _, _, "A" or "B" or "C" or "D", "Ring"] => BodyType.PlanetaryRing.ToString(),
+                        [.. _, _, "A" or "B" or "C" or "D", "Belt", "Cluster", string n] when int.TryParse(n, out _) => BodyType.AsteroidCluster.ToString(),
+                        [.. _, _, "Comet", string n] when int.TryParse(n, out _) => BodyType.SmallBody.ToString(),
+                        _ => null
+                    };
 
                     if (bodyType == null && stationType == "SurfaceStation")
                     {
@@ -2825,6 +2822,8 @@ namespace EddnIndexUpdate
                     Console.Error.Write(".");
                     Console.Error.Flush();
 
+                    SaveUpdates(newLines, newBodyLines, newStationLines, newNavRouteEntries, newSignalEntries, newBodySignalEntries);
+
                     if ((lineCount % 64000) == 0)
                     {
                         Console.Error.WriteLine($" {lineCount}");
@@ -2984,322 +2983,10 @@ namespace EddnIndexUpdate
 
             Console.Error.WriteLine($" {lineCount}");
 
+            SaveUpdates(newLines, newBodyLines, newStationLines, newNavRouteEntries, newSignalEntries, newBodySignalEntries);
+
             using (var ctx = ContextFactory.CreateDbContext())
             {
-                foreach (var ent in SystemCache.Values)
-                {
-                    if (ent.Id == 0)
-                    {
-                        ctx.Add(ent);
-                    }
-                    else
-                    {
-                        ctx.Attach(ent);
-                    }
-                }
-
-                foreach (var set in BodyCache.Values)
-                {
-                    foreach (var ent in set)
-                    {
-                        if (ent.Id == 0)
-                        {
-                            ctx.Add(ent);
-                        }
-                        else
-                        {
-                            ctx.Attach(ent);
-                        }
-                    }
-                }
-
-                foreach (var ent in SignalInfoSetCache.Values)
-                {
-                    foreach (var sig in ent.SignalSetItems)
-                    {
-                        if (sig.Signal != null && ctx.Entry(sig.Signal).State == EntityState.Detached)
-                        {
-                            ctx.Attach(sig.Signal);
-                        }
-                    }
-
-                    if (ent.Id == 0)
-                    {
-                        ctx.Add(ent);
-                    }
-                    else
-                    {
-                        ctx.Attach(ent);
-                    }
-                }
-
-                ctx.SaveChanges();
-
-                foreach (var _ent in newLines.Values)
-                {
-                    Assert(_ent.Software?.Id != 0);
-                    Assert(_ent.GameVersion?.Id != 0);
-                    Assert(_ent.System?.Id != 0);
-
-                    var ent = _ent with
-                    {
-                        SoftwareId = _ent.Software?.Id,
-                        GameVersionId = _ent.GameVersion?.Id,
-                        SystemId = _ent.System?.Id
-                    };
-
-                    if (ent.Software != null)
-                    {
-                        if (ctx.Entry(ent.Software).State == EntityState.Detached)
-                        {
-                            ctx.Attach(ent.Software);
-                        }
-
-                        if (ent.Software.FirstSeen == null || ent.GatewayTimestamp < ent.Software.FirstSeen)
-                        {
-                            ent.Software.FirstSeen = ent.GatewayTimestamp;
-                        }
-
-                        if (ent.Software.LastSeen == null || ent.GatewayTimestamp > ent.Software.LastSeen)
-                        {
-                            ent.Software.LastSeen = ent.GatewayTimestamp;
-                        }
-                    }
-
-                    if (ent.GameVersion != null)
-                    {
-                        if (ctx.Entry(ent.GameVersion).State == EntityState.Detached)
-                        {
-                            ctx.Attach(ent.GameVersion);
-                        }
-
-                        if (ent.GameVersion.FirstSeen == null || ent.GatewayTimestamp < ent.GameVersion.FirstSeen)
-                        {
-                            ent.GameVersion.FirstSeen = ent.GatewayTimestamp;
-                        }
-
-                        if (ent.GameVersion.LastSeen == null || ent.GatewayTimestamp > ent.GameVersion.LastSeen)
-                        {
-                            ent.GameVersion.LastSeen = ent.GatewayTimestamp;
-                        }
-                    }
-
-                    if (ent.System != null)
-                    {
-                        Assert(ctx.Entry(ent.System).State != EntityState.Detached);
-
-                        if (ent.System.FirstSeen == null || ent.GatewayTimestamp < ent.System.FirstSeen)
-                        {
-                            ent.System.FirstSeen = ent.GatewayTimestamp;
-                        }
-
-                        if (ent.System.LastSeen == null || ent.GatewayTimestamp > ent.System.LastSeen)
-                        {
-                            ent.System.LastSeen = ent.GatewayTimestamp;
-                        }
-                    }
-
-                    if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-                    {
-                        var entry = ctx.Attach(lineInfo);
-                        entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                        entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
-                        entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
-                        entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
-                        entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                        entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
-                    }
-                    else
-                    {
-                        ctx.Add(ent);
-                        LineInfoCache[(ent.FileId, ent.LineNo)] = ent;
-                    }
-                }
-
-                foreach (var _ent in newBodyLines.Values)
-                {
-                    Assert(_ent.Body != null);
-                    Assert(_ent.Body.Id != 0);
-
-                    var ent = _ent with { BodyId = _ent.Body.Id };
-
-                    Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
-
-                    if (ent.Body.FirstSeen == null || ent.Body.FirstSeen > ent.GatewayTimestamp)
-                    {
-                        ent.Body.FirstSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (ent.Body.LastSeen == null || ent.Body.LastSeen < ent.GatewayTimestamp)
-                    {
-                        ent.Body.LastSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (BodyInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-                    {
-                        var entry = ctx.Attach(lineInfo);
-                        entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
-                        entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                    }
-                    else
-                    {
-                        ctx.Add(ent);
-                        BodyInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-                    }
-                }
-
-                foreach (var _ent in newStationLines.Values)
-                {
-                    Assert(_ent.Station != null);
-                    Assert(_ent.Station.Id != 0);
-
-                    var ent = _ent with { StationId = _ent.Station.Id };
-
-                    if (ctx.Entry(ent.Station).State == EntityState.Detached)
-                    {
-                        ctx.Attach(ent.Station);
-                    }
-
-                    if (ent.Station.FirstSeen == null || ent.Station.FirstSeen > ent.GatewayTimestamp)
-                    {
-                        ent.Station.FirstSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (ent.Station.LastSeen == null || ent.Station.LastSeen < ent.GatewayTimestamp)
-                    {
-                        ent.Station.LastSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (StationInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-                    {
-                        var entry = ctx.Attach(lineInfo);
-                        entry.Property(e => e.StationId).CurrentValue = ent.StationId;
-                        entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                    }
-                    else
-                    {
-                        ctx.Add(ent);
-                        StationInfoCache[(ent.FileId, ent.LineNo)] = ent;
-                    }
-                }
-
-                foreach (var _ent in newNavRouteEntries.Values)
-                {
-                    Assert(_ent.System != null);
-                    Assert(_ent.System.Id != 0);
-
-                    var ent = _ent with { SystemId = _ent.System.Id };
-
-                    Assert(ctx.Entry(ent.System).State != EntityState.Detached);
-
-                    if (ent.System.FirstSeen == null || ent.GatewayTimestamp < ent.System.FirstSeen)
-                    {
-                        ent.System.FirstSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (ent.System.LastSeen == null || ent.GatewayTimestamp > ent.System.LastSeen)
-                    {
-                        ent.System.LastSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (NavRouteCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-                    {
-                        var entry = ctx.Attach(lineInfo);
-                        entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                        entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                    }
-                    else
-                    {
-                        ctx.Add(ent);
-                        NavRouteCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-                    }
-                }
-
-                foreach (var _ent in newSignalEntries.Values)
-                {
-                    Assert(_ent.SignalInfoSet != null);
-                    Assert(_ent.SignalInfoSet.Id != 0);
-
-                    var ent = _ent with { SignalSetId = _ent.SignalInfoSet.Id, SystemId = _ent.System?.Id };
-
-                    if (ent.System != null)
-                    {
-                        Assert(ctx.Entry(ent.System).State != EntityState.Detached);
-                    }
-
-                    foreach (var sig in ent.SignalInfoSet.SignalSetItems)
-                    {
-                        if (sig.Signal != null)
-                        {
-                            if (sig.Signal.FirstSeen == null || ent.GatewayTimestamp < sig.Signal.FirstSeen)
-                            {
-                                sig.Signal.FirstSeen = ent.GatewayTimestamp;
-                            }
-
-                            if (sig.Signal.LastSeen == null || ent.GatewayTimestamp > sig.Signal.LastSeen)
-                            {
-                                sig.Signal.LastSeen = ent.GatewayTimestamp;
-                            }
-                        }
-                    }
-
-                    if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-                    {
-                        var entry = ctx.Attach(lineInfo);
-                        entry.Property(e => e.SignalSetId).CurrentValue = ent.SignalSetId;
-                        entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                        entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                    }
-                    else
-                    {
-                        ctx.Add(ent);
-                        SignalInfoCache[(ent.FileId, ent.LineNo)] = ent;
-                    }
-                }
-
-                foreach (var _ent in newBodySignalEntries.Values)
-                {
-                    Assert(_ent.Signal != null);
-                    Assert(_ent.Signal.Id != 0);
-
-                    var ent = _ent with { BodySignalId = _ent.Signal.Id, BodyId = _ent.Body?.Id };
-
-                    if (ent.Body != null)
-                    {
-                        Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
-                    }
-
-                    if (ctx.Entry(ent.Signal).State == EntityState.Detached)
-                    {
-                        ctx.Attach(ent.Signal);
-                    }
-
-                    if (ent.Signal.FirstSeen == null || ent.GatewayTimestamp < ent.Signal.FirstSeen)
-                    {
-                        ent.Signal.FirstSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (ent.Signal.LastSeen == null || ent.GatewayTimestamp > ent.Signal.LastSeen)
-                    {
-                        ent.Signal.LastSeen = ent.GatewayTimestamp;
-                    }
-
-                    if (BodySignalInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-                    {
-                        var entry = ctx.Attach(lineInfo);
-                        entry.Property(e => e.BodySignalId).CurrentValue = ent.BodySignalId;
-                        entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
-                        entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                        entry.Property(e => e.Latitude).CurrentValue = ent.Latitude;
-                        entry.Property(e => e.Longitude).CurrentValue = ent.Longitude;
-                    }
-                    else
-                    {
-                        ctx.Add(ent);
-                        BodySignalInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-                    }
-                }
-
                 var fileEntry = ctx.Attach(file);
                 fileEntry.Property(e => e.LineCount).CurrentValue = lineCount;
                 fileEntry.Property(e => e.CompressedSize).CurrentValue = fileinfo.Length;
@@ -3331,6 +3018,346 @@ namespace EddnIndexUpdate
             NavRouteCache.Clear();
             SignalInfoCache.Clear();
             BodySignalInfoCache.Clear();
+        }
+
+        private void SaveUpdates(
+                Dictionary<int, Models.FileLineInfo> newLines,
+                Dictionary<(int LineNo, int EntryNum), Models.FileLineBody> newBodyLines,
+                Dictionary<int, Models.FileLineStation> newStationLines,
+                Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> newNavRouteEntries,
+                Dictionary<int, Models.FileLineSignal> newSignalEntries,
+                Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> newBodySignalEntries
+            )
+        {
+            using var ctx = ContextFactory.CreateDbContext();
+
+            foreach (var ent in SystemCache.Values)
+            {
+                if (ent.Id == 0)
+                {
+                    ctx.Add(ent);
+                }
+                else
+                {
+                    ctx.Attach(ent);
+                }
+            }
+
+            foreach (var set in BodyCache.Values)
+            {
+                foreach (var ent in set)
+                {
+                    if (ent.Id == 0)
+                    {
+                        ctx.Add(ent);
+                    }
+                    else
+                    {
+                        ctx.Attach(ent);
+                    }
+                }
+            }
+
+            foreach (var ent in SignalInfoSetCache.Values)
+            {
+                foreach (var sig in ent.SignalSetItems)
+                {
+                    if (sig.Signal != null && ctx.Entry(sig.Signal).State == EntityState.Detached)
+                    {
+                        ctx.Attach(sig.Signal);
+                    }
+                }
+
+                if (ent.Id == 0)
+                {
+                    ctx.Add(ent);
+                }
+                else
+                {
+                    ctx.Attach(ent);
+                }
+            }
+
+            ctx.SaveChanges();
+
+            foreach (var _ent in newLines.Values)
+            {
+                Assert(_ent.Software?.Id != 0);
+                Assert(_ent.GameVersion?.Id != 0);
+                Assert(_ent.System?.Id != 0);
+
+                var ent = _ent with
+                {
+                    SoftwareId = _ent.Software?.Id,
+                    GameVersionId = _ent.GameVersion?.Id,
+                    SystemId = _ent.System?.Id
+                };
+
+                if (ent.Software != null)
+                {
+                    if (ctx.Entry(ent.Software).State == EntityState.Detached)
+                    {
+                        ctx.Attach(ent.Software);
+                    }
+
+                    if (ent.Software.FirstSeen == null || ent.GatewayTimestamp < ent.Software.FirstSeen)
+                    {
+                        ent.Software.FirstSeen = ent.GatewayTimestamp;
+                    }
+
+                    if (ent.Software.LastSeen == null || ent.GatewayTimestamp > ent.Software.LastSeen)
+                    {
+                        ent.Software.LastSeen = ent.GatewayTimestamp;
+                    }
+                }
+
+                if (ent.GameVersion != null)
+                {
+                    if (ctx.Entry(ent.GameVersion).State == EntityState.Detached)
+                    {
+                        ctx.Attach(ent.GameVersion);
+                    }
+
+                    if (ent.GameVersion.FirstSeen == null || ent.GatewayTimestamp < ent.GameVersion.FirstSeen)
+                    {
+                        ent.GameVersion.FirstSeen = ent.GatewayTimestamp;
+                    }
+
+                    if (ent.GameVersion.LastSeen == null || ent.GatewayTimestamp > ent.GameVersion.LastSeen)
+                    {
+                        ent.GameVersion.LastSeen = ent.GatewayTimestamp;
+                    }
+                }
+
+                if (ent.System != null)
+                {
+                    Assert(ctx.Entry(ent.System).State != EntityState.Detached);
+
+                    if (ent.System.FirstSeen == null || ent.GatewayTimestamp < ent.System.FirstSeen)
+                    {
+                        ent.System.FirstSeen = ent.GatewayTimestamp;
+                    }
+
+                    if (ent.System.LastSeen == null || ent.GatewayTimestamp > ent.System.LastSeen)
+                    {
+                        ent.System.LastSeen = ent.GatewayTimestamp;
+                    }
+                }
+
+                if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+                {
+                    var entry = ctx.Attach(lineInfo);
+                    entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+                    entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
+                    entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
+                    entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
+                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                    entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
+                }
+                else
+                {
+                    ctx.Add(ent);
+                    LineInfoCache[(ent.FileId, ent.LineNo)] = ent;
+                }
+            }
+
+            newLines.Clear();
+
+            foreach (var _ent in newBodyLines.Values)
+            {
+                Assert(_ent.Body != null);
+                Assert(_ent.Body.Id != 0);
+
+                var ent = _ent with { BodyId = _ent.Body.Id };
+
+                Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
+
+                if (ent.Body.FirstSeen == null || ent.Body.FirstSeen > ent.GatewayTimestamp)
+                {
+                    ent.Body.FirstSeen = ent.GatewayTimestamp;
+                }
+
+                if (ent.Body.LastSeen == null || ent.Body.LastSeen < ent.GatewayTimestamp)
+                {
+                    ent.Body.LastSeen = ent.GatewayTimestamp;
+                }
+
+                if (BodyInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+                {
+                    var entry = ctx.Attach(lineInfo);
+                    entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
+                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                }
+                else
+                {
+                    ctx.Add(ent);
+                    BodyInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+                }
+            }
+
+            newBodyLines.Clear();
+
+            foreach (var _ent in newStationLines.Values)
+            {
+                Assert(_ent.Station != null);
+                Assert(_ent.Station.Id != 0);
+
+                var ent = _ent with { StationId = _ent.Station.Id };
+
+                if (ctx.Entry(ent.Station).State == EntityState.Detached)
+                {
+                    ctx.Attach(ent.Station);
+                }
+
+                if (ent.Station.FirstSeen == null || ent.Station.FirstSeen > ent.GatewayTimestamp)
+                {
+                    ent.Station.FirstSeen = ent.GatewayTimestamp;
+                }
+
+                if (ent.Station.LastSeen == null || ent.Station.LastSeen < ent.GatewayTimestamp)
+                {
+                    ent.Station.LastSeen = ent.GatewayTimestamp;
+                }
+
+                if (StationInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+                {
+                    var entry = ctx.Attach(lineInfo);
+                    entry.Property(e => e.StationId).CurrentValue = ent.StationId;
+                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                }
+                else
+                {
+                    ctx.Add(ent);
+                    StationInfoCache[(ent.FileId, ent.LineNo)] = ent;
+                }
+            }
+
+            newStationLines.Clear();
+
+            foreach (var _ent in newNavRouteEntries.Values)
+            {
+                Assert(_ent.System != null);
+                Assert(_ent.System.Id != 0);
+
+                var ent = _ent with { SystemId = _ent.System.Id };
+
+                Assert(ctx.Entry(ent.System).State != EntityState.Detached);
+
+                if (ent.System.FirstSeen == null || ent.GatewayTimestamp < ent.System.FirstSeen)
+                {
+                    ent.System.FirstSeen = ent.GatewayTimestamp;
+                }
+
+                if (ent.System.LastSeen == null || ent.GatewayTimestamp > ent.System.LastSeen)
+                {
+                    ent.System.LastSeen = ent.GatewayTimestamp;
+                }
+
+                if (NavRouteCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+                {
+                    var entry = ctx.Attach(lineInfo);
+                    entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                }
+                else
+                {
+                    ctx.Add(ent);
+                    NavRouteCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+                }
+            }
+
+            newNavRouteEntries.Clear();
+
+            foreach (var _ent in newSignalEntries.Values)
+            {
+                Assert(_ent.SignalInfoSet != null);
+                Assert(_ent.SignalInfoSet.Id != 0);
+
+                var ent = _ent with { SignalSetId = _ent.SignalInfoSet.Id, SystemId = _ent.System?.Id };
+
+                if (ent.System != null)
+                {
+                    Assert(ctx.Entry(ent.System).State != EntityState.Detached);
+                }
+
+                foreach (var sig in ent.SignalInfoSet.SignalSetItems)
+                {
+                    if (sig.Signal != null)
+                    {
+                        if (sig.Signal.FirstSeen == null || ent.GatewayTimestamp < sig.Signal.FirstSeen)
+                        {
+                            sig.Signal.FirstSeen = ent.GatewayTimestamp;
+                        }
+
+                        if (sig.Signal.LastSeen == null || ent.GatewayTimestamp > sig.Signal.LastSeen)
+                        {
+                            sig.Signal.LastSeen = ent.GatewayTimestamp;
+                        }
+                    }
+                }
+
+                if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+                {
+                    var entry = ctx.Attach(lineInfo);
+                    entry.Property(e => e.SignalSetId).CurrentValue = ent.SignalSetId;
+                    entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                }
+                else
+                {
+                    ctx.Add(ent);
+                    SignalInfoCache[(ent.FileId, ent.LineNo)] = ent;
+                }
+            }
+
+            newSignalEntries.Clear();
+
+            foreach (var _ent in newBodySignalEntries.Values)
+            {
+                Assert(_ent.Signal != null);
+                Assert(_ent.Signal.Id != 0);
+
+                var ent = _ent with { BodySignalId = _ent.Signal.Id, BodyId = _ent.Body?.Id };
+
+                if (ent.Body != null)
+                {
+                    Assert(ctx.Entry(ent.Body).State != EntityState.Detached);
+                }
+
+                if (ctx.Entry(ent.Signal).State == EntityState.Detached)
+                {
+                    ctx.Attach(ent.Signal);
+                }
+
+                if (ent.Signal.FirstSeen == null || ent.GatewayTimestamp < ent.Signal.FirstSeen)
+                {
+                    ent.Signal.FirstSeen = ent.GatewayTimestamp;
+                }
+
+                if (ent.Signal.LastSeen == null || ent.GatewayTimestamp > ent.Signal.LastSeen)
+                {
+                    ent.Signal.LastSeen = ent.GatewayTimestamp;
+                }
+
+                if (BodySignalInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+                {
+                    var entry = ctx.Attach(lineInfo);
+                    entry.Property(e => e.BodySignalId).CurrentValue = ent.BodySignalId;
+                    entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
+                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                    entry.Property(e => e.Latitude).CurrentValue = ent.Latitude;
+                    entry.Property(e => e.Longitude).CurrentValue = ent.Longitude;
+                }
+                else
+                {
+                    ctx.Add(ent);
+                    BodySignalInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+                }
+            }
+
+            newBodySignalEntries.Clear();
+
+            ctx.SaveChanges();
         }
     }
 }
