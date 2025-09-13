@@ -1,12 +1,12 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class Body
+    public record class Body : IHasFirstLastSeen, IHasId<long>
     {
         public long Id { get; set; }
-        public int SystemId { get; init; }
+        public int SystemId { get; set; }
         public long? SystemNameId { get; init; }
         public int? BodyId { get; init; }
-        public int? ParentSetId { get; init; }
+        public int? ParentSetId { get; set; }
         public int? BodyNameId { get; init; }
         public int? BodyDesignationId { get; set; }
         public decimal? ArgOfPeriapsis { get; init; }
@@ -19,8 +19,8 @@
         public DateTime? FirstSeen { get; set; }
         public DateTime? LastSeen { get; set; }
 
-        public System? System { get; init; }
-        public ParentSet? ParentSet { get; init; }
+        public System? System { get; set; }
+        public ParentSet? ParentSet { get; set; }
 
         public virtual bool Equals(Body? other)
         {

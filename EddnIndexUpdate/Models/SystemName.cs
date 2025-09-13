@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class SystemName
+    public record class SystemName : IHasId<int>
     {
         public int Id { get; set; }
         public required string Name { get; init; }

@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class Station
+    public record class Station : IHasFirstLastSeen, IHasId<int>
     {
         public int Id { get; set; }
         public long? MarketId { get; init; }

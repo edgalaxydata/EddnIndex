@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace EddnIndexUpdate.Models
 {
-    public record class SignalInfoSet
+    public record class SignalInfoSet : IHasId<int>
     {
         public int Id { get; set; }
         public int FirstSignalId { get; set; }

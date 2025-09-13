@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class SignalInfo
+    public record class SignalInfo : IHasFirstLastSeen, IHasId<int>
     {
         public int Id { get; init; }
         public required string SignalName { get; init; }

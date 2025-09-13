@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class BodyDesignation
+    public record class BodyDesignation : IHasId<int>
     {
         public int Id { get; set; }
         public int? DesignationId { get; set; }

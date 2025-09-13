@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class SoftwareInfo
+    public record class SoftwareInfo : IHasFirstLastSeen, IHasId<int>
     {
         public int Id { get; init; }
         public required string SoftwareName { get; init; }

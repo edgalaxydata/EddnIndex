@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class ParentSet
+    public record class ParentSet : IHasId<int>
     {
         public int Id { get; init; }
         public int? BodyID { get; init; }

@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class GameVersionInfo
+    public record class GameVersionInfo : IHasFirstLastSeen, IHasId<int>
     {
         public int Id { get; init; }
         public string? GameVersion { get; init; }

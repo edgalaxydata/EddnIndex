@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace EddnIndexUpdate.Models
 {
-    public record class System
+    public record class System : IHasFirstLastSeen, IHasId<int>
     {
         public int Id { get; set; }
         public long? SystemNameId { get; init; }

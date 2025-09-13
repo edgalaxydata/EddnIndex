@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace EddnIndexUpdate.Models
 {
-    public record class GameVersionDate
+    public record class GameVersionDate : IHasId<int>
     {
         public int Id { get; set; }
         public string? Season { get; set; }

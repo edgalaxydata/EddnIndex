@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace EddnIndexUpdate.Models
 {
-    public record class SystemNameOverride
+    public record class SystemNameOverride : IHasId<int>
     {
         public int Id { get; init; }
         public long SystemAddress { get; init; }

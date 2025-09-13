@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public class SignalInfoSetItem
+    public class SignalInfoSetItem : IHasId<int>
     {
         public int Id { get; set; }
         public int SignalInfoSetId { get; set; }

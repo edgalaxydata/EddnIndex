@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class BodySignalInfo
+    public record class BodySignalInfo : IHasFirstLastSeen, IHasId<int>
     {
         public int Id { get; init; }
         public required string SignalType { get; init; }

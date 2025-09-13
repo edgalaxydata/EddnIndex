@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models
 {
-    public record class BodyName
+    public record class BodyName : IHasId<int>
     {
         public int Id { get; init; }
         public required string Name { get; init; }
