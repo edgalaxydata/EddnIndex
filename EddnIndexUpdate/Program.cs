@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 var config = new ConfigurationBuilder()
     .AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true)
@@ -25,11 +26,44 @@ var svcprov = services.BuildServiceProvider();
 
 var processor = svcprov.GetRequiredService<FileProcessor>();
 
-foreach (var arg in args)
+var dirnames = new List<string>();
+bool wait = false;
+
+for (int i = 0; i < args.Length; i++)
+{
+    if (args[i].StartsWith("--"))
+    {
+        switch (args[i], args[i].Split('=', 2), args.Length > i + 1)
+        {
+            case ("--wait", _, _):
+                wait = true;
+                break;
+            default:
+                Console.Error.WriteLine($"Unrecognized option {args[i]}");
+                return;
+        }
+    }
+    else
+    {
+        dirnames.Add(args[i]);
+    }
+}
+
+if (wait)
+{
+    while (!Debugger.IsAttached)
+    {
+        Thread.Sleep(500);
+    }
+
+    Debugger.Break();
+}
+
+foreach (var dirname in dirnames)
 {
     List<string> filenames = [
-        .. Directory.EnumerateFiles(arg, "*.jsonl.bz2", SearchOption.AllDirectories),
-        .. Directory.EnumerateFiles(arg, "*.jsonl", SearchOption.AllDirectories)
+        .. Directory.EnumerateFiles(dirname, "*.jsonl.bz2", SearchOption.AllDirectories),
+        .. Directory.EnumerateFiles(dirname, "*.jsonl", SearchOption.AllDirectories)
     ];
 
     filenames = [..
