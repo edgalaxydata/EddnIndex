@@ -30,9 +30,11 @@ namespace EddnIndexUpdate
                             data.GatewayTimestamp = gwts;
                             break;
                         case ("gamebuild", JsonTokenType.String):
+                        case ("gameBuild", JsonTokenType.String):
                             data.GameBuild = reader.GetString();
                             break;
                         case ("gameversion", JsonTokenType.String):
+                        case ("gameVersion", JsonTokenType.String):
                             data.GameVersion = reader.GetString();
                             break;
                         case ("softwareName", JsonTokenType.String):
