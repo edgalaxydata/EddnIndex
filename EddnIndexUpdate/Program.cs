@@ -4,9 +4,61 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
+var cmdlineargs = new Dictionary<string, string?>();
+var dirnames = new List<string>();
+
+var mapopts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+{
+    ["exit-on-bad-data"] = "FileProcessor:ExitOnBadData",
+    ["break-on-bad-data"] = "FileProcessor:BreakOnBadData",
+    ["basedir"] = "FileProcessor:BaseDir",
+    ["wait"] = "WaitForDebugger",
+};
+
+for (int i = 0; i < args.Length; i++)
+{
+    if (args[i].StartsWith("--"))
+    {
+        string key, value;
+
+        switch (args[i], args[i].Split('=', 2), args.Length > i + 1 && !args[i + 1].StartsWith("--") ? args[i + 1] : null)
+        {
+            case (_, [string opt, string optarg], _):
+                key = opt[2..];
+                value = optarg;
+                break;
+            case (string opt, _, string optarg):
+                key = opt[2..];
+                value = optarg;
+                i++;
+                break;
+            case (string opt, _, _) when (opt.StartsWith("--no-", StringComparison.OrdinalIgnoreCase)):
+                key = opt[5..];
+                value = "false";
+                break;
+            default:
+                key = args[i];
+                value = "true";
+                break;
+        }
+
+        if (mapopts.TryGetValue(key, out var mapkey))
+        {
+            key = mapkey;
+        }
+
+        cmdlineargs[key] = value;
+    }
+    else
+    {
+        dirnames.Add(args[i]);
+    }
+}
+
 var config = new ConfigurationBuilder()
     .AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true)
     .AddJsonFile("appsettings.json", optional: true)
+    .AddInMemoryCollection(cmdlineargs)
     .Build();
 
 var services = new ServiceCollection();
@@ -26,30 +78,7 @@ var svcprov = services.BuildServiceProvider();
 
 var processor = svcprov.GetRequiredService<FileProcessor>();
 
-var dirnames = new List<string>();
-bool wait = false;
-
-for (int i = 0; i < args.Length; i++)
-{
-    if (args[i].StartsWith("--"))
-    {
-        switch (args[i], args[i].Split('=', 2), args.Length > i + 1)
-        {
-            case ("--wait", _, _):
-                wait = true;
-                break;
-            default:
-                Console.Error.WriteLine($"Unrecognized option {args[i]}");
-                return;
-        }
-    }
-    else
-    {
-        dirnames.Add(args[i]);
-    }
-}
-
-if (wait)
+if (config.GetValue<bool?>("WaitForDebugger") == true)
 {
     while (!Debugger.IsAttached)
     {

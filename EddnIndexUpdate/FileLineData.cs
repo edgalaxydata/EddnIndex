@@ -13,6 +13,7 @@ namespace EddnIndexUpdate
 
         public Models.File File { get; set; }
         public string? Schema { get; set; }
+        public string? EventType { get; set; }
         public string? GameVersion { get; set; }
         public string? GameBuild { get; set; }
         public bool? IsHorizons { get; set; }
@@ -46,6 +47,7 @@ namespace EddnIndexUpdate
             LineLength = lineLength;
             IsBad = false;
             Schema = null;
+            EventType = null;
             GameVersion = null;
             GameBuild = null;
             IsHorizons = null;

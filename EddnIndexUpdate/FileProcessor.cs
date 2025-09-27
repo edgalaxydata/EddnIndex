@@ -531,7 +531,16 @@ namespace EddnIndexUpdate
                         if (!TryProcessLine(line, ref data))
                         {
                             Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", filepath, lineCount);
-                            Environment.Exit(1);
+
+                            if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+                            {
+                                Debugger.Break();
+                            }
+
+                            if (Settings.ExitOnBadData != false)
+                            {
+                                Environment.Exit(1);
+                            }
 
                             data.IsBad = true;
                             errorCount++;
@@ -540,7 +549,16 @@ namespace EddnIndexUpdate
                     catch (Exception ex)
                     {
                         Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
-                        Environment.Exit(1);
+
+                        if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+                        {
+                            Debugger.Break();
+                        }
+
+                        if (Settings.ExitOnBadData != false)
+                        {
+                            Environment.Exit(1);
+                        }
 
                         data.IsBad = true;
                         errorCount++;
@@ -551,10 +569,20 @@ namespace EddnIndexUpdate
                         && data.Station == null
                         && data.Signals.Count == 0
                         && data.BodySignals.Count == 0
-                        && data.NavRouteSystems.Count == 0)
+                        && (data.NavRouteSystems.Count == 1
+                            || data.EventType != "NavRoute"))
                     {
                         Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", filepath, lineCount);
-                        Environment.Exit(1);
+
+                        if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+                        {
+                            Debugger.Break();
+                        }
+
+                        if (Settings.ExitOnBadData != false)
+                        {
+                            Environment.Exit(1);
+                        }
                     }
                 }
 

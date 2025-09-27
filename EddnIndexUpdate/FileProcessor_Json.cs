@@ -432,6 +432,7 @@ namespace EddnIndexUpdate
                             data.IsHorizons = reader.GetBoolean();
                             break;
                         case ("event", JsonTokenType.String):
+                            data.EventType = reader.GetString();
                             break;
                         case ("timestamp", JsonTokenType.String) when (reader.TryGetDateTime(out var ts)):
                             data.Timestamp = ts;
