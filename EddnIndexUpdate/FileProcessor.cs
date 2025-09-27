@@ -569,8 +569,8 @@ namespace EddnIndexUpdate
                         && data.Station == null
                         && data.Signals.Count == 0
                         && data.BodySignals.Count == 0
-                        && (data.NavRouteSystems.Count == 1
-                            || data.EventType != "NavRoute"))
+                        && data.NavRouteSystems.Count == 0
+                        && data.EventType != "NavRoute")
                     {
                         Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", filepath, lineCount);
 
