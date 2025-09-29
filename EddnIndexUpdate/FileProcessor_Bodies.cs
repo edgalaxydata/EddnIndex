@@ -89,7 +89,7 @@ namespace EddnIndexUpdate
             var spacePos = suffix.IndexOf(' ');
             if (spacePos == -1) spacePos = suffix.Length;
 
-            if (suffix[0] >= 'A' && suffix[0] <= 'Z' - spacePos && (suffix.Length < 6 || !suffix[1..6].SequenceEqual(" Belt")))
+            if (suffix[0] >= 'A' && suffix[0] <= 'Z' - spacePos && (suffix.Length < 6 || (!suffix[..6].SequenceEqual("Comet ") && !suffix[1..6].SequenceEqual(" Belt"))))
             {
                 var star = suffix[0];
 
