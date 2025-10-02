@@ -629,6 +629,11 @@ namespace EddnIndexUpdate
                     overrides = [.. overrides.Where(e => e.ValidFrom < timestamp && e.ValidTo > timestamp)];
                 }
 
+                if (bodyType != null && overrides.Any(e => e.BodyType == bodyType))
+                {
+                    overrides = [.. overrides.Where(e => e.BodyType == bodyType)];
+                }
+
                 if (overrides.Count > 1)
                 {
                     Debugger.Break();
