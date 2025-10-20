@@ -29,6 +29,7 @@ namespace EddnIndexUpdate
                         case ("gatewayTimestamp", JsonTokenType.String) when (reader.TryGetDateTime(out var gwts)):
                             data.GatewayTimestamp = gwts;
                             break;
+                        case ("build", JsonTokenType.String):
                         case ("gamebuild", JsonTokenType.String):
                         case ("gameBuild", JsonTokenType.String):
                             data.GameBuild = reader.GetString();
