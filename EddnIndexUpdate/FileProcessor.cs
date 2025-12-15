@@ -372,7 +372,7 @@ namespace EddnIndexUpdate
 
         private void WriteIndexedFile(string filepath, string indexFilename)
         {
-            Logger.LogInformation("Writing indexed file");
+            Logger.LogInformation("Writing indexed file {Filename}", indexFilename);
 
             Stream? stream = null;
             byte[]? buffer = null;
@@ -596,6 +596,11 @@ namespace EddnIndexUpdate
                 return;
             }
 
+            if (Settings.IndexedDir != null)
+            {
+                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename));
+            }
+
             Logger.LogInformation("Processing {Filename}", filename);
             Logger.LogInformation(
                 "Current: S:{CurLength} U:{CurUncLen} L:{CurLineCount} E:{CurErrorCount} V:{CurVersion} -> S:{UpdLength} V:{UpdVersion}",
@@ -607,11 +612,6 @@ namespace EddnIndexUpdate
                 fileinfo.Length,
                 Version
             );
-
-            if (Settings.IndexedDir != null)
-            {
-                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename));
-            }
 
             FillCacheForFile(file.Id);
 
