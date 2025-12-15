@@ -372,6 +372,8 @@ namespace EddnIndexUpdate
 
         private void WriteIndexedFile(string filepath, string indexFilename)
         {
+            Logger.LogInformation("Writing indexed file");
+
             Stream? stream = null;
             byte[]? buffer = null;
 
@@ -439,7 +441,7 @@ namespace EddnIndexUpdate
                     linepos += pos + 1;
                     lineno++;
 
-                    if (lineno == 1024)
+                    if ((lineno % 1024) == 0)
                     {
                         rawMemStream.Seek(0, SeekOrigin.Begin);
 
@@ -454,9 +456,17 @@ namespace EddnIndexUpdate
                         rawMemStream.Seek(0, SeekOrigin.Begin);
                         rawMemStream.SetLength(0);
 
-                        lineno = 0;
+                        Console.Error.Write(".");
+                        Console.Error.Flush();
+
+                        if ((lineno % 65536) == 0)
+                        {
+                            Console.Error.WriteLine($" {lineno}");
+                        }
                     }
                 }
+
+                Console.Error.WriteLine($" {lineno}");
 
                 if (rawMemStream.Length != 0)
                 {
