@@ -86,6 +86,7 @@ namespace EddnIndexUpdate
         public string GameVersionDatesFile { get; set; } = "game-version-dates.jsonl";
         public string MessageTypesFile { get; set; } = "msgtypes.txt";
         public string BaseDir { get; set; } = AppDomain.CurrentDomain.BaseDirectory;
+        public string? IndexedDir { get; set; }
         public bool? BreakOnBadData { get; set; }
         public bool? ExitOnBadData { get; set; }
     }

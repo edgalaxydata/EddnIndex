@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
@@ -368,6 +370,121 @@ namespace EddnIndexUpdate
             }
         }
 
+        private void WriteIndexedFile(string filepath, string indexFilename)
+        {
+            Stream? stream = null;
+            byte[]? buffer = null;
+
+            try
+            {
+                stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+                if (filepath.EndsWith(".bz2"))
+                {
+                    stream = new BZip2InputStream(stream);
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(indexFilename)!);
+                using var rawFileStream = File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
+                using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
+                using var rawMemStream = new MemoryStream();
+                Span<byte> idxspan = stackalloc byte[8];
+                BinaryPrimitives.WriteInt64LittleEndian(idxspan, 0);
+                rawFileIndexStream.Write(idxspan);
+
+                buffer = ArrayPool<byte>.Shared.Rent(4194304);
+                Span<byte> buf = buffer;
+                int linepos = 0;
+                int readpos = 0;
+                int lineno = 0;
+                int readlen = 0;
+                bool eof = false;
+
+                while (!eof || linepos < readpos)
+                {
+                    if (!eof && readpos < buffer.Length)
+                    {
+                        readlen = stream.Read(buffer, readpos, buffer.Length - readpos);
+
+                        if (readlen == 0)
+                        {
+                            if (linepos == readpos)
+                            {
+                                break;
+                            }
+
+                            eof = true;
+                        }
+                        else
+                        {
+                            readpos += readlen;
+                        }
+                    }
+
+                    var pos = buf[linepos..readpos].IndexOf((byte)'\n');
+
+                    if (pos == -1)
+                    {
+                        if (!eof)
+                        {
+                            buf[linepos..readpos].CopyTo(buffer);
+                            readpos -= linepos;
+                            continue;
+                        }
+
+                        pos = readpos - linepos - 1;
+                    }
+
+                    rawMemStream.Write(buf.Slice(linepos, pos + 1));
+                    linepos += pos + 1;
+                    lineno++;
+
+                    if (lineno == 1024)
+                    {
+                        rawMemStream.Seek(0, SeekOrigin.Begin);
+
+                        using (var bz2stream = new BZip2OutputStream(rawFileStream, true))
+                        {
+                            rawMemStream.CopyTo(bz2stream);
+                        }
+
+                        BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
+                        rawFileIndexStream.Write(idxspan);
+
+                        rawMemStream.Seek(0, SeekOrigin.Begin);
+                        rawMemStream.SetLength(0);
+
+                        lineno = 0;
+                    }
+                }
+
+                if (rawMemStream.Length != 0)
+                {
+                    rawMemStream.Seek(0, SeekOrigin.Begin);
+
+                    using (var bz2stream = new BZip2OutputStream(rawFileStream, true))
+                    {
+                        rawMemStream.CopyTo(bz2stream);
+                    }
+
+                    BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
+                    rawFileIndexStream.Write(idxspan);
+                }
+            }
+            finally
+            {
+                stream?.Dispose();
+
+                if (buffer != null)
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
+            }
+
+            File.Move(indexFilename + ".tmp", indexFilename, true);
+            File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
+        }
+
         public void ProcessFile(string filepath)
         {
             Init();
@@ -380,6 +497,12 @@ namespace EddnIndexUpdate
             var fileinfo = new FileInfo(filepath);
 
             var filename = Path.GetFileName(filepath);
+
+            if (!filename.EndsWith(".bz2"))
+            {
+                filename += ".bz2";
+            }
+
             bool test = false;
 
             if (Path.GetDirectoryName(filepath) is string filedir && Path.GetFileName(filedir) is string lastdir)
@@ -446,6 +569,13 @@ namespace EddnIndexUpdate
                 Files[filename] = file;
             }
 
+            var indexFilename = filename;
+
+            if (!indexFilename.Contains('/'))
+            {
+                indexFilename = $"{file.Date:yyyy-MM}/" + indexFilename;
+            }
+
             if (file.CompressedSize == fileinfo.Length
                 && file.UncompressedSize != null
                 && file.LineCount != null
@@ -467,6 +597,11 @@ namespace EddnIndexUpdate
                 Version
             );
 
+            if (Settings.IndexedDir != null)
+            {
+                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename));
+            }
+
             FillCacheForFile(file.Id);
 
             var newLines = new Dictionary<int, Models.FileLineInfo>();
@@ -487,7 +622,7 @@ namespace EddnIndexUpdate
 
             Stream stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-            if (filename.EndsWith(".bz2"))
+            if (filepath.EndsWith(".bz2"))
             {
                 stream = new BZip2InputStream(stream);
             }
