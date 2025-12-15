@@ -48,6 +48,9 @@ namespace EddnIndexUpdate
                             break;
                         case ("manuallyApproved", JsonTokenType.False or JsonTokenType.True):
                             break;
+                        case ("horizons", JsonTokenType.False or JsonTokenType.True):
+                        case ("odyssey", JsonTokenType.False or JsonTokenType.True):
+                            break;
                         default:
                             Fail($"Unknown header field {name}");
                             break;
