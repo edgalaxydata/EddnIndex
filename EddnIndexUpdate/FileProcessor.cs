@@ -408,7 +408,7 @@ namespace EddnIndexUpdate
                     {
                         readlen = stream.Read(buffer, readpos, buffer.Length - readpos);
 
-                        if (readlen == 0)
+                        if (readlen <= 0)
                         {
                             if (linepos == readpos)
                             {
@@ -431,6 +431,7 @@ namespace EddnIndexUpdate
                         {
                             buf[linepos..readpos].CopyTo(buffer);
                             readpos -= linepos;
+                            linepos = 0;
                             continue;
                         }
 
