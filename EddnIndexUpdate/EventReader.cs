@@ -95,19 +95,14 @@ namespace EddnIndexUpdate
 
                 Buffers[^1] = (lastBuffer, lastBuffer.AsMemory(0, bufferWritePos + len));
 
-                var readpos = BufferReadOffset;
+                var readpos = Buffers.Count == BufferReadSegmentNumber + 1 ? BufferReadOffset : 0;
 
-                for (int i = BufferReadSegmentNumber; i < Buffers.Count; i++)
+                var pos = Buffers[^1].Memory.Span[readpos..].IndexOf((byte)'\n');
+
+                if (pos >= 0)
                 {
-                    var pos = Buffers[i].Memory.Span[readpos..].IndexOf((byte)'\n');
-
-                    if (pos >= 0)
-                    {
-                        index = (i, readpos + pos);
-                        break;
-                    }
-
-                    readpos = 0;
+                    index = (BufferReadSegmentNumber, readpos + pos);
+                    break;
                 }
             }
 
