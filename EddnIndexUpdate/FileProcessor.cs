@@ -400,7 +400,8 @@ namespace EddnIndexUpdate
             while (reader.TryReadLine(out var line))
             {
                 var jsonReader = new Utf8JsonReader(line);
-                jsonReader.Skip();
+                Debug.Assert(jsonReader.Read());
+                Debug.Assert(jsonReader.TrySkip());
 
                 while (line.Length != 0)
                 {
