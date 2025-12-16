@@ -60,7 +60,7 @@ namespace EddnIndexUpdate
                 }
             }
 
-            while (index != (-1, -1))
+            while (index == (-1, -1))
             {
                 BufferSegment? lastSegment = null;
                 BufferSegment? prevSegment = null;
