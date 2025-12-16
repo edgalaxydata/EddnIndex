@@ -537,7 +537,8 @@ namespace EddnIndexUpdate
                 && file.UncompressedSize != null
                 && file.LineCount != null
                 && file.ErrorCount == 0
-                && file.ProcessedVersion == Version)
+                && file.ProcessedVersion == Version
+                && Settings.Reprocess != true)
             {
                 return;
             }

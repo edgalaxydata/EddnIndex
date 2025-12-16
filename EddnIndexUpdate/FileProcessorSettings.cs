@@ -89,5 +89,6 @@ namespace EddnIndexUpdate
         public string? IndexedDir { get; set; }
         public bool? BreakOnBadData { get; set; }
         public bool? ExitOnBadData { get; set; }
+        public bool? Reprocess { get; set; }
     }
 }
