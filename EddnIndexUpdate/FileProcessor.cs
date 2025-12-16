@@ -8,6 +8,7 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 
 namespace EddnIndexUpdate
 {
@@ -398,6 +399,9 @@ namespace EddnIndexUpdate
 
             while (reader.TryReadLine(out var line))
             {
+                var jsonReader = new Utf8JsonReader(line);
+                jsonReader.Skip();
+
                 while (line.Length != 0)
                 {
                     bz2stream.Write(line.FirstSpan);
