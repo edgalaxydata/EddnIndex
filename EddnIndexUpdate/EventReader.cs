@@ -77,10 +77,12 @@ namespace EddnIndexUpdate
                     Segments.RemoveRange(0, BufferReadSegmentNumber);
                     Buffers.RemoveRange(0, BufferReadSegmentNumber);
                     BufferReadSegmentNumber = 0;
+                    prevSegment = null;
+                    lastSegment = null;
+                    lastBuffer = null;
 
                     if (Segments.Count != 0)
                     {
-                        prevSegment = null;
                         lastSegment = new BufferSegment(Segments[0].Memory);
 
                         for (int i = 1; i < Segments.Count; i++)
