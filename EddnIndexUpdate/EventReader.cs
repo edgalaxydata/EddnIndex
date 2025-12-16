@@ -111,7 +111,7 @@ namespace EddnIndexUpdate
                 }
             }
 
-            var firstSegment = new BufferSegment(Buffers[BufferReadSegmentNumber].Memory[BufferReadOffset..]);
+            var firstSegment = new BufferSegment(Buffers[BufferReadSegmentNumber].Memory);
             var lastSegment = firstSegment;
             var segmentNumber = BufferReadSegmentNumber;
 
@@ -120,7 +120,7 @@ namespace EddnIndexUpdate
                 lastSegment = lastSegment.Append(Buffers[++segmentNumber].Memory);
             }
 
-            line = new ReadOnlySequence<byte>(firstSegment, 0, lastSegment, index.Offset + 1);
+            line = new ReadOnlySequence<byte>(firstSegment, BufferReadOffset, lastSegment, index.Offset + 1);
 
             if (index.Offset + 1 == Buffers[index.SegmentNumber].Memory.Length)
             {
