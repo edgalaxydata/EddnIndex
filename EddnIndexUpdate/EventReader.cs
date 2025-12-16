@@ -134,6 +134,10 @@ namespace EddnIndexUpdate
                 {
                     Segments[^1] = prevSegment.Append(lastBuffer.AsMemory(0, bufferWritePos));
                 }
+                else
+                {
+                    Segments[^1] = new BufferSegment(lastBuffer.AsMemory(0, bufferWritePos));
+                }
 
                 var readpos = BufferReadOffset;
 
