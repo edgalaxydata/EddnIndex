@@ -12,7 +12,7 @@ var mapopts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
     ["exit-on-bad-data"] = "FileProcessor:ExitOnBadData",
     ["break-on-bad-data"] = "FileProcessor:BreakOnBadData",
     ["basedir"] = "FileProcessor:BaseDir",
-    ["reprocess"] = "FileProcessor:Reprocessor",
+    ["reprocess"] = "FileProcessor:Reprocess",
     ["wait"] = "WaitForDebugger",
 };
 
