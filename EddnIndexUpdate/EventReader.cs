@@ -48,7 +48,7 @@ namespace EddnIndexUpdate
 
                 for (int i = BufferReadSegmentNumber; i < Segments.Count; i++)
                 {
-                    var pos = Segments[i].Memory.Span.IndexOf((byte)'\n');
+                    var pos = Segments[i].Memory.Span[readpos..].IndexOf((byte)'\n');
 
                     if (pos >= 0)
                     {
@@ -143,7 +143,7 @@ namespace EddnIndexUpdate
 
                 for (int i = BufferReadSegmentNumber; i < Segments.Count; i++)
                 {
-                    var pos = Segments[i].Memory.Span.IndexOf((byte)'\n');
+                    var pos = Segments[i].Memory.Span[readpos..].IndexOf((byte)'\n');
 
                     if (pos >= 0)
                     {
