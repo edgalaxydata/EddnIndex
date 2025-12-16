@@ -101,7 +101,7 @@ namespace EddnIndexUpdate
 
                 if (pos >= 0)
                 {
-                    index = (BufferReadSegmentNumber, readpos + pos);
+                    index = (Buffers.Count - 1, readpos + pos);
                     break;
                 }
             }
