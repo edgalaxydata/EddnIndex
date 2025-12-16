@@ -41,6 +41,7 @@ namespace EddnIndexUpdate
         private readonly HttpClient HttpClient = new();
 
         private static readonly int Version = 1;
+        private static readonly int MaxLength = 4194304;
 
         private bool InitComplete = false;
 
@@ -374,122 +375,67 @@ namespace EddnIndexUpdate
         {
             Logger.LogInformation("Writing indexed file {Filename}", indexFilename);
 
-            Stream? stream = null;
-            byte[]? buffer = null;
+            Stream stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-            try
+            if (filepath.EndsWith(".bz2"))
             {
-                stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                stream = new BZip2InputStream(stream);
+            }
 
-                if (filepath.EndsWith(".bz2"))
+            Directory.CreateDirectory(Path.GetDirectoryName(indexFilename)!);
+            using var rawFileStream = File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
+            using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
+            using var memStream = new MemoryStream();
+            var bz2stream = new BZip2OutputStream(memStream, true);
+            var segments = new List<(byte[] buffer, ReadOnlyMemory<byte> memory)>();
+            Span<byte> idxspan = stackalloc byte[8];
+            BinaryPrimitives.WriteInt64LittleEndian(idxspan, 0);
+            rawFileIndexStream.Write(idxspan);
+
+            using var reader = new EventReader(stream);
+
+            int lineno = 0;
+
+            while (reader.TryReadLine(out var line))
+            {
+                while (line.Length != 0)
                 {
-                    stream = new BZip2InputStream(stream);
+                    bz2stream.Write(line.FirstSpan);
+                    line = line.Slice(line.First.Length);
                 }
 
-                Directory.CreateDirectory(Path.GetDirectoryName(indexFilename)!);
-                using var rawFileStream = File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
-                using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
-                using var rawMemStream = new MemoryStream();
-                Span<byte> idxspan = stackalloc byte[8];
-                BinaryPrimitives.WriteInt64LittleEndian(idxspan, 0);
-                rawFileIndexStream.Write(idxspan);
+                lineno++;
 
-                buffer = ArrayPool<byte>.Shared.Rent(4194304);
-                Span<byte> buf = buffer;
-                int linepos = 0;
-                int readpos = 0;
-                int lineno = 0;
-                int readlen = 0;
-                bool eof = false;
-
-                while (!eof || linepos < readpos)
+                if ((lineno % 1024) == 0)
                 {
-                    if (!eof && readpos < buffer.Length)
-                    {
-                        readlen = stream.Read(buffer, readpos, buffer.Length - readpos);
+                    bz2stream.Dispose();
+                    memStream.CopyTo(rawFileStream);
+                    memStream.Seek(0, SeekOrigin.Begin);
+                    memStream.SetLength(0);
 
-                        if (readlen <= 0)
-                        {
-                            if (linepos == readpos)
-                            {
-                                break;
-                            }
-
-                            eof = true;
-                        }
-                        else
-                        {
-                            readpos += readlen;
-                        }
-                    }
-
-                    var pos = buf[linepos..readpos].IndexOf((byte)'\n');
-
-                    if (pos == -1)
-                    {
-                        if (!eof)
-                        {
-                            buf[linepos..readpos].CopyTo(buffer);
-                            readpos -= linepos;
-                            linepos = 0;
-                            continue;
-                        }
-
-                        pos = readpos - linepos - 1;
-                    }
-
-                    rawMemStream.Write(buf.Slice(linepos, pos + 1));
-                    linepos += pos + 1;
-                    lineno++;
-
-                    if ((lineno % 1024) == 0)
-                    {
-                        rawMemStream.Seek(0, SeekOrigin.Begin);
-
-                        using (var bz2stream = new BZip2OutputStream(rawFileStream, true))
-                        {
-                            rawMemStream.CopyTo(bz2stream);
-                        }
-
-                        BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
-                        rawFileIndexStream.Write(idxspan);
-
-                        rawMemStream.Seek(0, SeekOrigin.Begin);
-                        rawMemStream.SetLength(0);
-
-                        Console.Error.Write(".");
-                        Console.Error.Flush();
-
-                        if ((lineno % 65536) == 0)
-                        {
-                            Console.Error.WriteLine($" {lineno}");
-                        }
-                    }
-                }
-
-                Console.Error.WriteLine($" {lineno}");
-
-                if (rawMemStream.Length != 0)
-                {
-                    rawMemStream.Seek(0, SeekOrigin.Begin);
-
-                    using (var bz2stream = new BZip2OutputStream(rawFileStream, true))
-                    {
-                        rawMemStream.CopyTo(bz2stream);
-                    }
+                    bz2stream = new BZip2OutputStream(memStream, true);
 
                     BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
                     rawFileIndexStream.Write(idxspan);
+
+                    segments.Clear();
+
+                    Console.Error.Write(".");
+                    Console.Error.Flush();
+
+                    if ((lineno % 65536) == 0)
+                    {
+                        Console.Error.WriteLine($" {lineno}");
+                    }
                 }
             }
-            finally
-            {
-                stream?.Dispose();
 
-                if (buffer != null)
-                {
-                    ArrayPool<byte>.Shared.Return(buffer);
-                }
+            Console.Error.WriteLine($" {lineno}");
+
+            if ((lineno % 1024) != 0)
+            {
+                bz2stream.Dispose();
+                memStream.CopyTo(rawFileStream);
             }
 
             File.Move(indexFilename + ".tmp", indexFilename, true);
@@ -664,9 +610,9 @@ namespace EddnIndexUpdate
                     continue;
                 }
 
-                data.Clear(file, lineCount, line.Length);
+                data.Clear(file, lineCount, int.CreateSaturating(line.Length));
 
-                if (line.Length < 2)
+                if (line.Length < 2 || line.Length >= MaxLength)
                 {
                     data.IsBad = true;
                 }

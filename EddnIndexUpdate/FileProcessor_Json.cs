@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Buffers;
+using System.Text;
 using System.Text.Json;
 
 namespace EddnIndexUpdate
@@ -286,7 +287,7 @@ namespace EddnIndexUpdate
             return true;
         }
 
-        private bool TryProcessLineMessage(ref Utf8JsonReader reader, ReadOnlySpan<byte> json, ref FileLineData data)
+        private bool TryProcessLineMessage(ref Utf8JsonReader reader, ReadOnlySequence<byte> json, ref FileLineData data)
         {
             string? bodyName = null;
             string? bodyType = null;
@@ -340,9 +341,9 @@ namespace EddnIndexUpdate
                             bodyType = reader.GetString();
                             break;
                         case ("Parents", JsonTokenType.StartArray):
-                            var pos = (int)reader.TokenStartIndex;
+                            var pos = reader.TokenStartIndex;
                             reader.Skip();
-                            var span = json[pos..(int)(reader.TokenStartIndex + 1)];
+                            var span = json.Slice(pos, reader.TokenStartIndex + 1 - pos);
                             parentsJson = Encoding.UTF8.GetString(span);
                             break;
                         case ("Periapsis", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
@@ -512,7 +513,7 @@ namespace EddnIndexUpdate
             return true;
         }
 
-        private bool TryProcessLine(ReadOnlySpan<byte> line, ref FileLineData data)
+        private bool TryProcessLine(ReadOnlySequence<byte> line, ref FileLineData data)
         {
             var reader = new Utf8JsonReader(line);
             bool gotSchema = false;

@@ -5,70 +5,179 @@ namespace EddnIndexUpdate
     public class EventReader(Stream stream) : IDisposable
     {
         private Stream? InnerStream = stream;
-        private readonly byte[] Buffer = ArrayPool<byte>.Shared.Rent(4194304);
-        private int BufferOffset;
-        private int BufferLength;
+        private readonly List<byte[]> Buffers = [];
+        private readonly List<BufferSegment> Segments = [];
+
+        private int BufferReadOffset;
+        private int BufferReadSegmentNumber;
         public long Position { get; private set; } = 0;
 
-        public bool TryReadLine(out ReadOnlySpan<byte> line)
+        private class BufferSegment : ReadOnlySequenceSegment<byte>
+        {
+            public BufferSegment(ReadOnlyMemory<byte> memory)
+            {
+                Memory = memory;
+            }
+
+            public BufferSegment Append(ReadOnlyMemory<byte> memory)
+            {
+                var segment = new BufferSegment(memory)
+                {
+                    RunningIndex = RunningIndex + Memory.Length
+                };
+
+                Next = segment;
+                return segment;
+            }
+        }
+
+        public bool TryReadLine(out ReadOnlySequence<byte> line)
         {
             ObjectDisposedException.ThrowIf(InnerStream == null, this);
 
-            var buf = Buffer.AsSpan(BufferOffset, BufferLength - BufferOffset);
-            var index = buf.IndexOf((byte)'\n');
-
-            while (index < 0)
+            if (Segments.Count != Buffers.Count)
             {
-                buf.CopyTo(Buffer);
-                BufferLength -= BufferOffset;
-                BufferOffset = 0;
-                var fill = Buffer.AsSpan(BufferLength);
-                fill.Clear();
-                int len;
+                throw new InvalidOperationException();
+            }
 
-                byte[]? readBuffer = ArrayPool<byte>.Shared.Rent(fill.Length);
+            var index = (SegmentNumber: -1, Offset: -1);
+
+            if (Buffers.Count != 0)
+            {
+                var readpos = BufferReadOffset;
+
+                for (int i = BufferReadSegmentNumber; i < Segments.Count; i++)
+                {
+                    var pos = Segments[i].Memory.Span.IndexOf((byte)'\n');
+
+                    if (pos >= 0)
+                    {
+                        index = (i, readpos + pos);
+                        break;
+                    }
+
+                    readpos = 0;
+                }
+            }
+
+            while (index != (-1, -1))
+            {
+                BufferSegment? lastSegment = null;
+                BufferSegment? prevSegment = null;
+                byte[]? lastBuffer = null;
+                int bufferWritePos = 0;
+
+                if (BufferReadSegmentNumber != 0)
+                {
+                    for (int i = 0; i < BufferReadSegmentNumber; i++)
+                    {
+                        ArrayPool<byte>.Shared.Return(Buffers[i]);
+                    }
+
+                    Segments.RemoveRange(0, BufferReadSegmentNumber);
+                    Buffers.RemoveRange(0, BufferReadSegmentNumber);
+                    BufferReadSegmentNumber = 0;
+
+                    if (Segments.Count != 0)
+                    {
+                        lastSegment = new BufferSegment(Segments[0].Memory);
+
+                        for (int i = 1; i < Segments.Count; i++)
+                        {
+                            prevSegment = lastSegment;
+                            Segments[i] = lastSegment = lastSegment.Append(Segments[i].Memory);
+                            lastBuffer = Buffers[i];
+                            bufferWritePos = lastSegment.Memory.Length;
+                        }
+                    }
+                }
+
+                if (lastBuffer == null || bufferWritePos == lastBuffer.Length)
+                {
+                    if (lastSegment != null)
+                    {
+                        prevSegment = lastSegment;
+                        lastSegment = prevSegment.Append(ReadOnlyMemory<byte>.Empty);
+                    }
+                    else
+                    {
+                        lastSegment = new BufferSegment(ReadOnlyMemory<byte>.Empty);
+                    }
+
+                    lastBuffer = ArrayPool<byte>.Shared.Rent(65536);
+                    Buffers.Add(lastBuffer);
+                    Segments.Add(lastSegment);
+                    bufferWritePos = 0;
+                }
+
+                int len;
 
                 try
                 {
-                    len = InnerStream.Read(readBuffer, 0, fill.Length);
-                    new ReadOnlySpan<byte>(readBuffer, 0, fill.Length).CopyTo(fill);
+                    len = InnerStream.Read(lastBuffer, bufferWritePos, lastBuffer.Length);
                 }
-                catch (IOException ex)
+                catch (IOException)
                 {
-                    line = [];
+                    line = ReadOnlySequence<byte>.Empty;
                     return false;
-                }
-                finally
-                {
-                    ArrayPool<byte>.Shared.Return(readBuffer);
                 }
 
                 if (len <= 0)
                 {
-                    line = [];
+                    line = ReadOnlySequence<byte>.Empty;
                     return false;
                 }
 
-                BufferLength += len;
+                bufferWritePos += len;
 
-                buf = Buffer.AsSpan(BufferOffset, BufferLength - BufferOffset);
-                index = buf.IndexOf((byte)'\n');
-
-                if (index < 0 && BufferLength == Buffer.Length)
+                if (prevSegment != null)
                 {
-                    throw new InvalidOperationException("Line too long");
+                    Segments[^1] = prevSegment.Append(lastBuffer.AsMemory(0, bufferWritePos));
+                }
+
+                var readpos = BufferReadOffset;
+
+                for (int i = BufferReadSegmentNumber; i < Segments.Count; i++)
+                {
+                    var pos = Segments[i].Memory.Span.IndexOf((byte)'\n');
+
+                    if (pos >= 0)
+                    {
+                        index = (i, readpos + pos);
+                        break;
+                    }
+
+                    readpos = 0;
                 }
             }
 
-            line = buf[..index];
-            BufferOffset += index + 1;
-            Position += index + 1;
+            line = new ReadOnlySequence<byte>(Segments[BufferReadSegmentNumber], BufferReadOffset, Segments[index.SegmentNumber], index.Offset + 1);
+
+            if (index.Offset + 1 == Segments[index.SegmentNumber].Memory.Length)
+            {
+                BufferReadSegmentNumber = index.SegmentNumber + 1;
+                BufferReadOffset = 0;
+            }
+            else
+            {
+                BufferReadSegmentNumber = index.SegmentNumber;
+                BufferReadOffset = index.Offset + 1;
+            }
+
+            Position += line.Length;
             return true;
         }
 
         public void Dispose()
         {
-            ArrayPool<byte>.Shared.Return(Buffer);
+            foreach (var buffer in Buffers)
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
+
+            Buffers.Clear();
+            Segments.Clear();
+
             InnerStream?.Dispose();
             InnerStream = null;
             GC.SuppressFinalize(this);
