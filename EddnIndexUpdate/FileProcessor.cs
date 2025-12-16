@@ -860,6 +860,11 @@ namespace EddnIndexUpdate
                 ctx.SaveChanges();
             }
 
+            if (Settings.IndexedDir != null && !filepath.EndsWith(".bz2") && reader.Position > fileinfo.Length)
+            {
+                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename));
+            }
+
             SystemCache.Clear();
             SystemCacheById.Clear();
 
