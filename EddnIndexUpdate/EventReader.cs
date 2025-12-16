@@ -62,9 +62,9 @@ namespace EddnIndexUpdate
 
             while (index == (-1, -1))
             {
-                BufferSegment? lastSegment = null;
-                BufferSegment? prevSegment = null;
-                byte[]? lastBuffer = null;
+                BufferSegment? lastSegment = Segments.Count == 0 ? null : Segments[^1];
+                BufferSegment? prevSegment = Segments.Count <= 1 ? null : Segments[^2];
+                byte[]? lastBuffer = Buffers.Count == 0 ? null : Buffers[^1];
                 int bufferWritePos = 0;
 
                 if (BufferReadSegmentNumber != 0)
@@ -80,6 +80,7 @@ namespace EddnIndexUpdate
 
                     if (Segments.Count != 0)
                     {
+                        prevSegment = null;
                         lastSegment = new BufferSegment(Segments[0].Memory);
 
                         for (int i = 1; i < Segments.Count; i++)
