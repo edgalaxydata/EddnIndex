@@ -5,7 +5,7 @@ namespace EddnIndexUpdate
     public class EventReader(Stream stream) : IDisposable
     {
         private Stream? InnerStream = stream;
-        private readonly byte[] Buffer = ArrayPool<byte>.Shared.Rent(1048576);
+        private readonly byte[] Buffer = ArrayPool<byte>.Shared.Rent(4194304);
         private int BufferOffset;
         private int BufferLength;
         public long Position { get; private set; } = 0;
@@ -17,7 +17,7 @@ namespace EddnIndexUpdate
             var buf = Buffer.AsSpan(BufferOffset, BufferLength - BufferOffset);
             var index = buf.IndexOf((byte)'\n');
 
-            if (index < 0)
+            while (index < 0)
             {
                 buf.CopyTo(Buffer);
                 BufferLength -= BufferOffset;
@@ -54,7 +54,7 @@ namespace EddnIndexUpdate
                 buf = Buffer.AsSpan(BufferOffset, BufferLength - BufferOffset);
                 index = buf.IndexOf((byte)'\n');
 
-                if (index < 0)
+                if (index < 0 && BufferLength == Buffer.Length)
                 {
                     throw new InvalidOperationException("Line too long");
                 }
@@ -68,6 +68,7 @@ namespace EddnIndexUpdate
 
         public void Dispose()
         {
+            ArrayPool<byte>.Shared.Return(Buffer);
             InnerStream?.Dispose();
             InnerStream = null;
             GC.SuppressFinalize(this);
