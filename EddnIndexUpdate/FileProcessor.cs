@@ -403,10 +403,12 @@ namespace EddnIndexUpdate
                 Debug.Assert(jsonReader.Read());
                 Debug.Assert(jsonReader.TrySkip());
 
-                while (line.Length != 0)
+                var seqreader = new SequenceReader<byte>(line);
+
+                while (seqreader.Remaining > 0)
                 {
-                    bz2stream.Write(line.FirstSpan);
-                    line = line.Slice(line.First.Length);
+                    bz2stream.Write(seqreader.UnreadSpan);
+                    seqreader.Advance(seqreader.UnreadSpan.Length);
                 }
 
                 lineno++;
