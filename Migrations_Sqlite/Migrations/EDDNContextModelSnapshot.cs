@@ -314,6 +314,9 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("PrimarySchemaEventId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("INTEGER");
 
@@ -332,6 +335,8 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.HasKey("Id");
 
                     b.HasAlternateKey("FileName");
+
+                    b.HasIndex("PrimarySchemaEventId");
 
                     b.ToTable("Files", (string)null);
                 });
@@ -432,6 +437,9 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("SchemaEventId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int?>("SoftwareId")
                         .HasColumnType("INTEGER");
 
@@ -445,6 +453,8 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.HasKey("FileId", "LineNo");
 
                     b.HasIndex("GameVersionId");
+
+                    b.HasIndex("SchemaEventId");
 
                     b.HasIndex("SoftwareId");
 
@@ -663,6 +673,34 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.HasIndex("BodyID", "BodyType", "ParentSetId");
 
                     b.ToTable("ParentSets", (string)null);
+                });
+
+            modelBuilder.Entity("EddnIndexUpdate.Models.SchemaEventInfo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("EventType")
+                        .HasMaxLength(32)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("FirstSeen")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastSeen")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Schema")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Schema", "EventType");
+
+                    b.ToTable("SchemaEvents", (string)null);
                 });
 
             modelBuilder.Entity("EddnIndexUpdate.Models.Sector", b =>
@@ -1060,6 +1098,15 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Navigation("System");
                 });
 
+            modelBuilder.Entity("EddnIndexUpdate.Models.File", b =>
+                {
+                    b.HasOne("EddnIndexUpdate.Models.SchemaEventInfo", "PrimarySchemaEvent")
+                        .WithMany()
+                        .HasForeignKey("PrimarySchemaEventId");
+
+                    b.Navigation("PrimarySchemaEvent");
+                });
+
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineBody", b =>
                 {
                     b.HasOne("EddnIndexUpdate.Models.Body", "Body")
@@ -1094,6 +1141,10 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .WithMany()
                         .HasForeignKey("GameVersionId");
 
+                    b.HasOne("EddnIndexUpdate.Models.SchemaEventInfo", "SchemaEvent")
+                        .WithMany()
+                        .HasForeignKey("SchemaEventId");
+
                     b.HasOne("EddnIndexUpdate.Models.SoftwareInfo", "Software")
                         .WithMany()
                         .HasForeignKey("SoftwareId");
@@ -1103,6 +1154,8 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .HasForeignKey("SystemId");
 
                     b.Navigation("GameVersion");
+
+                    b.Navigation("SchemaEvent");
 
                     b.Navigation("Software");
 

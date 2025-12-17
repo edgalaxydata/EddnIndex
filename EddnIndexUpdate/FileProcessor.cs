@@ -35,6 +35,7 @@ namespace EddnIndexUpdate
         private readonly Dictionary<(string Name, string Version), Models.SoftwareInfo> Software = [];
         private readonly Dictionary<(string? Version, string? Build, bool? IsOdyssey, bool? IsHorizons), Models.GameVersionInfo> GameVersions = [];
         private readonly Dictionary<(string SignalName, string? SignalType, bool? IsStation), Models.SignalInfo> Signals = [];
+        private readonly Dictionary<(string Schema, string? EventType), Models.SchemaEventInfo> SchemaEvents = [];
         private readonly Dictionary<int, Models.SignalInfo> SignalsById = [];
         private readonly Dictionary<(string Type, int? Count, string? Category, string? SubCategory, string? Region, long? EntryID), Models.BodySignalInfo> BodySignals = [];
         private readonly Dictionary<(string? StationName, long? MarketId, string? StationType, string? SystemName, long? SystemAddress, string? BodyName), List<Models.Station>> Stations = [];
@@ -116,6 +117,15 @@ namespace EddnIndexUpdate
                 {
                     Signals[(s.SignalName, s.SignalType, s.IsStation)] = s;
                     SignalsById[s.Id] = s;
+                }
+            }
+
+            if (SchemaEvents.Count == 0)
+            {
+                Logger.LogInformation("Loading schema events");
+                foreach (var s in ctx.Set<Models.SchemaEventInfo>().AsNoTracking())
+                {
+                    SchemaEvents[(s.Schema, s.EventType)] = s;
                 }
             }
 
@@ -257,6 +267,26 @@ namespace EddnIndexUpdate
             Signals[(name, type, isStation)] = signal;
             SignalsById[signal.Id] = signal;
             return signal;
+        }
+
+        private Models.SchemaEventInfo GetOrAddSchemaEvent(string schema, string? eventType)
+        {
+            if (SchemaEvents.TryGetValue((schema, eventType), out var schemaEvent))
+            {
+                return schemaEvent;
+            }
+
+            using var ctx = ContextFactory.CreateDbContext();
+            schemaEvent = new Models.SchemaEventInfo
+            {
+                Schema = schema,
+                EventType = eventType
+            };
+
+            ctx.Add(schemaEvent);
+            ctx.SaveChanges();
+            SchemaEvents[(schema, eventType)] = schemaEvent;
+            return schemaEvent;
         }
 
         private Models.SignalInfoSet GetOrAddSignalInfoSet(ICollection<Models.SignalInfo> signals)
@@ -515,6 +545,13 @@ namespace EddnIndexUpdate
 
                 test |= prefix.StartsWith("Test-");
 
+                Models.SchemaEventInfo? primarySchemaEvent = null;
+
+                if (primarySchema?.PrimarySchema != null)
+                {
+                    primarySchemaEvent = GetOrAddSchemaEvent(primarySchema.PrimarySchema, primarySchema?.EventType ?? eventType);
+                }
+
                 using var ctx = ContextFactory.CreateDbContext();
 
                 file = new Models.File
@@ -523,7 +560,8 @@ namespace EddnIndexUpdate
                     Date = date,
                     PrimarySchema = primarySchema?.PrimarySchema,
                     EventType = primarySchema?.EventType ?? eventType,
-                    IsTest = primarySchema?.IsTest == true || test
+                    IsTest = primarySchema?.IsTest == true || test,
+                    PrimarySchemaEventId = primarySchemaEvent?.Id
                 };
 
                 ctx.Add(file);
@@ -696,6 +734,7 @@ namespace EddnIndexUpdate
                     GameVersion = data.GameVersionInfo,
                     Software = data.Software,
                     System = data.System,
+                    SchemaEvent = data.SchemaEvent,
                     IsBad = data.IsBad,
                 };
 
@@ -795,6 +834,13 @@ namespace EddnIndexUpdate
 
             SaveUpdates(newLines, newBodyLines, newStationLines, newNavRouteEntries, newSignalEntries, newBodySignalEntries);
 
+            Models.SchemaEventInfo? fileSchemaEvent = null;
+
+            if (file.PrimarySchema != null)
+            {
+                fileSchemaEvent = GetOrAddSchemaEvent(file.PrimarySchema, file.EventType);
+            }
+
             using (var ctx = ContextFactory.CreateDbContext())
             {
                 var fileEntry = ctx.Attach(file);
@@ -809,6 +855,7 @@ namespace EddnIndexUpdate
                 fileEntry.Property(e => e.BodySignalCount).CurrentValue = bodySignalCount;
                 fileEntry.Property(e => e.ErrorCount).CurrentValue = errorCount;
                 fileEntry.Property(e => e.ProcessedVersion).CurrentValue = Version;
+                fileEntry.Property(e => e.PrimarySchemaEventId).CurrentValue = fileSchemaEvent?.Id;
 
                 ctx.SaveChanges();
             }
@@ -937,31 +984,37 @@ namespace EddnIndexUpdate
                 var softwareUpdates = new Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
                 var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
                 var systemUpdates = new Dictionary<int, (Models.System Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+                var schemaEventUpdates = new Dictionary<int, (Models.SchemaEventInfo, DateTime? FirstSeen, DateTime? LastSeen)>();
 
                 foreach (var _ent in newLines.Values)
                 {
                     Assert(_ent.Software?.Id != 0);
                     Assert(_ent.GameVersion?.Id != 0);
                     Assert(_ent.System?.Id != 0);
+                    Assert(_ent.SchemaEvent?.Id != 0);
 
                     var software = _ent.Software;
                     var gameVersion = _ent.GameVersion;
                     var system = _ent.System;
                     var gatewayTimestamp = _ent.GatewayTimestamp;
+                    var schemaEvent = _ent.SchemaEvent;
 
                     var ent = _ent with
                     {
                         SoftwareId = software?.Id,
                         GameVersionId = gameVersion?.Id,
                         SystemId = system?.Id,
+                        SchemaEventId = schemaEvent?.Id,
                         GameVersion = null,
                         Software = null,
-                        System = null
+                        System = null,
+                        SchemaEvent = null
                     };
 
                     AddOrUpdateInfo(softwareUpdates, software, gatewayTimestamp);
                     AddOrUpdateInfo(gameVersionUpdates, gameVersion, gatewayTimestamp);
                     AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
+                    AddOrUpdateInfo(schemaEventUpdates, schemaEvent, gatewayTimestamp);
 
                     if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
                     {
@@ -969,6 +1022,7 @@ namespace EddnIndexUpdate
                         entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
                         entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
                         entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
+                        entry.Property(e => e.SchemaEventId).CurrentValue = ent.SchemaEventId;
                         entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
                         entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
                         entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;

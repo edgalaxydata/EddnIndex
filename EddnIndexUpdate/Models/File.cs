@@ -19,5 +19,8 @@
         public int? ErrorCount { get; set; }
         public bool? IsTest { get; set; }
         public int? ProcessedVersion { get; set; }
+        public int? PrimarySchemaEventId { get; set; }
+
+        public SchemaEventInfo? PrimarySchemaEvent { get; set; }
     }
 }

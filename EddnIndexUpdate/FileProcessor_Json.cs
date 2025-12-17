@@ -488,6 +488,7 @@ namespace EddnIndexUpdate
             else if (stationName != null)
             {
                 if (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials_capi/1") != true
+                    && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials/1") != true
                     && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/dockingdenied/1") != true
                     && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/dockinggranted/1") != true
                     && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials_journal/1") != true)
@@ -551,6 +552,11 @@ namespace EddnIndexUpdate
                             break;
                     }
                 }
+            }
+
+            if (data.Schema != null)
+            {
+                data.SchemaEvent = GetOrAddSchemaEvent(data.Schema, data.EventType);
             }
 
             data.GameVersionInfo = GetOrAddGameVersion(data.GameBuild, data.GameVersion, data.IsOdyssey, data.IsHorizons);

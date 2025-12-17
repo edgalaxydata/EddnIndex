@@ -33,6 +33,7 @@ namespace EddnIndexUpdate
         public Models.Station? Station { get; set; }
         public Models.SoftwareInfo? Software { get; set; }
         public Models.GameVersionInfo? GameVersionInfo { get; set; }
+        public Models.SchemaEventInfo? SchemaEvent { get; set; }
         public Dictionary<int, (string Name, decimal? innerRadius, decimal? outerRadius)> RingData => _ringData ??= [];
         public Dictionary<int, (Models.Body body, short? smaerror, short? aoperror, short? incerror)> SubBodies => _subBodies ??= [];
         public Dictionary<int, Models.System> NavRouteSystems => _navRouteSystems ??= [];
@@ -61,6 +62,7 @@ namespace EddnIndexUpdate
             Station = null;
             Software = null;
             GameVersionInfo = null;
+            SchemaEvent = null;
             RingData.Clear();
             SubBodies.Clear();
             NavRouteSystems.Clear();

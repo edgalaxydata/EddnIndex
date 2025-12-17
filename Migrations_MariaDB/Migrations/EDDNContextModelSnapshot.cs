@@ -331,6 +331,9 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("varchar(128)");
 
+                    b.Property<int?>("PrimarySchemaEventId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("int");
 
@@ -349,6 +352,8 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.HasKey("Id");
 
                     b.HasAlternateKey("FileName");
+
+                    b.HasIndex("PrimarySchemaEventId");
 
                     b.ToTable("Files", (string)null);
                 });
@@ -449,6 +454,9 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("int");
 
+                    b.Property<int?>("SchemaEventId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("SoftwareId")
                         .HasColumnType("int");
 
@@ -462,6 +470,8 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.HasKey("FileId", "LineNo");
 
                     b.HasIndex("GameVersionId");
+
+                    b.HasIndex("SchemaEventId");
 
                     b.HasIndex("SoftwareId");
 
@@ -688,6 +698,36 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.HasIndex("BodyID", "BodyType", "ParentSetId");
 
                     b.ToTable("ParentSets", (string)null);
+                });
+
+            modelBuilder.Entity("EddnIndexUpdate.Models.SchemaEventInfo", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("EventType")
+                        .HasMaxLength(32)
+                        .HasColumnType("varchar(32)");
+
+                    b.Property<DateTime?>("FirstSeen")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LastSeen")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("Schema")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Schema", "EventType");
+
+                    b.ToTable("SchemaEvents", (string)null);
                 });
 
             modelBuilder.Entity("EddnIndexUpdate.Models.Sector", b =>
@@ -1124,6 +1164,15 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Navigation("System");
                 });
 
+            modelBuilder.Entity("EddnIndexUpdate.Models.File", b =>
+                {
+                    b.HasOne("EddnIndexUpdate.Models.SchemaEventInfo", "PrimarySchemaEvent")
+                        .WithMany()
+                        .HasForeignKey("PrimarySchemaEventId");
+
+                    b.Navigation("PrimarySchemaEvent");
+                });
+
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineBody", b =>
                 {
                     b.HasOne("EddnIndexUpdate.Models.Body", "Body")
@@ -1158,6 +1207,10 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                         .WithMany()
                         .HasForeignKey("GameVersionId");
 
+                    b.HasOne("EddnIndexUpdate.Models.SchemaEventInfo", "SchemaEvent")
+                        .WithMany()
+                        .HasForeignKey("SchemaEventId");
+
                     b.HasOne("EddnIndexUpdate.Models.SoftwareInfo", "Software")
                         .WithMany()
                         .HasForeignKey("SoftwareId");
@@ -1167,6 +1220,8 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                         .HasForeignKey("SystemId");
 
                     b.Navigation("GameVersion");
+
+                    b.Navigation("SchemaEvent");
 
                     b.Navigation("Software");
 

@@ -12,9 +12,11 @@
         public DateTime? GatewayTimestamp { get; init; }
         public bool? IsBad { get; init; }
         public int? ProcessedVersion { get; init; }
+        public int? SchemaEventId { get; init; }
 
         public SoftwareInfo? Software { get; init; }
         public System? System { get; init; }
         public GameVersionInfo? GameVersion { get; init; }
+        public SchemaEventInfo? SchemaEvent { get; init; }
     }
 }

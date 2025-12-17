@@ -251,6 +251,15 @@ namespace EddnIndexUpdate.Models
                 m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
             });
 
+            modelBuilder.Entity<SchemaEventInfo>(m =>
+            {
+                m.ToTable("SchemaEvents");
+                m.HasKey(e => e.Id);
+                m.HasIndex(e => new { e.Schema, e.EventType });
+                m.Property(e => e.Schema).HasMaxLength(128);
+                m.Property(e => e.EventType).HasMaxLength(32);
+            });
+
             modelBuilder.Entity<Station>(m =>
             {
                 m.ToTable("Stations");
