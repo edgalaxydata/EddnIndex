@@ -433,6 +433,7 @@ namespace EddnIndexUpdate
                         ixbzStream.Seek(startPos, SeekOrigin.Begin);
                         ixbzStream.ReadExactly(buf.AsSpan(0, (int)(endPos - startPos)));
                         ixmemStream.Write(buf.AsSpan(0, (int)(endPos - startPos)));
+                        ixmemStream.Seek(0, SeekOrigin.Begin);
                         ArrayPool<byte>.Shared.Return(buf);
 
                         using var ixStream = new BZip2InputStream(ixmemStream);
