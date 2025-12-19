@@ -427,11 +427,13 @@ namespace EddnIndexUpdate
                 if (endPos > startPos && endPos - startPos < 1048576)
                 {
                     using var ixbzStream = File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    var buf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
-                    ixbzStream.ReadExactly(buf);
-
-                    using (var ixmemStream = new MemoryStream(buf))
+                    using (var ixmemStream = new MemoryStream())
                     {
+                        var buf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
+                        ixbzStream.Seek(startPos, SeekOrigin.Begin);
+                        ixbzStream.ReadExactly(buf.AsSpan(0, (int)(endPos - startPos)));
+                        ixmemStream.Write(buf.AsSpan(0, (int)(endPos - startPos)));
+
                         using var ixStream = new BZip2InputStream(ixmemStream);
                         using var ixReader = new EventReader(ixStream);
 
