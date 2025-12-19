@@ -493,6 +493,7 @@ namespace EddnIndexUpdate
                     if ((lineno % 1024) == 0)
                     {
                         bz2stream.Dispose();
+                        memStream.Seek(0, SeekOrigin.Begin);
                         memStream.CopyTo(rawFileStream);
                         memStream.Seek(0, SeekOrigin.Begin);
                         memStream.SetLength(0);
@@ -519,6 +520,7 @@ namespace EddnIndexUpdate
                 if ((lineno % 1024) != 0)
                 {
                     bz2stream.Dispose();
+                    memStream.Seek(0, SeekOrigin.Begin);
                     memStream.CopyTo(rawFileStream);
 
                     BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
