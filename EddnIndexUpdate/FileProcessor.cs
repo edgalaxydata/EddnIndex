@@ -8,6 +8,7 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace EddnIndexUpdate
@@ -402,9 +403,52 @@ namespace EddnIndexUpdate
             }
         }
 
-        private void WriteIndexedFile(string filepath, string indexFilename)
+        private void WriteIndexedFile(string filepath, string indexFilename, int? lineCount, bool force)
         {
             Logger.LogInformation("Writing indexed file {Filename}", indexFilename);
+
+            if (File.Exists(indexFilename)
+                && File.Exists(indexFilename + ".index")
+                && lineCount is int lineCountVal
+                && lineCountVal > 0
+                && !force
+                && new FileInfo(indexFilename + ".index") is { } ixInfo
+                && ixInfo.Length % 8 == 0
+                && ((lineCountVal + 1023) / 1024) <= (ixInfo.Length / 8) - 1)
+            {
+                using var indexStream = File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
+                indexStream.Seek(indexStream.Length - 16, SeekOrigin.Begin);
+                var ixlineno = (indexStream.Position / 8) * 1024;
+                long startPos = 0;
+                long endPos = 0;
+                indexStream.ReadExactly(MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref startPos, 1)));
+                indexStream.ReadExactly(MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref endPos, 1)));
+
+                if (endPos > startPos && endPos - startPos < 1048576)
+                {
+                    using var ixbzStream = File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
+                    var buf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
+                    ixbzStream.ReadExactly(buf);
+
+                    using (var ixmemStream = new MemoryStream(buf))
+                    {
+                        using var ixStream = new BZip2InputStream(ixmemStream);
+                        using var ixReader = new EventReader(ixStream);
+
+                        while (ixReader.TryReadLine(out _))
+                        {
+                            ixlineno++;
+                        }
+                    }
+
+                    ArrayPool<byte>.Shared.Return(buf);
+
+                    if (ixlineno >= lineCount)
+                    {
+                        return;
+                    }
+                }
+            }
 
             Stream stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
@@ -429,9 +473,12 @@ namespace EddnIndexUpdate
 
             while (reader.TryReadLine(out var line))
             {
-                var jsonReader = new Utf8JsonReader(line);
-                Debug.Assert(jsonReader.Read());
-                Debug.Assert(jsonReader.TrySkip());
+                if (line.Length > 1)
+                {
+                    var jsonReader = new Utf8JsonReader(line);
+                    Debug.Assert(jsonReader.Read());
+                    Debug.Assert(jsonReader.TrySkip());
+                }
 
                 var pos = line.Start;
 
@@ -589,7 +636,7 @@ namespace EddnIndexUpdate
 
             if (Settings.IndexedDir != null)
             {
-                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename));
+                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename), file.LineCount, fileinfo.Length > file.UncompressedSize);
             }
 
             Logger.LogInformation("Processing {Filename}", filename);
@@ -862,7 +909,7 @@ namespace EddnIndexUpdate
 
             if (Settings.IndexedDir != null && !filepath.EndsWith(".bz2") && reader.Position > fileinfo.Length)
             {
-                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename));
+                WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename), null, null);
             }
 
             SystemCache.Clear();
