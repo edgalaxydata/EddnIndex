@@ -458,67 +458,72 @@ namespace EddnIndexUpdate
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(indexFilename)!);
-            using var rawFileStream = File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
-            using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
-            using var memStream = new MemoryStream();
-            var bz2stream = new BZip2OutputStream(memStream, true);
-            var segments = new List<(byte[] buffer, ReadOnlyMemory<byte> memory)>();
-            Span<byte> idxspan = stackalloc byte[8];
-            BinaryPrimitives.WriteInt64LittleEndian(idxspan, 0);
-            rawFileIndexStream.Write(idxspan);
-
-            using var reader = new EventReader(stream);
-
-            int lineno = 0;
-
-            while (reader.TryReadLine(out var line))
+            using (var rawFileStream = File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
             {
-                if (line.Length > 1)
+                using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
+                using var memStream = new MemoryStream();
+                var bz2stream = new BZip2OutputStream(memStream, true);
+                var segments = new List<(byte[] buffer, ReadOnlyMemory<byte> memory)>();
+                Span<byte> idxspan = stackalloc byte[8];
+                BinaryPrimitives.WriteInt64LittleEndian(idxspan, 0);
+                rawFileIndexStream.Write(idxspan);
+
+                using var reader = new EventReader(stream);
+
+                int lineno = 0;
+
+                while (reader.TryReadLine(out var line))
                 {
-                    var jsonReader = new Utf8JsonReader(line);
-                    Debug.Assert(jsonReader.Read());
-                    Debug.Assert(jsonReader.TrySkip());
+                    if (line.Length > 1)
+                    {
+                        var jsonReader = new Utf8JsonReader(line);
+                        Debug.Assert(jsonReader.Read());
+                        Debug.Assert(jsonReader.TrySkip());
+                    }
+
+                    var pos = line.Start;
+
+                    while (line.TryGet(ref pos, out var mem, true))
+                    {
+                        bz2stream.Write(mem.Span);
+                    }
+
+                    lineno++;
+
+                    if ((lineno % 1024) == 0)
+                    {
+                        bz2stream.Dispose();
+                        memStream.CopyTo(rawFileStream);
+                        memStream.Seek(0, SeekOrigin.Begin);
+                        memStream.SetLength(0);
+
+                        bz2stream = new BZip2OutputStream(memStream, true);
+
+                        BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
+                        rawFileIndexStream.Write(idxspan);
+
+                        segments.Clear();
+
+                        Console.Error.Write(".");
+                        Console.Error.Flush();
+
+                        if ((lineno % 65536) == 0)
+                        {
+                            Console.Error.WriteLine($" {lineno}");
+                        }
+                    }
                 }
 
-                var pos = line.Start;
+                Console.Error.WriteLine($" {lineno}");
 
-                while (line.TryGet(ref pos, out var mem, true))
-                {
-                    bz2stream.Write(mem.Span);
-                }
-
-                lineno++;
-
-                if ((lineno % 1024) == 0)
+                if ((lineno % 1024) != 0)
                 {
                     bz2stream.Dispose();
                     memStream.CopyTo(rawFileStream);
-                    memStream.Seek(0, SeekOrigin.Begin);
-                    memStream.SetLength(0);
-
-                    bz2stream = new BZip2OutputStream(memStream, true);
 
                     BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
                     rawFileIndexStream.Write(idxspan);
-
-                    segments.Clear();
-
-                    Console.Error.Write(".");
-                    Console.Error.Flush();
-
-                    if ((lineno % 65536) == 0)
-                    {
-                        Console.Error.WriteLine($" {lineno}");
-                    }
                 }
-            }
-
-            Console.Error.WriteLine($" {lineno}");
-
-            if ((lineno % 1024) != 0)
-            {
-                bz2stream.Dispose();
-                memStream.CopyTo(rawFileStream);
             }
 
             File.Move(indexFilename + ".tmp", indexFilename, true);
