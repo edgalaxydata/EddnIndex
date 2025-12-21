@@ -1145,6 +1145,11 @@ namespace EddnIndexUpdate
                         entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
                         entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
                         entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
+                        entry.Property(e => e.HasBody).CurrentValue = ent.HasBody;
+                        entry.Property(e => e.HasStation).CurrentValue = ent.HasStation;
+                        entry.Property(e => e.SignalCount).CurrentValue = ent.SignalCount;
+                        entry.Property(e => e.BodySignalCount).CurrentValue = ent.BodySignalCount;
+                        entry.Property(e => e.NavRouteSystemCount).CurrentValue = ent.NavRouteSystemCount;
                     }
                     else
                     {
