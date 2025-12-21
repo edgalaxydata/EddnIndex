@@ -25,6 +25,7 @@ namespace EddnIndexUpdate
 
         private readonly Dictionary<string, Models.SignalInfoSet> SignalInfoSetCache = [];
         private readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
+        private readonly Dictionary<int, int> SignalInfoSetCounts = [];
         private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
         private readonly Dictionary<(int FileId, int LineNo), int> BodyInfoCounts = [];
         private readonly Dictionary<(int FileId, int LineNo), Models.FileLineInfo> LineInfoCache = [];
@@ -156,6 +157,16 @@ namespace EddnIndexUpdate
                     }
 
                     stnlist.Add(s);
+                }
+            }
+
+            if (SignalInfoSetCounts.Count == 0)
+            {
+                Logger.LogInformation("Loading signal counts");
+
+                foreach (var s in ctx.Set<Models.SignalInfoSet>().Select(e => new { e.Id, e.SignalCount }))
+                {
+                    SignalInfoSetCounts[s.Id] = s.SignalCount;
                 }
             }
 
@@ -325,6 +336,7 @@ namespace EddnIndexUpdate
                 if (!SignalInfoSetCacheById.TryGetValue(signalSet.Id, out var byid))
                 {
                     SignalInfoSetCacheById[signalSet.Id] = byid = signalSet;
+                    SignalInfoSetCounts[signalSet.Id] = signalSet.SignalCount;
                 }
 
                 SignalInfoSetCache[signalIdsJson] = byid;
@@ -409,11 +421,11 @@ namespace EddnIndexUpdate
             foreach (var line in ctx.Set<Models.FileLineSignal>().Where(e => e.FileId == fileid).AsNoTracking())
             {
                 SignalInfoCache[(line.FileId, line.LineNo)] = line;
-            }
 
-            foreach (var line in ctx.Set<Models.FileLineSignal>().Select(e => new { e.FileId, e.LineNo, e.SignalInfoSet!.SignalCount }).AsNoTracking())
-            {
-                SignalInfoCounts[(line.FileId, line.LineNo)] = line.SignalCount;
+                if (SignalInfoSetCounts.TryGetValue(line.SignalSetId, out var count))
+                {
+                    SignalInfoCounts[(line.FileId, line.LineNo)] = count;
+                }
             }
 
             foreach (var line in ctx.Set<Models.FileLineBodySignal>().Where(e => e.FileId == fileid).AsNoTracking())
@@ -982,8 +994,11 @@ namespace EddnIndexUpdate
             BodyInfoCache.Clear();
             StationInfoCache.Clear();
             NavRouteCache.Clear();
+            NavRouteCounts.Clear();
             SignalInfoCache.Clear();
+            SignalInfoCounts.Clear();
             BodySignalInfoCache.Clear();
+            BodySignalInfoCounts.Clear();
         }
 
         private static void AddOrUpdateInfo<T, TId>(Dictionary<TId, (T Info, DateTime? FirstSeen, DateTime? LastSeen)> updates, T? entry, DateTime? gatewayTimestamp)
