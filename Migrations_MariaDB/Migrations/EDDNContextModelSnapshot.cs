@@ -438,6 +438,9 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Property<int>("LineNo")
                         .HasColumnType("int");
 
+                    b.Property<int?>("BodySignalCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("GameVersionId")
                         .HasColumnType("int");
 
@@ -445,16 +448,28 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                         .HasPrecision(6)
                         .HasColumnType("datetime(6)");
 
+                    b.Property<bool?>("HasBody")
+                        .HasColumnType("tinyint(1)");
+
+                    b.Property<bool?>("HasStation")
+                        .HasColumnType("tinyint(1)");
+
                     b.Property<bool?>("IsBad")
                         .HasColumnType("tinyint(1)");
 
                     b.Property<int>("LineLength")
                         .HasColumnType("int");
 
+                    b.Property<int?>("NavRouteSystemCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("int");
 
                     b.Property<int?>("SchemaEventId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SignalCount")
                         .HasColumnType("int");
 
                     b.Property<int?>("SoftwareId")

@@ -13,6 +13,11 @@
         public bool? IsBad { get; init; }
         public int? ProcessedVersion { get; init; }
         public int? SchemaEventId { get; init; }
+        public bool? HasBody { get; init; }
+        public bool? HasStation { get; init; }
+        public int? BodySignalCount { get; init; }
+        public int? SignalCount { get; init; }
+        public int? NavRouteSystemCount { get; init; }
 
         public SoftwareInfo? Software { get; init; }
         public System? System { get; init; }

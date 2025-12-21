@@ -439,6 +439,9 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<int>("LineNo")
                         .HasColumnType("int");
 
+                    b.Property<int?>("BodySignalCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("GameVersionId")
                         .HasColumnType("int");
 
@@ -446,16 +449,28 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .HasPrecision(6)
                         .HasColumnType("datetime2(6)");
 
+                    b.Property<bool?>("HasBody")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("HasStation")
+                        .HasColumnType("bit");
+
                     b.Property<bool?>("IsBad")
                         .HasColumnType("bit");
 
                     b.Property<int>("LineLength")
                         .HasColumnType("int");
 
+                    b.Property<int?>("NavRouteSystemCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("int");
 
                     b.Property<int?>("SchemaEventId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SignalCount")
                         .HasColumnType("int");
 
                     b.Property<int?>("SoftwareId")

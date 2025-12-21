@@ -26,11 +26,15 @@ namespace EddnIndexUpdate
         private readonly Dictionary<string, Models.SignalInfoSet> SignalInfoSetCache = [];
         private readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
         private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
+        private readonly Dictionary<(int FileId, int LineNo), int> BodyInfoCounts = [];
         private readonly Dictionary<(int FileId, int LineNo), Models.FileLineInfo> LineInfoCache = [];
         private readonly Dictionary<(int FileId, int LineNo), Models.FileLineStation> StationInfoCache = [];
         private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineNavRoute> NavRouteCache = [];
+        private readonly Dictionary<(int FileId, int LineNo), int> NavRouteCounts = [];
         private readonly Dictionary<(int FileId, int LineNo), Models.FileLineSignal> SignalInfoCache = [];
+        private readonly Dictionary<(int FileId, int LineNo), int> SignalInfoCounts = [];
         private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBodySignal> BodySignalInfoCache = [];
+        private readonly Dictionary<(int FileId, int LineNo), int> BodySignalInfoCounts = [];
 
         private readonly Dictionary<string, Models.File> Files = [];
         private readonly Dictionary<(string Name, string Version), Models.SoftwareInfo> Software = [];
@@ -382,6 +386,11 @@ namespace EddnIndexUpdate
                 BodyInfoCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
             }
 
+            foreach (var grp in BodyInfoCache.Keys.GroupBy(e => (e.FileId, e.LineNo)))
+            {
+                BodyInfoCounts[grp.Key] = grp.Count();
+            }
+
             foreach (var line in ctx.Set<Models.FileLineStation>().Where(e => e.FileId == fileid).AsNoTracking())
             {
                 StationInfoCache[(line.FileId, line.LineNo)] = line;
@@ -392,14 +401,29 @@ namespace EddnIndexUpdate
                 NavRouteCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
             }
 
+            foreach (var grp in NavRouteCache.Keys.GroupBy(e => (e.FileId, e.LineNo)))
+            {
+                NavRouteCounts[grp.Key] = grp.Count();
+            }
+
             foreach (var line in ctx.Set<Models.FileLineSignal>().Where(e => e.FileId == fileid).AsNoTracking())
             {
                 SignalInfoCache[(line.FileId, line.LineNo)] = line;
             }
 
+            foreach (var line in ctx.Set<Models.FileLineSignal>().Select(e => new { e.FileId, e.LineNo, e.SignalInfoSet!.SignalCount }).AsNoTracking())
+            {
+                SignalInfoCounts[(line.FileId, line.LineNo)] = line.SignalCount;
+            }
+
             foreach (var line in ctx.Set<Models.FileLineBodySignal>().Where(e => e.FileId == fileid).AsNoTracking())
             {
                 BodySignalInfoCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
+            }
+
+            foreach (var grp in BodySignalInfoCache.Keys.GroupBy(e => (e.FileId, e.LineNo)))
+            {
+                BodySignalInfoCounts[grp.Key] = grp.Count();
             }
         }
 
@@ -706,8 +730,27 @@ namespace EddnIndexUpdate
                     }
                 }
 
-                if (LineInfoCache.TryGetValue((file.Id, lineCount), out var lineInfo) && lineInfo.ProcessedVersion == Version)
+                if (LineInfoCache.TryGetValue((file.Id, lineCount), out var lineInfo)
+                    && lineInfo.ProcessedVersion == Version
+                    && lineInfo.SchemaEventId != null
+                    && lineInfo.HasStation is bool hasStation
+                    && lineInfo.HasBody is bool hasBody
+                    && lineInfo.NavRouteSystemCount is int lineNavRouteSystemCount
+                    && lineInfo.BodySignalCount is int lineBodySignalCount
+                    && lineInfo.SignalCount is int lineSignalCount
+                    && BodyInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo, 0)) == hasBody
+                    && StationInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo)) == hasStation
+                    && BodySignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineBodySignalCount
+                    && SignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineSignalCount
+                    && NavRouteCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineNavRouteSystemCount)
                 {
+                    systemLineCount += lineInfo.SystemId != null ? 1 : 0;
+                    bodyLineCount += hasBody ? 1 : 0;
+                    stationLineCount += hasStation ? 1 : 0;
+                    navRouteSystemCount += lineNavRouteSystemCount;
+                    signalCount += lineSignalCount;
+                    bodySignalCount += lineBodySignalCount;
+
                     continue;
                 }
 
@@ -792,6 +835,11 @@ namespace EddnIndexUpdate
                     System = data.System,
                     SchemaEvent = data.SchemaEvent,
                     IsBad = data.IsBad,
+                    HasBody = data.Body != null,
+                    HasStation = data.Station != null,
+                    NavRouteSystemCount = data.NavRouteSystems.Count,
+                    BodySignalCount = data.BodySignals.Count,
+                    SignalCount = data.Signals.Count,
                 };
 
                 if (data.Body != null)
