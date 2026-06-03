@@ -57,8 +57,9 @@ for (int i = 0; i < args.Length; i++)
 }
 
 var config = new ConfigurationBuilder()
-    .AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true)
     .AddJsonFile("appsettings.json", optional: true)
+    .AddJsonFile("hosting.json", optional: true)
+    .AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true)
     .AddInMemoryCollection(cmdlineargs)
     .Build();
 
