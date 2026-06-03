@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="Dockerfile" />
+  </Folder>
+  <Project Path="EddnIndexUpdate/EddnIndexUpdate.csproj" />
+  <Project Path="Migrations_MariaDB/EddnIndexUpdate.Migrations_MariaDB.csproj" />
+  <Project Path="Migrations_Sqlite/EddnIndexUpdate.Migrations_Sqlite.csproj" />
+  <Project Path="Migrations_SqlServer/EddnIndexUpdate.Migrations_SqlServer.csproj" />
+</Solution>
