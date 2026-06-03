@@ -1,21 +1,20 @@
-﻿namespace EddnIndexUpdate.Models
+﻿namespace EddnIndexUpdate.Models;
+
+public record class BodyName : IHasId<int>
 {
-    public record class BodyName : IHasId<int>
+    public int Id { get; init; }
+    public required string Name { get; init; }
+
+    public virtual bool Equals(BodyName? other)
     {
-        public int Id { get; init; }
-        public required string Name { get; init; }
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
 
-        public virtual bool Equals(BodyName? other)
-        {
-            if (other is null) return false;
-            if (ReferenceEquals(this, other)) return true;
+        return this.Name == other.Name;
+    }
 
-            return this.Name == other.Name;
-        }
-
-        public override int GetHashCode()
-        {
-            return Name.GetHashCode();
-        }
+    public override int GetHashCode()
+    {
+        return Name.GetHashCode();
     }
 }

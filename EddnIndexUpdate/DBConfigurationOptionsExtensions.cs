@@ -2,90 +2,89 @@
 using Microsoft.Extensions.Configuration;
 using System.Data.Common;
 
-namespace EddnIndexUpdate
+namespace EddnIndexUpdate;
+
+public static class DBConfigurationOptionsExtensions
 {
-    public static class DBConfigurationOptionsExtensions
+    public static void ConfigureDB(this DbContextOptionsBuilder opts, IConfigurationSection section)
     {
-        public static void ConfigureDB(this DbContextOptionsBuilder opts, IConfigurationSection section)
+        var dbsettings = section.Get<Dictionary<string, object>>() ?? [];
+        dbsettings.Remove("Provider");
+        var provider = section.GetValue<string>("Provider")?.ToLowerInvariant();
+        DbConnectionStringBuilder csb;
+
+        if (provider == "mysql" || provider == "mariadb")
         {
-            var dbsettings = section.Get<Dictionary<string, object>>() ?? [];
-            dbsettings.Remove("Provider");
-            var provider = section.GetValue<string>("Provider")?.ToLowerInvariant();
-            DbConnectionStringBuilder csb;
+            csb = new MySqlConnector.MySqlConnectionStringBuilder();
+            dbsettings.Remove("ServerVersion");
+        }
+        else if (provider == "sqlite")
+        {
+            csb = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder();
+        }
+        else
+        {
+            csb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder();
+        }
 
-            if (provider == "mysql" || provider == "mariadb")
+        foreach (var (name, value) in dbsettings)
+        {
+            var prop = csb.GetType().GetProperty(name);
+
+            if (prop != null)
             {
-                csb = new MySqlConnector.MySqlConnectionStringBuilder();
-                dbsettings.Remove("ServerVersion");
-            }
-            else if (provider == "sqlite")
-            {
-                csb = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder();
+                if (prop.PropertyType == typeof(bool))
+                {
+                    prop.SetValue(csb, Convert.ToBoolean(value));
+                }
+                else if (prop.PropertyType == typeof(string))
+                {
+                    prop.SetValue(csb, Convert.ToString(value));
+                }
+                else if (typeof(IConvertible).IsAssignableFrom(prop.PropertyType))
+                {
+                    prop.SetValue(csb, Convert.ChangeType(value, prop.PropertyType));
+                }
             }
             else
             {
-                csb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder();
+                csb[name] = value;
             }
+        }
 
-            foreach (var (name, value) in dbsettings)
-            {
-                var prop = csb.GetType().GetProperty(name);
+        var connstring = csb.ToString();
 
-                if (prop != null)
-                {
-                    if (prop.PropertyType == typeof(bool))
-                    {
-                        prop.SetValue(csb, Convert.ToBoolean(value));
-                    }
-                    else if (prop.PropertyType == typeof(string))
-                    {
-                        prop.SetValue(csb, Convert.ToString(value));
-                    }
-                    else if (typeof(IConvertible).IsAssignableFrom(prop.PropertyType))
-                    {
-                        prop.SetValue(csb, Convert.ChangeType(value, prop.PropertyType));
-                    }
-                }
-                else
-                {
-                    csb[name] = value;
-                }
-            }
-
-            var connstring = csb.ToString();
-
-            if (provider == "mariadb")
-            {
-                opts.UseMySql(
-                    connstring,
-                    new MariaDbServerVersion(section.GetValue<string>("ServerVersion") ?? "11.0"),
-                    dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_MariaDB")
-                );
-                opts.AddInterceptors(new UTCTimeInterceptor());
-            }
-            else if (provider == "mysql")
-            {
-                opts.UseMySql(
-                    connstring,
-                    new MySqlServerVersion(section.GetValue<string>("ServerVersion") ?? "8.0"),
-                    dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_MySQL")
-                );
-                opts.AddInterceptors(new UTCTimeInterceptor());
-            }
-            else if (provider == "sqlite")
-            {
-                opts.UseSqlite(
-                    connstring,
-                    dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_Sqlite")
-                );
-            }
-            else
-            {
-                opts.UseSqlServer(
-                    connstring,
-                    dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_SqlServer")
-                );
-            }
+        if (provider == "mariadb")
+        {
+            opts.UseMySql(
+                connstring,
+                new MariaDbServerVersion(section.GetValue<string>("ServerVersion") ?? "11.0"),
+                dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_MariaDB")
+            );
+            opts.AddInterceptors(new UTCTimeInterceptor());
+        }
+        else if (provider == "mysql")
+        {
+            opts.UseMySql(
+                connstring,
+                new MySqlServerVersion(section.GetValue<string>("ServerVersion") ?? "8.0"),
+                dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_MySQL")
+            );
+            opts.AddInterceptors(new UTCTimeInterceptor());
+        }
+        else if (provider == "sqlite")
+        {
+            opts.UseSqlite(
+                connstring,
+                dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_Sqlite")
+            );
+        }
+        else
+        {
+            opts.UseSqlServer(
+                connstring,
+                dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_SqlServer")
+            );
         }
     }
 }

@@ -5,11 +5,10 @@ using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EddnIndexUpdate.Models
+namespace EddnIndexUpdate.Models;
+
+public interface IHasId<T>
+    where T : unmanaged
 {
-    public interface IHasId<T>
-        where T : unmanaged
-    {
-        T Id { get; }
-    }
+    T Id { get; }
 }

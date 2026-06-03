@@ -1,16 +1,15 @@
-﻿namespace EddnIndexUpdate
+﻿namespace EddnIndexUpdate;
+
+public enum BodyType
 {
-    public enum BodyType
-    {
-        None = 0,
-        Null,
-        Star,
-        Planet,
-        Ring,
-        PlanetaryRing,
-        StellarRing,
-        AsteroidCluster,
-        SmallBody,
-        Station
-    }
+    None = 0,
+    Null,
+    Star,
+    Planet,
+    Ring,
+    PlanetaryRing,
+    StellarRing,
+    AsteroidCluster,
+    SmallBody,
+    Station
 }

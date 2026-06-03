@@ -4,14 +4,13 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EddnIndexUpdate.Models
+namespace EddnIndexUpdate.Models;
+
+public class SchemaEventInfo : IHasFirstLastSeen, IHasId<int>
 {
-    public class SchemaEventInfo : IHasFirstLastSeen, IHasId<int>
-    {
-        public int Id { get; set; }
-        public required string Schema { get; init; }
-        public string? EventType { get; init; }
-        public DateTime? FirstSeen { get; set; }
-        public DateTime? LastSeen { get; set; }
-    }
+    public int Id { get; set; }
+    public required string Schema { get; init; }
+    public string? EventType { get; init; }
+    public DateTime? FirstSeen { get; set; }
+    public DateTime? LastSeen { get; set; }
 }

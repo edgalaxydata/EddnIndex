@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace EddnIndexUpdate.Models
+namespace EddnIndexUpdate.Models;
+
+public interface IHasFirstLastSeen
 {
-    public interface IHasFirstLastSeen
-    {
-        DateTime? FirstSeen { get; }
-        DateTime? LastSeen { get; }
-    }
+    DateTime? FirstSeen { get; }
+    DateTime? LastSeen { get; }
 }

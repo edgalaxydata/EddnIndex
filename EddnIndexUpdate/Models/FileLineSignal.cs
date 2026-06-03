@@ -1,14 +1,13 @@
-﻿namespace EddnIndexUpdate.Models
-{
-    public record class FileLineSignal
-    {
-        public int FileId { get; init; }
-        public int LineNo { get; init; }
-        public int SignalSetId { get; init; }
-        public int? SystemId { get; init; }
-        public DateTime? GatewayTimestamp { get; init; }
+﻿namespace EddnIndexUpdate.Models;
 
-        public SignalInfoSet? SignalInfoSet { get; init; }
-        public System? System { get; init; }
-    }
+public record class FileLineSignal
+{
+    public int FileId { get; init; }
+    public int LineNo { get; init; }
+    public int SignalSetId { get; init; }
+    public int? SystemId { get; init; }
+    public DateTime? GatewayTimestamp { get; init; }
+
+    public SignalInfoSet? SignalInfoSet { get; init; }
+    public System? System { get; init; }
 }
