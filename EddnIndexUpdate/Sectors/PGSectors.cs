@@ -583,7 +583,7 @@ public static class PGSectors
             x = (x | x >> 8) & 0x001F0000FF0000FFUL;
             x = (x | x >> 16) & 0x001F00000000FFFFUL;
             x = (x | x >> 32) & 0x00000000001FFFFFUL;
-            return new ByteXYZ ((sbyte)(x & 0x7F), (sbyte)(x >> 7 & 0x7F), (sbyte)(x >> 14 & 0x7F));
+            return new ByteXYZ((sbyte)(x & 0x7F), (sbyte)(x >> 7 & 0x7F), (sbyte)(x >> 14 & 0x7F));
         }
     }
 }

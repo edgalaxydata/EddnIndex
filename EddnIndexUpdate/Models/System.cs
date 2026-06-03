@@ -1,5 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Metadata;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
 
 namespace EddnIndexUpdate.Models;
 
@@ -23,13 +22,13 @@ public record class System : IHasFirstLastSeen, IHasId<int>
         get => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
         set { }
     }
-    
+
     public int? SectorAddress
     {
         get => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
         set { }
     }
-    
+
     public string? PGSuffix
     {
         get => GetPGSuffix(SystemNameId);
@@ -47,7 +46,7 @@ public record class System : IHasFirstLastSeen, IHasId<int>
         get => SystemNameId >= (1L << 60);
         set { }
     }
-    
+
     public long? SystemAddress
     {
         get => ModSystemAddressToSystemAddress(ModSystemAddress);

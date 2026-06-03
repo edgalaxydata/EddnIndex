@@ -34,6 +34,6 @@ public readonly record struct HandAuthoredSector
     public (uint x, uint y, uint z) GetBaseBlockCoords(int masscode)
     {
         uint mult = 10U * (1U << 7 - masscode);
-        return ( (uint)((X0 + 49985) / mult), (uint)((Y0 + 40985) / mult), (uint)((Z0 + 24105) / mult) );
+        return ((uint)((X0 + 49985) / mult), (uint)((Y0 + 40985) / mult), (uint)((Z0 + 24105) / mult));
     }
 }
