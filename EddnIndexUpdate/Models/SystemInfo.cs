@@ -2,7 +2,7 @@
 
 namespace EddnIndexUpdate.Models;
 
-public record class System : IHasFirstLastSeen, IHasId<int>
+public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
 {
     public int Id { get; set; }
     public long? SystemNameId { get; init; }
@@ -77,7 +77,7 @@ public record class System : IHasFirstLastSeen, IHasId<int>
         set { }
     }
 
-    public virtual bool Equals(System? other)
+    public virtual bool Equals(SystemInfo? other)
     {
         if (other is null) return false;
         if (ReferenceEquals(other, this)) return true;

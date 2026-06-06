@@ -37,14 +37,14 @@ public partial class FileProcessor(
     private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBodySignal> BodySignalInfoCache = [];
     private readonly Dictionary<(int FileId, int LineNo), int> BodySignalInfoCounts = [];
 
-    private readonly Dictionary<string, Models.File> Files = [];
+    private readonly Dictionary<string, Models.FileInfo> Files = [];
     private readonly Dictionary<(string Name, string Version), Models.SoftwareInfo> Software = [];
     private readonly Dictionary<(string? Version, string? Build, bool? IsOdyssey, bool? IsHorizons), Models.GameVersionInfo> GameVersions = [];
     private readonly Dictionary<(string SignalName, string? SignalType, bool? IsStation), Models.SignalInfo> Signals = [];
     private readonly Dictionary<(string Schema, string? EventType), Models.SchemaEventInfo> SchemaEvents = [];
     private readonly Dictionary<int, Models.SignalInfo> SignalsById = [];
     private readonly Dictionary<(string Type, int? Count, string? Category, string? SubCategory, string? Region, long? EntryID), Models.BodySignalInfo> BodySignals = [];
-    private readonly Dictionary<(string? StationName, long? MarketId, string? StationType, string? SystemName, long? SystemAddress, string? BodyName), List<Models.Station>> Stations = [];
+    private readonly Dictionary<(string? StationName, long? MarketId, string? StationType, string? SystemName, long? SystemAddress, string? BodyName), List<Models.StationInfo>> Stations = [];
 
     private readonly HttpClient HttpClient = new();
 
@@ -90,7 +90,7 @@ public partial class FileProcessor(
         {
             Logger.LogInformation("Loading file info");
 
-            foreach (var file in ctx.Set<Models.File>().AsNoTracking())
+            foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking())
             {
                 Files[file.FileName] = file;
             }
@@ -149,7 +149,7 @@ public partial class FileProcessor(
         {
             Logger.LogInformation("Loading stations");
 
-            foreach (var s in ctx.Set<Models.Station>().AsNoTracking())
+            foreach (var s in ctx.Set<Models.StationInfo>().AsNoTracking())
             {
                 if (!Stations.TryGetValue((s.StationName, s.MarketId, s.StationType, s.SystemName, s.SystemAddress, s.BodyName), out var stnlist))
                 {
@@ -219,7 +219,7 @@ public partial class FileProcessor(
         return version;
     }
 
-    private Models.Station GetOrAddStation(string? stationName, long? marketId, string? stationType, string? systemName, long? systemAddress, string? bodyName, decimal? latitude, decimal? longitude)
+    private Models.StationInfo GetOrAddStation(string? stationName, long? marketId, string? stationType, string? systemName, long? systemAddress, string? bodyName, decimal? latitude, decimal? longitude)
     {
         if (stationType == "FleetCarrier" || (marketId >= 3700_000_000 && marketId < 3789_600_000))
         {
@@ -246,7 +246,7 @@ public partial class FileProcessor(
 
         using var ctx = ContextFactory.CreateDbContext();
 
-        var station = new Models.Station
+        var station = new Models.StationInfo
         {
             StationName = stationName,
             MarketId = marketId,
@@ -646,7 +646,7 @@ public partial class FileProcessor(
 
             using var ctx = ContextFactory.CreateDbContext();
 
-            file = new Models.File
+            file = new Models.FileInfo
             {
                 FileName = filename,
                 Date = date,
@@ -1102,7 +1102,7 @@ public partial class FileProcessor(
         {
             var softwareUpdates = new Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
             var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-            var systemUpdates = new Dictionary<int, (Models.System Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+            var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
             var schemaEventUpdates = new Dictionary<int, (Models.SchemaEventInfo, DateTime? FirstSeen, DateTime? LastSeen)>();
 
             foreach (var _ent in newLines.Values)
@@ -1186,7 +1186,7 @@ public partial class FileProcessor(
 
         using (var ctx = ContextFactory.CreateDbContext())
         {
-            var bodyUpdates = new Dictionary<long, (Models.Body Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+            var bodyUpdates = new Dictionary<long, (Models.BodyInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
             foreach (var _ent in newBodyLines.Values)
             {
@@ -1231,7 +1231,7 @@ public partial class FileProcessor(
 
         using (var ctx = ContextFactory.CreateDbContext())
         {
-            var stationUpdates = new Dictionary<int, (Models.Station Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+            var stationUpdates = new Dictionary<int, (Models.StationInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
             foreach (var _ent in newStationLines.Values)
             {
@@ -1276,7 +1276,7 @@ public partial class FileProcessor(
 
         using (var ctx = ContextFactory.CreateDbContext())
         {
-            var systemUpdates = new Dictionary<int, (Models.System Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+            var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
             foreach (var _ent in newNavRouteEntries.Values)
             {

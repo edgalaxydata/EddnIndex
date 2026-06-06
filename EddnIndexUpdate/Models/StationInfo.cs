@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models;
 
-public record class Station : IHasFirstLastSeen, IHasId<int>
+public record class StationInfo : IHasFirstLastSeen, IHasId<int>
 {
     public int Id { get; set; }
     public long? MarketId { get; init; }
@@ -17,7 +17,7 @@ public record class Station : IHasFirstLastSeen, IHasId<int>
     public DateTime? FirstSeen { get; set; }
     public DateTime? LastSeen { get; set; }
 
-    public virtual bool Equals(Station? other)
+    public virtual bool Equals(StationInfo? other)
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;

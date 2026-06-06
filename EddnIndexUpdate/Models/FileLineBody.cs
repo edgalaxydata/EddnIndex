@@ -11,5 +11,5 @@ public record class FileLineBody
     public short? InclinationError { get; init; }
     public short? SemiMajorAxisError { get; init; }
 
-    public Body? Body { get; init; }
+    public BodyInfo? Body { get; init; }
 }

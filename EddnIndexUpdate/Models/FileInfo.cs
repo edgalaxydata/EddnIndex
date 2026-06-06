@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models;
 
-public record class File : IHasId<int>
+public record class FileInfo : IHasId<int>
 {
     public int Id { get; set; }
     public required string FileName { get; init; }

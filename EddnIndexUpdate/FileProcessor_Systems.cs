@@ -8,8 +8,8 @@ namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private readonly Dictionary<(string? SystemName, long? SystemAddress, decimal? X, decimal? Y, decimal? Z), Models.System> SystemCache = [];
-    private readonly Dictionary<int, Models.System> SystemCacheById = [];
+    private readonly Dictionary<(string? SystemName, long? SystemAddress, decimal? X, decimal? Y, decimal? Z), Models.SystemInfo> SystemCache = [];
+    private readonly Dictionary<int, Models.SystemInfo> SystemCacheById = [];
 
     private readonly Dictionary<string, Models.SystemName> SystemNames = [];
     private readonly Dictionary<int, Models.SystemName> SystemNamesById = [];
@@ -255,7 +255,7 @@ public partial class FileProcessor
             && masscode < 8)
         {
             var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
-            var checkSuffix = Models.System.GetPGSuffix(boxelid);
+            var checkSuffix = Models.SystemInfo.GetPGSuffix(boxelid);
             Assert(name.EndsWith(checkSuffix), extraData: new { name, checkSuffix });
 
             var sector = GetOrAddSector(sectorName);
@@ -327,7 +327,7 @@ public partial class FileProcessor
         return Math.Round(val * 32) / 32;
     }
 
-    private Models.System GetOrAddSystem(string? name, long? systemAddress, decimal? x, decimal? y, decimal? z)
+    private Models.SystemInfo GetOrAddSystem(string? name, long? systemAddress, decimal? x, decimal? y, decimal? z)
     {
         x = RoundCoords(x);
         y = RoundCoords(y);
@@ -344,8 +344,8 @@ public partial class FileProcessor
         }
 
         var nameid = GetOrAddSystemName(name);
-        var modsysaddr = Models.System.SystemAddressToModSystemAddress(systemAddress);
-        var revsysaddr = Models.System.ModSystemAddressToSystemAddress(modsysaddr);
+        var modsysaddr = Models.SystemInfo.SystemAddressToModSystemAddress(systemAddress);
+        var revsysaddr = Models.SystemInfo.ModSystemAddressToSystemAddress(modsysaddr);
         Assert(systemAddress == revsysaddr, extraData: new { modsysaddr, systemAddress, revsysaddr });
         var namemodsysaddr = TryGetNameModSystemAddress(nameid);
 
@@ -377,7 +377,7 @@ public partial class FileProcessor
 
             if (overrides is [{ } ovr])
             {
-                namemodsysaddr ??= Models.System.SystemAddressToModSystemAddress(ovr.SystemAddress);
+                namemodsysaddr ??= Models.SystemInfo.SystemAddressToModSystemAddress(ovr.SystemAddress);
 
                 if ((systemAddress == null || ovr.SystemAddress == systemAddress)
                     && (ovr.X == null || x == null || ovr.X == x)
@@ -392,8 +392,8 @@ public partial class FileProcessor
 
         modsysaddr ??= namemodsysaddr;
 
-        var namesysaddr = Models.System.ModSystemAddressToSystemAddress(namemodsysaddr);
-        var revnamemodsysaddr = Models.System.SystemAddressToModSystemAddress(namesysaddr);
+        var namesysaddr = Models.SystemInfo.ModSystemAddressToSystemAddress(namemodsysaddr);
+        var revnamemodsysaddr = Models.SystemInfo.SystemAddressToModSystemAddress(namesysaddr);
         Assert(namemodsysaddr == revnamemodsysaddr, extraData: new { namemodsysaddr, namesysaddr, revnamemodsysaddr });
 
         systemAddress ??= namesysaddr;
@@ -401,7 +401,7 @@ public partial class FileProcessor
         using var ctx = ContextFactory.CreateDbContext();
 
         system =
-            ctx.Set<Models.System>()
+            ctx.Set<Models.SystemInfo>()
                .AsNoTracking()
                .FirstOrDefault(e => e.SystemNameId == nameid
                                  && e.ModSystemAddress == modsysaddr
@@ -428,7 +428,7 @@ public partial class FileProcessor
             return system;
         }
 
-        system = new Models.System
+        system = new Models.SystemInfo
         {
             SystemNameId = nameid,
             ModSystemAddress = modsysaddr,

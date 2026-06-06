@@ -8,8 +8,8 @@ namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private readonly Dictionary<(string? BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.Body>> BodyCache = [];
-    private readonly Dictionary<long, Models.Body> BodyCacheById = [];
+    private readonly Dictionary<(string? BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.BodyInfo>> BodyCache = [];
+    private readonly Dictionary<long, Models.BodyInfo> BodyCacheById = [];
 
     private readonly Dictionary<string, Models.BodyName> BodyNames = [];
     private readonly Dictionary<string, Models.BodyDesignation> BodyDesignations = [];
@@ -324,7 +324,7 @@ public partial class FileProcessor
     private int? GetOrAddBodyName(
             string? name,
             string? systemName,
-            Models.System system,
+            Models.SystemInfo system,
             int? bodyId,
             string? bodyType,
             decimal? argOfPeriapsis,
@@ -450,11 +450,11 @@ public partial class FileProcessor
     }
 
     private bool TryGetMatchingBody(
-            List<Models.Body> bodiesList,
+            List<Models.BodyInfo> bodiesList,
             decimal? argOfPeriapsis,
             decimal? inclination,
             decimal? semiMajorAxis,
-            [NotNullWhen(true)] out Models.Body? body,
+            [NotNullWhen(true)] out Models.BodyInfo? body,
             out short? semiMajorAxisError,
             out short? inclinationError,
             out short? argOfPeriapsisError
@@ -526,7 +526,7 @@ public partial class FileProcessor
         return body != null;
     }
 
-    private (Models.Body body, short? smaerror, short? aoperror, short? incerror) GetOrAddBody(
+    private (Models.BodyInfo body, short? smaerror, short? aoperror, short? incerror) GetOrAddBody(
             string? name,
             string? systemName,
             int? bodyId,
@@ -537,7 +537,7 @@ public partial class FileProcessor
             decimal? semiMajorAxis,
             DateTime? timestamp,
             string? gameVersion,
-            Models.System system
+            Models.SystemInfo system
         )
     {
         if (argOfPeriapsis == null || inclination == null || semiMajorAxis == null || semiMajorAxis <= 0)
@@ -565,7 +565,7 @@ public partial class FileProcessor
             using var ctx = ContextFactory.CreateDbContext();
 
             bodyList.AddRange(
-                ctx.Set<Models.Body>()
+                ctx.Set<Models.BodyInfo>()
                    .Where(e =>
                         e.SystemId == system.Id
                         && e.BodyNameId == bodyNameId
@@ -649,7 +649,7 @@ public partial class FileProcessor
             sma *= 0.1m;
         }
 
-        body = new Models.Body
+        body = new Models.BodyInfo
         {
             BodyNameId = bodyNameId,
             BodyDesignationId = bodyDesigId,

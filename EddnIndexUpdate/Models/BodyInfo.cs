@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models;
 
-public record class Body : IHasFirstLastSeen, IHasId<long>
+public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
 {
     public long Id { get; set; }
     public int SystemId { get; set; }
@@ -19,10 +19,10 @@ public record class Body : IHasFirstLastSeen, IHasId<long>
     public DateTime? FirstSeen { get; set; }
     public DateTime? LastSeen { get; set; }
 
-    public System? System { get; set; }
+    public SystemInfo? System { get; set; }
     public ParentSet? ParentSet { get; set; }
 
-    public virtual bool Equals(Body? other)
+    public virtual bool Equals(BodyInfo? other)
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;

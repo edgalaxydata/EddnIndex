@@ -12,5 +12,5 @@ public record class FileLineBodySignal
     public DateTime? GatewayTimestamp { get; init; }
 
     public BodySignalInfo? Signal { get; init; }
-    public Body? Body { get; init; }
+    public BodyInfo? Body { get; init; }
 }

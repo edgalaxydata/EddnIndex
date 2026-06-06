@@ -20,7 +20,7 @@ public record class FileLineInfo
     public int? NavRouteSystemCount { get; init; }
 
     public SoftwareInfo? Software { get; init; }
-    public System? System { get; init; }
+    public SystemInfo? System { get; init; }
     public GameVersionInfo? GameVersion { get; init; }
     public SchemaEventInfo? SchemaEvent { get; init; }
 }

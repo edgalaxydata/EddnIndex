@@ -9,5 +9,5 @@ public record class FileLineStation
     public short? LatitudeError { get; init; }
     public short? LongitudeError { get; init; }
 
-    public Station? Station { get; init; }
+    public StationInfo? Station { get; init; }
 }

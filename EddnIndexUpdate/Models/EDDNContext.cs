@@ -14,7 +14,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Body>(m =>
+        modelBuilder.Entity<BodyInfo>(m =>
         {
             m.ToTable("Bodies");
             m.HasKey(e => e.Id);
@@ -87,7 +87,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
         });
 
-        modelBuilder.Entity<File>(m =>
+        modelBuilder.Entity<FileInfo>(m =>
         {
             m.ToTable("Files");
             m.HasKey(e => e.Id);
@@ -260,7 +260,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.EventType).HasMaxLength(32);
         });
 
-        modelBuilder.Entity<Station>(m =>
+        modelBuilder.Entity<StationInfo>(m =>
         {
             m.ToTable("Stations");
             m.HasKey(e => e.Id);
@@ -278,7 +278,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
         });
 
-        modelBuilder.Entity<System>(m =>
+        modelBuilder.Entity<SystemInfo>(m =>
         {
             m.ToTable("Systems");
             m.HasKey(e => e.Id);

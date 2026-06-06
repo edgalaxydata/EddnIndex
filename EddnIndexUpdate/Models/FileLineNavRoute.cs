@@ -8,5 +8,5 @@ public record class FileLineNavRoute
     public int SystemId { get; init; }
     public DateTime? GatewayTimestamp { get; init; }
 
-    public System? System { get; init; }
+    public SystemInfo? System { get; init; }
 }

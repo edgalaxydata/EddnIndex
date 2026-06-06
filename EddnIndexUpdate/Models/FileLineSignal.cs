@@ -9,5 +9,5 @@ public record class FileLineSignal
     public DateTime? GatewayTimestamp { get; init; }
 
     public SignalInfoSet? SignalInfoSet { get; init; }
-    public System? System { get; init; }
+    public SystemInfo? System { get; init; }
 }
