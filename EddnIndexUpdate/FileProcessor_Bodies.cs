@@ -359,7 +359,7 @@ public partial class FileProcessor
             {
                 var sysNameSpan = name.AsSpan(0, spacePos);
 
-                if (TrySplitProcgenName(sysNameSpan, out var sectorName, out _, out _, out _)
+                if (Models.SystemInfo.TrySplitProcgenName(sysNameSpan, out var sectorName, out _, out _, out _)
                     && Sectors.ContainsKey(sectorName)
                     && TryGetBodyDesignation(name, sysNameSpan, bodyId, bodyType, argOfPeriapsis, inclination, out desig))
                 {

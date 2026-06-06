@@ -143,72 +143,6 @@ public partial class FileProcessor
         }
     }
 
-    private static bool TrySplitProcgenName(ReadOnlySpan<char> systemname, [NotNullWhen(true)] out string? sectorname, out int mid, out int n2, out int masscode)
-    {
-        var sn = systemname;
-
-        int i = sn.Length - 1;
-
-        if (i < 9) goto fail;                                   // a bc-d e0
-
-        if (sn[i] < '0' || sn[i] > '9') goto fail;              // cepheus dark region a sector xy-z a1-[0]
-
-        n2 = 0;
-        int mult = 1;
-        while (i > 8 && sn[i] >= '0' && sn[i] <= '9')
-        {
-            n2 += (sn[i] - '0') * mult;
-            i--;
-            mult *= 10;
-        }
-
-        mid = 0;
-        if (sn[i] == '-')                                          // cepheus dark region a sector xy-z a1[-]0
-        {
-            i--;
-
-            int vend = i;
-            mult = 1;
-            while (i > 8 && sn[i] >= '0' && sn[i] <= '9')          // cepheus dark region a sector xy-z a[1]-0
-            {
-                mid += (sn[i] - '0') * mult;
-                i--;
-                mult *= 10;
-            }
-
-            if (i == vend) goto fail;
-        }
-
-        mid *= 26 * 26 * 26;
-
-        if (sn[i] < 'a' || sn[i] > 'h') goto fail;              // cepheus dark region a sector xy-z [a]1-0
-        masscode = (sn[i] - 'a');
-        i--;
-        if (sn[i] != ' ') goto fail;                            // cepheus dark region a sector xy-z[ ]a1-0
-        i--;
-        if (sn[i] < 'A' || sn[i] > 'Z') goto fail;              // cepheus dark region a sector xy-[z] a1-0
-        mid += (sn[i] - 'A') * 26 * 26;
-        i--;
-        if (sn[i] != '-') goto fail;                            // cepheus dark region a sector xy[-]z a1-0
-        i--;
-        if (sn[i] < 'A' || sn[i] > 'Z') goto fail;              // cepheus dark region a sector x[y]-z a1-0
-        mid += (sn[i] - 'A') * 26;
-        i--;
-        if (sn[i] < 'A' || sn[i] > 'Z') goto fail;              // cepheus dark region a sector [x]y-z a1-0
-        mid += (sn[i] - 'A');
-        i--;
-        if (sn[i] != ' ') goto fail;                            // cepheus dark region a sector[ ]xy-z a1-0
-        sectorname = new string(systemname[..i]);               // [cepheus dark region a sector] xy-z a1-0
-        return true;
-
-    fail:
-        sectorname = null;
-        mid = 0;
-        n2 = 0;
-        masscode = 0;
-        return false;
-    }
-
     private Models.Sector GetOrAddSector(string name)
     {
         if (Sectors.TryGetValue(name, out var sector)) return sector;
@@ -246,7 +180,7 @@ public partial class FileProcessor
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
 
-        if (TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode)
+        if (Models.SystemInfo.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode)
             && n2 >= 0
             && n2 < 65536
             && mid >= 0

@@ -116,6 +116,76 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
         );
     }
 
+    public static bool TrySplitProcgenName(ReadOnlySpan<char> systemname, [NotNullWhen(true)] out string? sectorname, out int mid, out int n2, out int masscode, bool caseSensitive = true)
+    {
+        Func<char, bool> isLetterUpper = caseSensitive ? char.IsAsciiLetterUpper : char.IsAsciiLetter;
+        Func<char, char> toUpper = caseSensitive ? e => e : char.ToUpperInvariant;
+        Func<char, char> toLower = caseSensitive ? e => e : char.ToLowerInvariant;
+
+        var sn = systemname;
+
+        int i = sn.Length - 1;
+
+        if (i < 9) goto fail;                                   // a bc-d e0
+
+        if (!char.IsAsciiDigit(sn[i])) goto fail;               // cepheus dark region a sector xy-z a1-[0]
+
+        n2 = 0;
+        int mult = 1;
+        while (i > 8 && char.IsAsciiDigit(sn[i]))
+        {
+            n2 += (sn[i] - '0') * mult;
+            i--;
+            mult *= 10;
+        }
+
+        mid = 0;
+        if (sn[i] == '-')                                       // cepheus dark region a sector xy-z a1[-]0
+        {
+            i--;
+
+            int vend = i;
+            mult = 1;
+            while (i > 8 && char.IsAsciiDigit(sn[i]))           // cepheus dark region a sector xy-z a[1]-0
+            {
+                mid += (sn[i] - '0') * mult;
+                i--;
+                mult *= 10;
+            }
+
+            if (i == vend) goto fail;
+        }
+
+        mid *= 26 * 26 * 26;
+
+        masscode = (toLower(sn[i]) - 'a');
+        if (masscode is < 0 or > 7) goto fail;                  // cepheus dark region a sector xy-z [a]1-0
+        i--;
+        if (sn[i] != ' ') goto fail;                            // cepheus dark region a sector xy-z[ ]a1-0
+        i--;
+        if (!isLetterUpper(sn[i])) goto fail;                   // cepheus dark region a sector xy-[z] a1-0
+        mid += (toUpper(sn[i]) - 'A') * 26 * 26;
+        i--;
+        if (sn[i] != '-') goto fail;                            // cepheus dark region a sector xy[-]z a1-0
+        i--;
+        if (!isLetterUpper(sn[i])) goto fail;                   // cepheus dark region a sector x[y]-z a1-0
+        mid += (toUpper(sn[i]) - 'A') * 26;
+        i--;
+        if (!isLetterUpper(sn[i])) goto fail;                   // cepheus dark region a sector [x]y-z a1-0
+        mid += (toUpper(sn[i]) - 'A');
+        i--;
+        if (sn[i] != ' ') goto fail;                            // cepheus dark region a sector[ ]xy-z a1-0
+        sectorname = new string(systemname[..i]);               // [cepheus dark region a sector] xy-z a1-0
+        return true;
+
+    fail:
+        sectorname = null;
+        mid = 0;
+        n2 = 0;
+        masscode = 0;
+        return false;
+    }
+
     public static long? SystemAddressToModSystemAddress(long? systemAddress)
     {
         if (systemAddress is not long sysaddr || sysaddr < 0)

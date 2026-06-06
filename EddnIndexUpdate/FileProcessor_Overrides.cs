@@ -463,7 +463,7 @@ public partial class FileProcessor
                     syslist.Remove(prev);
                     syslist.Add(prev with { ValidTo = date });
                 }
-                else if (!TrySplitProcgenName(sysname, out _, out _, out _, out _))
+                else if (!Models.SystemInfo.TrySplitProcgenName(sysname, out _, out _, out _, out _))
                 {
                     syslist.Add(new Models.SystemNameOverride
                     {
