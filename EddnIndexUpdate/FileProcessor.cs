@@ -8,7 +8,6 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace EddnIndexUpdate;
@@ -457,8 +456,10 @@ public partial class FileProcessor(
             var ixlineno = (indexStream.Position / 8) * 1024;
             long startPos = 0;
             long endPos = 0;
-            indexStream.ReadExactly(MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref startPos, 1)));
-            indexStream.ReadExactly(MemoryMarshal.AsBytes(MemoryMarshal.CreateSpan(ref endPos, 1)));
+            Span<byte> ixStartEndData = stackalloc byte[16];
+            indexStream.ReadExactly(ixStartEndData);
+            startPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndData);
+            endPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndData[8..]);
 
             if (endPos > startPos && endPos - startPos < 1048576)
             {
