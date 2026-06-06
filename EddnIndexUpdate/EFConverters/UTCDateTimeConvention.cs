@@ -17,7 +17,7 @@ public class UTCDateTimeConvention : IModelFinalizingConvention
                     {
                         propertyBuilder.HasConversion(new UTCDateTimeConverterNonNull(precision));
                     }
-                    else if (property.ClrType == typeof(DateTimeOffset))
+                    else if (property.ClrType == typeof(DateTime?))
                     {
                         propertyBuilder.HasConversion(new UTCDateTimeConverter(precision));
                     }
