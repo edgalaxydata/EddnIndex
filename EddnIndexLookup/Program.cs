@@ -13,7 +13,11 @@ builder.Configuration.AddJsonFile("hosting.json", optional: true);
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
 
 builder.Services.AddControllers()
-                .AddJsonOptions(opts => opts.JsonSerializerOptions.PropertyNamingPolicy = null);
+                .AddJsonOptions(opts =>
+                {
+                    opts.JsonSerializerOptions.PropertyNamingPolicy = null;
+                    opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+                });
 
 builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
 builder.Services.Configure<EddnLookupServiceSettings>(builder.Configuration.GetSection("APIService"));
