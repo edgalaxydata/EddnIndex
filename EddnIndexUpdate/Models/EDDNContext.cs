@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using EddnIndexUpdate.EFConverters;
+using Microsoft.EntityFrameworkCore;
 
 namespace EddnIndexUpdate.Models;
 
 public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(options)
 {
-    private static DateTime? TruncateDateTime(DateTime? val)
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
-        if (val is not DateTime dt) return null;
-        return new DateTime(dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second, 0, dt.Kind);
+        base.ConfigureConventions(configurationBuilder);
+        configurationBuilder.Conventions.Add(_ => new UTCDateTimeConvention());
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -24,10 +25,10 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.ArgOfPeriapsis).HasPrecision(9, 6);
             m.Property(e => e.Inclination).HasPrecision(9, 6);
             m.Property(e => e.SemiMajorAxis).HasPrecision(9, 6);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.ParentSet).WithMany().HasForeignKey(e => e.ParentSetId).HasPrincipalKey(e => e.Id);
             m.Ignore(e => e.SysName_PGSuffix);
@@ -53,8 +54,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.BodyDesignation).HasMaxLength(255);
             m.Property(e => e.Inclination).HasPrecision(12, 6);
             m.Property(e => e.ArgOfPeriapsis).HasPrecision(12, 6);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
         });
 
         modelBuilder.Entity<BodyDesignation>(m =>
@@ -84,10 +85,10 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.Category).HasMaxLength(255);
             m.Property(e => e.SubCategory).HasMaxLength(255);
             m.Property(e => e.Region).HasMaxLength(255);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
         });
 
         modelBuilder.Entity<FileInfo>(m =>
@@ -106,7 +107,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasKey(e => new { e.FileId, e.LineNo, e.EntryNum });
             m.HasIndex(e => e.BodyId);
             m.HasOne(e => e.Body).WithMany().HasForeignKey(e => e.BodyId).HasPrincipalKey(e => e.Id);
-            m.Property(e => e.GatewayTimestamp).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
 
         modelBuilder.Entity<FileLineBodySignal>(m =>
@@ -117,7 +118,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => e.BodySignalId);
             m.Property(e => e.Latitude).HasPrecision(9, 6);
             m.Property(e => e.Longitude).HasPrecision(9, 6);
-            m.Property(e => e.GatewayTimestamp).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.GatewayTimestamp).HasPrecision(6);
             m.HasOne(e => e.Body).WithMany().HasForeignKey(e => e.BodyId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.Signal).WithMany().HasForeignKey(e => e.BodySignalId).HasPrincipalKey(e => e.Id);
         });
@@ -130,8 +131,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.Software).WithMany().HasForeignKey(e => e.SoftwareId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.GameVersion).WithMany().HasForeignKey(e => e.GameVersionId).HasPrincipalKey(e => e.Id);
-            m.Property(e => e.Timestamp).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.GatewayTimestamp).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.Timestamp).HasPrecision(0);
+            m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
 
         modelBuilder.Entity<FileLineNavRoute>(m =>
@@ -140,7 +141,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasKey(e => new { e.FileId, e.LineNo, e.EntryNum });
             m.HasIndex(e => e.SystemId);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
-            m.Property(e => e.GatewayTimestamp).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
 
         modelBuilder.Entity<FileLineSignal>(m =>
@@ -151,7 +152,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => e.SystemId);
             m.HasOne(e => e.SignalInfoSet).WithMany().HasForeignKey(e => e.SignalSetId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
-            m.Property(e => e.GatewayTimestamp).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
 
         modelBuilder.Entity<FileLineStation>(m =>
@@ -160,7 +161,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasKey(e => new { e.FileId, e.LineNo });
             m.HasIndex(e => e.StationId);
             m.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).HasPrincipalKey(e => e.Id);
-            m.Property(e => e.GatewayTimestamp).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
 
         modelBuilder.Entity<GameVersionDate>(m =>
@@ -170,9 +171,9 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.Season).HasMaxLength(50);
             m.Property(e => e.Version).HasMaxLength(50);
             m.Property(e => e.Description).HasMaxLength(100);
-            m.Property(e => e.UpdateTime).HasPrecision(0).HasConversion(e => (DateTime)TruncateDateTime(e)!, e => DateTime.SpecifyKind(e, DateTimeKind.Utc));
-            m.Property(e => e.UpdateStartTime).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.UpdateEndTime).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.UpdateTime).HasPrecision(0);
+            m.Property(e => e.UpdateStartTime).HasPrecision(0);
+            m.Property(e => e.UpdateEndTime).HasPrecision(0);
         });
 
         modelBuilder.Entity<GameVersionInfo>(m =>
@@ -182,8 +183,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => new { e.GameVersion, e.GameBuild, e.IsOdyssey, e.IsHorizons });
             m.Property(e => e.GameVersion).HasMaxLength(100);
             m.Property(e => e.GameBuild).HasMaxLength(100);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
         });
 
         modelBuilder.Entity<ParentSet>(m =>
@@ -211,10 +212,10 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.SizeX).HasPrecision(12, 6);
             m.Property(e => e.SizeY).HasPrecision(12, 6);
             m.Property(e => e.SizeZ).HasPrecision(12, 6);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
         });
 
         modelBuilder.Entity<SignalInfo>(m =>
@@ -224,10 +225,10 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => e.SignalName);
             m.Property(e => e.SignalName).HasMaxLength(255);
             m.Property(e => e.SignalType).HasMaxLength(255);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
         });
 
         modelBuilder.Entity<SignalInfoSet>(m =>
@@ -250,8 +251,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => new { e.SoftwareName, e.SoftwareVersion });
             m.Property(e => e.SoftwareName).HasMaxLength(255);
             m.Property(e => e.SoftwareVersion).HasMaxLength(255);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
         });
 
         modelBuilder.Entity<SchemaEventInfo>(m =>
@@ -275,10 +276,10 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.BodyName).HasMaxLength(128);
             m.Property(e => e.Latitude).HasPrecision(9, 6);
             m.Property(e => e.Longitude).HasPrecision(9, 6);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
         });
 
         modelBuilder.Entity<SystemInfo>(m =>
@@ -291,10 +292,10 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.X).HasPrecision(12, 6);
             m.Property(e => e.Y).HasPrecision(12, 6);
             m.Property(e => e.Z).HasPrecision(12, 6);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.FirstSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
+            m.Property(e => e.FirstSeen).HasPrecision(6);
+            m.Property(e => e.LastSeen).HasPrecision(6);
 
             if (Database.IsMySql())
             {
@@ -340,8 +341,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.X).HasPrecision(12, 6);
             m.Property(e => e.Y).HasPrecision(12, 6);
             m.Property(e => e.Z).HasPrecision(12, 6);
-            m.Property(e => e.ValidFrom).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
-            m.Property(e => e.ValidTo).HasPrecision(0).HasConversion(e => TruncateDateTime(e), e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
+            m.Property(e => e.ValidFrom).HasPrecision(0);
+            m.Property(e => e.ValidTo).HasPrecision(0);
         });
 
         modelBuilder.Entity<FilePrefixSchema>(m =>
