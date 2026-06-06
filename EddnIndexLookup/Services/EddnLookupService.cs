@@ -1,13 +1,13 @@
 ﻿using EddnIndexLookup.DTO;
 using EddnIndexLookup.Options;
 using EddnIndexUpdate;
-using EddnIndexUpdate.Options;
 using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
 using Models = EddnIndexUpdate.Models;
 using Sectors = EddnIndexUpdate.Sectors;
 
@@ -34,7 +34,7 @@ public class EddnLookupService(
 
     private readonly TimeSpan MaxCacheAge = TimeSpan.FromHours(1);
 
-    private IEnumerable<long> GetSystemNameIds(string? name)
+    private async IAsyncEnumerable<long> GetSystemNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -43,9 +43,9 @@ public class EddnLookupService(
 
         name = name.Trim();
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        foreach (var entry in ctx.Set<Models.SystemName>().Where(e => e.Name == name))
+        foreach (var entry in await ctx.Set<Models.SystemName>().Where(e => e.Name == name).ToListAsync(canceltoken))
         {
             yield return -entry.Id;
         }
@@ -72,23 +72,23 @@ public class EddnLookupService(
         }
     }
 
-    private Dictionary<string, List<long>> GetSystemNameIds(ICollection<string> names)
+    private async Task<Dictionary<string, List<long>>> GetSystemNameIdsAsync(ICollection<string> names, CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        var sysNames =
+        var sysNames = await
             ctx.Set<Models.SystemName>()
                .Where(e => names.Contains(e.Name))
-               .AsEnumerable()
+               .AsAsyncEnumerable()
                .GroupBy(e => e.Name)
-               .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+               .ToDictionaryAsync(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase, canceltoken);
 
-        var sectors =
+        var sectors = await
             ctx.Set<Models.Sector>()
                .Where(e => names.Contains(e.Name))
-               .AsEnumerable()
+               .AsAsyncEnumerable()
                .GroupBy(e => e.Name)
-               .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+               .ToDictionaryAsync(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase, canceltoken);
 
         var sysNameIds = new Dictionary<string, List<long>>(StringComparer.OrdinalIgnoreCase);
 
@@ -135,7 +135,7 @@ public class EddnLookupService(
         return sysNameIds;
     }
 
-    private IEnumerable<(long? SystemNameId, int BodyNameId)> GetBodyNameIds(string? name)
+    private async IAsyncEnumerable<(long? SystemNameId, int BodyNameId)> GetBodyNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -154,21 +154,21 @@ public class EddnLookupService(
             nameEnts[name[spacePos..]] = name[..spacePos];
         }
 
-        var sysNamesToIds = GetSystemNameIds(nameEnts.Values);
+        var sysNamesToIds = await GetSystemNameIdsAsync(nameEnts.Values, canceltoken);
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        foreach (var entry in ctx.Set<Models.BodyName>().Where(e => e.Name == name))
+        await foreach (var entry in ctx.Set<Models.BodyName>().Where(e => e.Name == name).AsAsyncEnumerable())
         {
             yield return (null, entry.Id);
         }
 
-        var desigs =
+        var desigs = await
             ctx.Set<Models.BodyDesignation>()
                .Where(e => nameEnts.Keys.Contains(e.Designation))
-               .AsEnumerable()
+               .AsAsyncEnumerable()
                .GroupBy(e => e.Designation)
-               .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+               .ToDictionaryAsync(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase, canceltoken);
 
         foreach (var (desigName, desigEnts) in desigs)
         {
@@ -190,16 +190,16 @@ public class EddnLookupService(
         }
     }
 
-    private Dictionary<int, SystemData>? GetSystems(string? systemName, long? systemAddress, bool includeRejected)
+    private async Task<Dictionary<int, SystemData>?> GetSystemsAsync(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
     {
         if (string.IsNullOrWhiteSpace(systemName) && (systemAddress == null || systemAddress <= 0))
         {
             return null;
         }
 
-        List<long> sysNameIds = [.. GetSystemNameIds(systemName)];
+        List<long> sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.SystemInfo> query = ctx.Set<Models.SystemInfo>();
 
@@ -218,10 +218,15 @@ public class EddnLookupService(
             query = query.Where(e => e.IsRejected != true);
         }
 
-        return FillSystems(ctx, query.ToDictionary(e => e.Id));
+        var systems = await
+            query
+                .OrderByDescending(e => e.LastSeen)
+                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
+
+        return await FillSystemsAsync(ctx, systems, canceltoken);
     }
 
-    private static Dictionary<int, SystemData> FillSystems(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems)
+    private static async Task<Dictionary<int, SystemData>> FillSystemsAsync(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems, CancellationToken canceltoken)
     {
         var systemNameIds = systems.Values.Select(e => e.SystemNameId).Distinct().ToList();
         var sectorIds =
@@ -232,20 +237,20 @@ public class EddnLookupService(
                 .Distinct()
                 .ToList();
 
-        var systemNames =
+        var systemNames = await
             ctx.Set<Models.SystemName>()
                .Where(e => systemNameIds.Contains(-e.Id))
-               .ToDictionary(e => (long)e.Id, e => e.Name);
+               .ToDictionaryAsync(e => (long)e.Id, e => e.Name, cancellationToken: canceltoken);
 
-        var sectorsById =
+        var sectorsById = await
             ctx.Set<Models.Sector>()
                .Where(e => sectorIds.Contains(e.Id + 0x100000))
-               .ToDictionary(e => (long)e.Id + 0x100000, e => e.Name);
+               .ToDictionaryAsync(e => (long)e.Id + 0x100000, e => e.Name, cancellationToken: canceltoken);
 
-        var sectorsByAddr =
+        var sectorsByAddr = await
             ctx.Set<Models.Sector>()
                .Where(e => e.SectorAddress != null && sectorIds.Contains(e.SectorAddress.Value))
-               .ToDictionary(e => e.SectorAddress!.Value, e => e.Name);
+               .ToDictionaryAsync(e => e.SectorAddress!.Value, e => e.Name, cancellationToken: canceltoken);
 
         var systemDatas = new Dictionary<int, SystemData>();
 
@@ -289,7 +294,7 @@ public class EddnLookupService(
         return systemDatas;
     }
 
-    private static Dictionary<long, BodyData> FillBodies(Models.EDDNContext ctx, Dictionary<long, Models.BodyInfo> bodies)
+    private static async Task<Dictionary<long, BodyData>> FillBodiesAsync(Models.EDDNContext ctx, Dictionary<long, Models.BodyInfo> bodies, CancellationToken canceltoken)
     {
         var bodyNameIds =
             bodies
@@ -316,35 +321,35 @@ public class EddnLookupService(
                 .Distinct()
                 .ToList();
 
-        var bodyNames =
+        var bodyNames = await
             ctx.Set<Models.BodyName>()
                .Where(e => bodyNameIds.Contains(e.Id))
-               .ToDictionary(e => e.Id);
+               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
-        var bodyDesigsById =
+        var bodyDesigsById = await
             ctx.Set<Models.BodyDesignation>()
                .Where(e => bodyNameIds.Contains(-e.Id))
-               .ToDictionary(e => e.Id);
+               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
-        var bodyDesigsByDesigId =
+        var bodyDesigsByDesigId = await
             ctx.Set<Models.BodyDesignation>()
                .Where(e => e.DesignationId != null && bodyNameIds.Contains(e.DesignationId.Value))
-               .ToDictionary(e => e.DesignationId!.Value);
+               .ToDictionaryAsync(e => e.DesignationId!.Value, cancellationToken: canceltoken);
 
-        var systemNames =
+        var systemNames = await
             ctx.Set<Models.SystemName>()
                .Where(e => systemNameIds.Contains(-e.Id))
-               .ToDictionary(e => (long)e.Id, e => e.Name);
+               .ToDictionaryAsync(e => (long)e.Id, e => e.Name, cancellationToken: canceltoken);
 
-        var sectorsById =
+        var sectorsById = await
             ctx.Set<Models.Sector>()
                .Where(e => sectorIds.Contains(e.Id + 0x100000))
-               .ToDictionary(e => (long)e.Id + 0x100000, e => e.Name);
+               .ToDictionaryAsync(e => (long)e.Id + 0x100000, e => e.Name, cancellationToken: canceltoken);
 
-        var sectorsByAddr =
+        var sectorsByAddr = await
             ctx.Set<Models.Sector>()
                .Where(e => e.SectorAddress != null && sectorIds.Contains(e.SectorAddress.Value))
-               .ToDictionary(e => e.SectorAddress!.Value, e => e.Name);
+               .ToDictionaryAsync(e => e.SectorAddress!.Value, e => e.Name, cancellationToken: canceltoken);
 
         var bodiesData = new Dictionary<long, BodyData>();
 
@@ -425,21 +430,21 @@ public class EddnLookupService(
         return bodiesData;
     }
 
-    private Dictionary<long, BodyData>? GetBodies(string? systemName, long? systemAddress, string? bodyName, int? bodyId, bool includeRejected)
+    private async Task<Dictionary<long, BodyData>?> GetBodiesAsync(string? systemName, long? systemAddress, string? bodyName, int? bodyId, bool includeRejected, CancellationToken canceltoken)
     {
-        var systems = GetSystems(systemName, systemAddress, includeRejected);
+        var systems = await GetSystemsAsync(systemName, systemAddress, includeRejected, canceltoken);
 
         if ((systems == null || bodyId == null || bodyId < 0) && string.IsNullOrWhiteSpace(bodyName))
         {
             return null;
         }
 
-        var sysAndBodyNameIds = GetBodyNameIds(bodyName);
+        var sysAndBodyNameIds = await GetBodyNameIdsAsync(bodyName, canceltoken).ToListAsync(canceltoken);
         var sysNameIds = sysAndBodyNameIds.Select(e => e.SystemNameId).OfType<long>().ToList();
         var bodyNameIds = sysAndBodyNameIds.Where(e => e.SystemNameId == null).Select(e => e.BodyNameId).ToList();
         var bodyDesigIds = sysAndBodyNameIds.Where(e => e.SystemNameId != null).Select(e => e.BodyNameId).ToList();
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.BodyInfo> query =
             ctx.Set<Models.BodyInfo>()
@@ -462,14 +467,17 @@ public class EddnLookupService(
             query = query.Where(e => e.IsRejected != true);
         }
 
-        var bodies = query.ToDictionary(e => e.Id);
+        var bodies = await
+            query
+                .OrderByDescending(e => e.LastSeen)
+                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
-        return FillBodies(ctx, bodies);
+        return await FillBodiesAsync(ctx, bodies, canceltoken);
     }
 
-    private Dictionary<int, SystemData> GetSystems(ICollection<int> systemIds, bool includeRejected)
+    private async Task<Dictionary<int, SystemData>> GetSystemsAsync(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var query =
             ctx.Set<Models.SystemInfo>()
@@ -480,12 +488,12 @@ public class EddnLookupService(
             query = query.Where(e => e.IsRejected != true);
         }
 
-        return FillSystems(ctx, query.ToDictionary(e => e.Id));
+        return await FillSystemsAsync(ctx, await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken), canceltoken);
     }
 
-    private Dictionary<int, Dictionary<long, BodyData>> GetSystemBodies(ICollection<int> systemIds, bool includeRejected)
+    private async Task<Dictionary<int, Dictionary<long, BodyData>>> GetSystemBodiesAsync(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var query =
             ctx.Set<Models.BodyInfo>()
@@ -498,23 +506,26 @@ public class EddnLookupService(
             query = query.Where(e => e.IsRejected != true);
         }
 
-        var bodies = query.ToDictionary(e => e.Id);
+        var bodies = await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
+
+        var bodies2 = await FillBodiesAsync(ctx, bodies, canceltoken);
 
         return
-            FillBodies(ctx, bodies)
+            bodies2
                 .Values
                 .GroupBy(e => e.SystemId)
                 .ToDictionary(g => g.Key, g => g.ToDictionary(e => e.Id));
     }
 
-    private Dictionary<int, List<MatchEntry>> GetSystemMatchEntries(
+    private async Task<Dictionary<int, List<MatchEntry>>> GetSystemMatchEntriesAsync(
             ICollection<int> systemIds,
             int? limitMatches,
             DateTimeOffset? minDate,
-            DateTimeOffset? maxDate
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
         )
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var routeQuery =
             ctx.Set<Models.FileLineNavRoute>()
@@ -608,27 +619,28 @@ public class EddnLookupService(
             routeQuery = routeQuery.Where(e => e.GatewayTimestamp <= maxTS);
         }
 
-        return
+        return await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
                 .Take(limitMatches ?? 5000)
-                .AsEnumerable()
-                .Concat(routeQuery.OrderByDescending(e => e.GatewayTimestamp).Take(limitMatches ?? 5000))
+                .AsAsyncEnumerable()
+                .Concat(routeQuery.OrderByDescending(e => e.GatewayTimestamp).Take(limitMatches ?? 5000).AsAsyncEnumerable())
                 .OrderByDescending(e => e.GatewayTimestamp)
                 .Take(limitMatches ?? 5000)
                 .Where(e => e.SystemId != null)
                 .GroupBy(e => e.SystemId!.Value)
-                .ToDictionary(g => g.Key, g => g.ToList());
+                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
     }
 
-    private Dictionary<long, List<MatchEntry>> GetBodyMatchEntries(
+    private async Task<Dictionary<long, List<MatchEntry>>> GetBodyMatchEntriesAsync(
             ICollection<long> bodyIds,
             int? limitMatches,
             DateTimeOffset? minDate,
-            DateTimeOffset? maxDate
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
         )
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var query =
             ctx.Set<Models.FileLineBody>()
@@ -684,24 +696,25 @@ public class EddnLookupService(
             query = query.Where(e => e.GatewayTimestamp <= maxTS);
         }
 
-        return
+        return await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
                 .Take(limitMatches ?? 5000)
-                .AsEnumerable()
+                .AsAsyncEnumerable()
                 .Where(e => e.BodyId != null)
                 .GroupBy(e => e.BodyId!.Value)
-                .ToDictionary(g => g.Key, g => g.ToList());
+                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
     }
 
-    private Dictionary<int, List<MatchEntry>> GetStationMatchEntries(
+    private async Task<Dictionary<int, List<MatchEntry>>> GetStationMatchEntriesAsync(
             ICollection<int> stationIds,
             int? limitMatches,
             DateTimeOffset? minDate,
-            DateTimeOffset? maxDate
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
         )
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var query =
             ctx.Set<Models.FileLineStation>()
@@ -757,18 +770,18 @@ public class EddnLookupService(
             query = query.Where(e => e.GatewayTimestamp <= maxTS);
         }
 
-        var matches =
+        var matches = await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
                 .Take(limitMatches ?? 5000)
-                .AsEnumerable()
+                .AsAsyncEnumerable()
                 .Where(e => e.StationId != null)
                 .GroupBy(e => e.StationId!.Value)
-                .ToDictionary(g => g.Key, g => g.ToList());
+                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
 
         var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
 
-        var systems = GetSystems(systemIds, true);
+        var systems = await GetSystemsAsync(systemIds, true, canceltoken);
 
         return matches.ToDictionary(
             kvp => kvp.Key,
@@ -786,40 +799,40 @@ public class EddnLookupService(
         );
     }
 
-    private Dictionary<int, int> GetSystemMatchCounts(ICollection<int> systemIds)
+    private async Task<Dictionary<int, int>> GetSystemMatchCountsAsync(ICollection<int> systemIds, CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return
+        return await
             ctx.Set<Models.FileLineInfo>()
                .Where(e => e.SystemId != null && systemIds.Contains(e.SystemId.Value))
                .GroupBy(e => e.SystemId!.Value)
                .Select(g => new { SystemId = g.Key, Count = g.Count() })
-               .ToDictionary(e => e.SystemId, e => e.Count);
+               .ToDictionaryAsync(e => e.SystemId, e => e.Count, cancellationToken: canceltoken);
     }
 
-    private Dictionary<long, int> GetBodyMatchCounts(ICollection<long> bodyIds)
+    private async Task<Dictionary<long, int>> GetBodyMatchCountsAsync(ICollection<long> bodyIds, CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return
+        return await
             ctx.Set<Models.FileLineBody>()
                .Where(e => bodyIds.Contains(e.BodyId))
                .GroupBy(e => e.BodyId)
                .Select(g => new { BodyId = g.Key, Count = g.Count() })
-               .ToDictionary(e => e.BodyId, e => e.Count);
+               .ToDictionaryAsync(e => e.BodyId, e => e.Count, cancellationToken: canceltoken);
     }
 
-    private Dictionary<int, int> GetStationMatchCounts(ICollection<int> stationIds)
+    private async Task<Dictionary<int, int>> GetStationMatchCountsAsync(ICollection<int> stationIds, CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return
+        return await
             ctx.Set<Models.FileLineStation>()
                .Where(e => stationIds.Contains(e.StationId))
                .GroupBy(e => e.StationId)
                .Select(g => new { BodyId = g.Key, Count = g.Count() })
-               .ToDictionary(e => e.BodyId, e => e.Count);
+               .ToDictionaryAsync(e => e.BodyId, e => e.Count, cancellationToken: canceltoken);
     }
 
     /// <summary>Lookup systems</summary>
@@ -833,23 +846,25 @@ public class EddnLookupService(
     /// <param name="limitMatches">Limit number of matches returned</param>
     /// <param name="minDate">Start of date range for matches</param>
     /// <param name="maxDate">End of date range for matches</param>
+    /// <param name="canceltoken">Cancellation token</param>
     /// <returns>Matched system entries</returns>
-    public List<SystemData> GetSystems(
+    public async Task<List<SystemData>> GetSystemsAsync(
             string? systemName,
             long? systemAddress,
             bool includeRejected,
             bool brief,
             int? limitMatches,
             DateTimeOffset? minDate,
-            DateTimeOffset? maxDate
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
         )
     {
-        if (GetSystems(systemName, systemAddress, includeRejected) is not { } systems)
+        if (await GetSystemsAsync(systemName, systemAddress, includeRejected, canceltoken) is not { } systems)
         {
             return [];
         }
 
-        var bodies = GetSystemBodies(systems.Keys, includeRejected);
+        var bodies = await GetSystemBodiesAsync(systems.Keys, includeRejected, canceltoken);
 
         var bodyIds =
             bodies
@@ -861,7 +876,7 @@ public class EddnLookupService(
 
         var systemMatches = brief
                           ? []
-                          : GetSystemMatchEntries(systems.Keys, limitMatches, minDate, maxDate);
+                          : await GetSystemMatchEntriesAsync(systems.Keys, limitMatches, minDate, maxDate, canceltoken);
         
         var bodyMatches =
             systemMatches
@@ -871,8 +886,8 @@ public class EddnLookupService(
                 .GroupBy(e => e.BodyId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-        var systemMatchCounts = GetSystemMatchCounts(systems.Keys);
-        var bodyMatchCounts = GetBodyMatchCounts(bodyIds);
+        var systemMatchCounts = await GetSystemMatchCountsAsync(systems.Keys, canceltoken);
+        var bodyMatchCounts = await GetBodyMatchCountsAsync(bodyIds, canceltoken);
 
         var entries = new List<SystemData>();
 
@@ -928,8 +943,9 @@ public class EddnLookupService(
     /// <param name="limitMatches">Limit number of matches returned</param>
     /// <param name="minDate">Start of date range for matches</param>
     /// <param name="maxDate">End of date range for matches</param>
+    /// <param name="canceltoken">Cancellation token</param>
     /// <returns>Matched body entries</returns>
-    public List<BodyData> GetBodies(
+    public async Task<List<BodyData>> GetBodiesAsync(
             string? bodyName,
             string? systemName,
             long? systemAddress,
@@ -938,10 +954,11 @@ public class EddnLookupService(
             bool brief,
             int? limitMatches,
             DateTimeOffset? minDate,
-            DateTimeOffset? maxDate
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
         )
     {
-        if (GetBodies(systemName, systemAddress, bodyName, bodyId, includeRejected) is not { } bodies)
+        if (await GetBodiesAsync(systemName, systemAddress, bodyName, bodyId, includeRejected, canceltoken) is not { } bodies)
         {
             return [];
         }
@@ -951,13 +968,13 @@ public class EddnLookupService(
                 .Select(e => e.Value.SystemId)
                 .ToList();
 
-        var systems = GetSystems(systemIds, includeRejected);
+        var systems = await GetSystemsAsync(systemIds, includeRejected, canceltoken);
 
         var bodyMatches = brief
                         ? []
-                        : GetBodyMatchEntries(bodies.Keys, limitMatches, minDate, maxDate);
+                        : await GetBodyMatchEntriesAsync(bodies.Keys, limitMatches, minDate, maxDate, canceltoken);
         
-        var bodyMatchCounts = GetBodyMatchCounts(bodies.Keys);
+        var bodyMatchCounts = await GetBodyMatchCountsAsync(bodies.Keys, canceltoken);
 
         var entries = new List<BodyData>();
 
@@ -994,15 +1011,17 @@ public class EddnLookupService(
     /// <param name="limitMatches">Limit number of matches returned</param>
     /// <param name="minDate">Start of date range for matches</param>
     /// <param name="maxDate">End of date range for matches</param>
+    /// <param name="canceltoken">Cancellation token</param>
     /// <returns></returns>
-    public List<StationData> GetStations(
+    public async Task<List<StationData>> GetStationsAsync(
             string? stationName,
             long? marketId,
             bool includeRejected,
             bool brief,
             int? limitMatches,
             DateTimeOffset? minDate,
-            DateTimeOffset? maxDate
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
         )
     {
         if (string.IsNullOrWhiteSpace(stationName) && (marketId == null || marketId <= 0))
@@ -1012,7 +1031,7 @@ public class EddnLookupService(
 
         stationName = stationName?.Trim();
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.StationInfo> query = ctx.Set<Models.StationInfo>();
 
@@ -1031,8 +1050,8 @@ public class EddnLookupService(
             query = query.Where(e => e.IsRejected != true);
         }
 
-        var stations =
-            ctx.Set<Models.StationInfo>()
+        var stations = await
+            query
                .Select(e => new DTO.StationData
                {
                    Id = e.Id,
@@ -1050,13 +1069,14 @@ public class EddnLookupService(
                    ValidFrom = e.ValidFrom,
                    ValidTo = e.ValidTo
                })
-               .ToDictionary(e => e.Id);
+               .OrderByDescending(e => e.LastSeen)
+               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
         var matches = brief
                     ? []
-                    : GetStationMatchEntries(stations.Keys, limitMatches, minDate, maxDate);
+                    : await GetStationMatchEntriesAsync(stations.Keys, limitMatches, minDate, maxDate, canceltoken);
         
-        var matchCounts = GetStationMatchCounts(stations.Keys);
+        var matchCounts = await GetStationMatchCountsAsync(stations.Keys, canceltoken);
 
         var entries = new Dictionary<int, StationData>();
 
@@ -1069,7 +1089,7 @@ public class EddnLookupService(
             };
         }
 
-        return [];
+        return entries.Values.ToList();
     }
 
     /// <summary>Extract EDDN event</summary>
@@ -1078,8 +1098,9 @@ public class EddnLookupService(
     /// </remarks>
     /// <param name="filename">EDDN capture filename without path</param>
     /// <param name="lineno">1-based Line number</param>
+    /// <param name="canceltoken">Cancellation token</param>
     /// <returns></returns>
-    public string? ExtractLine(string filename, int lineno)
+    public async Task<string?> ExtractLineAsync(string filename, int lineno, CancellationToken canceltoken)
     {
         if (Settings.IndexedDir == null || lineno <= 0 || string.IsNullOrWhiteSpace(filename))
         {
@@ -1095,9 +1116,9 @@ public class EddnLookupService(
 
         Models.FileInfo? file;
 
-        using (var ctx = ContextFactory.CreateDbContext())
+        await using (var ctx = await ContextFactory.CreateDbContextAsync(canceltoken))
         {
-            file = ctx.Set<Models.FileInfo>().FirstOrDefault(e => e.FileName == filename);
+            file = await ctx.Set<Models.FileInfo>().FirstOrDefaultAsync(e => e.FileName == filename, cancellationToken: canceltoken);
 
             if (file == null)
             {
@@ -1186,10 +1207,9 @@ public class EddnLookupService(
 
             try
             {
-                var dataSpan = databuf.AsSpan(0, (int)(endPos - startPos));
                 dataStream.Seek(startPos, SeekOrigin.Begin);
-                dataStream.ReadExactly(dataSpan);
-                bzmemstream.Write(dataSpan);
+                await dataStream.ReadExactlyAsync(databuf, 0, (int)(endPos - startPos), cancellationToken: canceltoken);
+                bzmemstream.Write(databuf.AsSpan(0, (int)(endPos - startPos)));
                 bzmemstream.Seek(0, SeekOrigin.Begin);
             }
             finally

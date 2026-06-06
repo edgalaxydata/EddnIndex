@@ -53,22 +53,22 @@ public record class StationData : IMatchedItem
     /// <summary>
     /// Set if the system was renamed or reassigned; Date from which details are valid
     /// </summary>
-    public DateTimeOffset? ValidFrom { get; init; }
+    public DateTime? ValidFrom { get; init; }
 
     /// <summary>
     /// Set if the system was renamed or reassigned; Date until which details were valid
     /// </summary>
-    public DateTimeOffset? ValidTo { get; init; }
+    public DateTime? ValidTo { get; init; }
 
     /// <summary>
     /// GatewayTimestamp when item was first seen with these details
     /// </summary>
-    public DateTimeOffset? FirstSeen { get; init; }
+    public DateTime? FirstSeen { get; init; }
 
     /// <summary>
     /// GatewayTimestamp when item was last seen with these details
     /// </summary>
-    public DateTimeOffset? LastSeen { get; init; }
+    public DateTime? LastSeen { get; init; }
 
     /// <summary>
     /// Number of events matching these details

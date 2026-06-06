@@ -14,7 +14,7 @@ public class EDDNEventHeader
     /// </summary>
     [System.Text.Json.Serialization.JsonPropertyName("gatewayTimestamp")]
     [Newtonsoft.Json.JsonProperty("gatewayTimestamp")]
-    public DateTimeOffset? GatewayTimestamp { get; init; }
+    public DateTime? GatewayTimestamp { get; init; }
 
     /// <summary>
     /// Game Build from Fileheader or LoadGame journal event

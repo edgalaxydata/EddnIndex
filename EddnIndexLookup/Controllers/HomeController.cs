@@ -50,7 +50,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <returns>Matched system entries</returns>
     [HttpGet("systems")]
     [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
-    public ActionResult<List<SystemData>> GetSystems(
+    public async Task<ActionResult<List<SystemData>>> GetSystemsAsync(
         [FromQuery] string? systemName,
         [FromQuery] long? systemAddress,
         [FromQuery] bool includeRejected = false,
@@ -61,7 +61,24 @@ public class HomeController(EddnLookupService service) : ControllerBase
     {
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
 
-        return Ok(Service.GetSystems(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate));
+        var systems = await Service.GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+
+        systems = [.. systems.Select(e => e with
+        {
+            Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
+            {
+                Extract = GetExtractUrl(m.FileName, m.LineNo)
+            })],
+            Bodies = e.Bodies is null ? null : [.. e.Bodies.Select(b => b with
+            {
+                Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
+                {
+                    Extract = GetExtractUrl(m.FileName, m.LineNo)
+                })]
+            })]
+        })];
+
+        return Ok(systems);
     }
 
     /// <summary>Lookup bodies</summary>
@@ -98,7 +115,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [HttpGet("bodies")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
-    public ActionResult<List<BodyData>> GetBodies(
+    public async Task<ActionResult<List<BodyData>>> GetBodiesAsync(
         [FromQuery] string? bodyName,
         [FromQuery] string? systemName,
         [FromQuery] long? systemAddress,
@@ -111,7 +128,17 @@ public class HomeController(EddnLookupService service) : ControllerBase
     {
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
 
-        return Ok(Service.GetBodies(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate));
+        var bodies = await Service.GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+
+        bodies = [.. bodies.Select(e => e with
+        {
+            Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
+            {
+                Extract = GetExtractUrl(m.FileName, m.LineNo)
+            })]
+        })];
+
+        return Ok(bodies);
     }
 
     /// <summary>Lookup stations</summary>
@@ -143,7 +170,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <returns>Matched station entries</returns>
     [HttpGet("stations")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
-    public ActionResult<List<StationData>> GetStations(
+    public async Task<ActionResult<List<StationData>>> GetStationsAsync(
         [FromQuery] string? stationName,
         [FromQuery] long? marketId,
         [FromQuery] bool includeRejected = false,
@@ -152,7 +179,24 @@ public class HomeController(EddnLookupService service) : ControllerBase
         [FromQuery] DateTimeOffset? minDate = null,
         [FromQuery] DateTimeOffset? maxDate = null)
     {
-        return Ok(Service.GetStations(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate));
+        var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+
+        stations = [..
+            stations.Select(e => e with
+            {
+                Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
+                {
+                    Extract = GetExtractUrl(m.FileName, m.LineNo)
+                })]
+            })
+        ];            
+
+        return Ok(stations);
+    }
+
+    private string? GetExtractUrl(string filename, int lineno)
+    {
+        return Url.Action("ExtractLine", "Home", new { filename, lineno }, Request.Scheme);
     }
 
     /// <summary>Extract EDDN event</summary>
@@ -165,9 +209,9 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [HttpGet("extract")]
     [ProducesResponseType<EDDNEvent>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult<EDDNEvent> ExtractLine([FromQuery] string filename, [FromQuery] int lineno)
+    public async Task<ActionResult<EDDNEvent>> ExtractLineAsync([FromQuery] string filename, [FromQuery] int lineno)
     {
-        if (Service.ExtractLine(filename, lineno) is not { } line)
+        if (await Service.ExtractLineAsync(filename, lineno, HttpContext.RequestAborted) is not { } line)
         {
             return NotFound();
         }

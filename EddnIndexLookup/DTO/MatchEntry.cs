@@ -73,12 +73,12 @@ public record class MatchEntry
     /// <summary>
     /// UTC Event timestamp from event source (e.g. journal)
     /// </summary>
-    public DateTimeOffset? Timestamp { get; init; }
+    public DateTime? Timestamp { get; init; }
 
     /// <summary>
     /// UTC Timestamp when message was received by EDDN gateway
     /// </summary>
-    public DateTimeOffset? GatewayTimestamp { get; init; }
+    public DateTime? GatewayTimestamp { get; init; }
 
     /// <summary>
     /// URL to extract event JSON
