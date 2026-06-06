@@ -29,7 +29,7 @@ public class UTCDateTimeConverterNonNull(int precision)
     private static DateTime TruncateDateTime(DateTime value, int mult)
     {
         var tick = (value.Ticks / mult) * mult;
-        return new DateTime(tick);
+        return new DateTime(tick, DateTimeKind.Unspecified);
     }
 
     private static Expression<Func<DateTime, DateTime>> AsUTCFunc()

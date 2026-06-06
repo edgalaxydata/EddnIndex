@@ -34,7 +34,7 @@ public class UTCDateTimeConverter(int precision)
         }
 
         var tick = (value.Ticks / mult) * mult;
-        return new DateTime(tick);
+        return new DateTime(tick, DateTimeKind.Unspecified);
     }
 
     private static Expression<Func<DateTime?, DateTime?>> AsUTCFunc()
