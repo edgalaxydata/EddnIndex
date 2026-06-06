@@ -30,6 +30,9 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.LastSeen).HasPrecision(6).HasConversion(e => e, e => e != null ? DateTime.SpecifyKind((DateTime)e, DateTimeKind.Utc) : null);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.ParentSet).WithMany().HasForeignKey(e => e.ParentSetId).HasPrincipalKey(e => e.Id);
+            m.Ignore(e => e.SysName_PGSuffix);
+            m.Ignore(e => e.SysName_SectorId);
+            m.Ignore(e => e.SysName_SectorAddress);
         });
 
         modelBuilder.Entity<BodyName>(m =>

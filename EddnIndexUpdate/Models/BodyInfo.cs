@@ -22,6 +22,24 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
     public SystemInfo? System { get; set; }
     public ParentSet? ParentSet { get; set; }
 
+    public int? SysName_SectorId
+    {
+        get => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
+        set { }
+    }
+
+    public int? SysName_SectorAddress
+    {
+        get => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
+        set { }
+    }
+
+    public string? SysName_PGSuffix
+    {
+        get => Models.SystemInfo.GetPGSuffix(SystemNameId);
+        set { }
+    }
+
     public virtual bool Equals(BodyInfo? other)
     {
         if (other is null) return false;
