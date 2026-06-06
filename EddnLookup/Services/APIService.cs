@@ -1,0 +1,1221 @@
+﻿using EddnIndexUpdate;
+using EddnLookup.DTO;
+using Ionic.BZip2;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
+using System.Buffers;
+using System.Buffers.Binary;
+using Models = EddnIndexUpdate.Models;
+using Sectors = EddnIndexUpdate.Sectors;
+
+namespace EddnLookup.Services;
+
+/// <summary>
+/// Backend service for EDDN lookup API
+/// </summary>
+/// <param name="contextFactory"></param>
+/// <param name="logger"></param>
+/// <param name="options"></param>
+public class APIService(
+        IDbContextFactory<Models.EDDNContext> contextFactory,
+        ILogger<FileProcessor> logger,
+        IOptions<FileProcessorSettings> options
+    )
+{
+    private readonly IDbContextFactory<Models.EDDNContext> ContextFactory = contextFactory;
+    private readonly ILogger Logger = logger;
+    private readonly FileProcessorSettings Settings = options.Value;
+    private readonly Dictionary<string, (DateTime LastMod, long Length, Dictionary<int, LinkedListNode<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)>> Entries)> LineCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly LinkedList<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)> LineCacheLRU = [];
+    private readonly Lock LineCacheLock = new();
+
+    private readonly TimeSpan MaxCacheAge = TimeSpan.FromHours(1);
+
+    private IEnumerable<long> GetSystemNameIds(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            yield break;
+        }
+
+        name = name.Trim();
+
+        using var ctx = ContextFactory.CreateDbContext();
+
+        foreach (var entry in ctx.Set<Models.SystemName>().Where(e => e.Name == name))
+        {
+            yield return -entry.Id;
+        }
+
+        if (Models.SystemInfo.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode, true)
+            && n2 >= 0
+            && n2 < 65536
+            && mid >= 0
+            && mid < 0x200000
+            && masscode >= 0
+            && masscode < 8)
+        {
+            var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+
+            foreach (var sector in ctx.Set<Models.Sector>().Where(e => e.Name == sectorName))
+            {
+                if (sector.SectorAddress is int sectoraddr && sectoraddr >= 0 && sectoraddr < 0x100000)
+                {
+                    yield return (long)sectoraddr << 40 | boxelid;
+                }
+
+                yield return ((long)sector.Id + 0x100000) << 40 | boxelid;
+            }
+        }
+    }
+
+    private Dictionary<string, List<long>> GetSystemNameIds(ICollection<string> names)
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        var sysNames =
+            ctx.Set<Models.SystemName>()
+               .Where(e => names.Contains(e.Name))
+               .AsEnumerable()
+               .GroupBy(e => e.Name)
+               .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var sectors =
+            ctx.Set<Models.Sector>()
+               .Where(e => names.Contains(e.Name))
+               .AsEnumerable()
+               .GroupBy(e => e.Name)
+               .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var sysNameIds = new Dictionary<string, List<long>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var sysname in names)
+        {
+            var ids = new List<long>();
+
+            if (Models.SystemInfo.TrySplitProcgenName(sysname, out string? sectorname, out int mid, out int n2, out int masscode, true)
+                && n2 >= 0
+                && n2 < 65536
+                && mid >= 0
+                && mid < 0x200000
+                && masscode >= 0
+                && masscode < 8
+                && sectors.TryGetValue(sectorname, out var sectorEnts))
+            {
+                var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+
+                foreach (var sector in sectorEnts)
+                {
+                    if (sector.SectorAddress is int sectoraddr && sectoraddr >= 0 && sectoraddr < 0x100000)
+                    {
+                        ids.Add((long)sectoraddr << 40 | boxelid);
+                    }
+
+                    ids.Add(((long)sector.Id + 0x100000) << 40 | boxelid);
+                }
+            }
+
+            if (sysNames.TryGetValue(sysname, out var sysNameEnts))
+            {
+                foreach (var sysNameEnt in sysNameEnts)
+                {
+                    ids.Add(-sysNameEnt.Id);
+                }
+            }
+
+            if (ids.Count > 0)
+            {
+                sysNameIds[sysname] = ids;
+            }
+        }
+
+        return sysNameIds;
+    }
+
+    private IEnumerable<(long? SystemNameId, int BodyNameId)> GetBodyNameIds(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            yield break;
+        }
+
+        name = name.Trim();
+
+        var nameEnts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            [""] = name
+        };
+
+        for (var spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
+        {
+            nameEnts[name[spacePos..]] = name[..spacePos];
+        }
+
+        var sysNamesToIds = GetSystemNameIds(nameEnts.Values);
+
+        using var ctx = ContextFactory.CreateDbContext();
+
+        foreach (var entry in ctx.Set<Models.BodyName>().Where(e => e.Name == name))
+        {
+            yield return (null, entry.Id);
+        }
+
+        var desigs =
+            ctx.Set<Models.BodyDesignation>()
+               .Where(e => nameEnts.Keys.Contains(e.Designation))
+               .AsEnumerable()
+               .GroupBy(e => e.Designation)
+               .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (desigName, desigEnts) in desigs)
+        {
+            if (nameEnts.TryGetValue(desigName, out var sysname) && sysNamesToIds.TryGetValue(sysname, out var sysNameIds))
+            {
+                foreach (var desigEnt in desigEnts)
+                {
+                    foreach (var sysNameId in sysNameIds)
+                    {
+                        yield return (sysNameId, -desigEnt.Id);
+
+                        if (desigEnt.DesignationId is int desigid)
+                        {
+                            yield return (sysNameId, desigid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private Dictionary<int, SystemData>? GetSystems(string? systemName, long? systemAddress, bool includeRejected)
+    {
+        if (string.IsNullOrWhiteSpace(systemName) && (systemAddress == null || systemAddress <= 0))
+        {
+            return null;
+        }
+
+        List<long> sysNameIds = [.. GetSystemNameIds(systemName)];
+
+        using var ctx = ContextFactory.CreateDbContext();
+
+        IQueryable<Models.SystemInfo> query = ctx.Set<Models.SystemInfo>();
+
+        if (sysNameIds.Count != 0)
+        {
+            query = query.Where(e => e.SystemNameId != null && sysNameIds.Contains(e.SystemNameId.Value));
+        }
+
+        if (Models.SystemInfo.SystemAddressToModSystemAddress(systemAddress) is long modsysaddr)
+        {
+            query = query.Where(e => e.ModSystemAddress == modsysaddr);
+        }
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        return FillSystems(ctx, query.ToDictionary(e => e.Id));
+    }
+
+    private static Dictionary<int, SystemData> FillSystems(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems)
+    {
+        var systemNameIds = systems.Values.Select(e => e.SystemNameId).Distinct().ToList();
+        var sectorIds =
+            systemNameIds
+                .Where(e => e > 0)
+                .Select(e => (int)(e!.Value >> 40))
+                .Union(systems.Values.Select(e => e.SysAddr_SectorAddress).OfType<int>())
+                .Distinct()
+                .ToList();
+
+        var systemNames =
+            ctx.Set<Models.SystemName>()
+               .Where(e => systemNameIds.Contains(-e.Id))
+               .ToDictionary(e => (long)e.Id, e => e.Name);
+
+        var sectorsById =
+            ctx.Set<Models.Sector>()
+               .Where(e => sectorIds.Contains(e.Id + 0x100000))
+               .ToDictionary(e => (long)e.Id + 0x100000, e => e.Name);
+
+        var sectorsByAddr =
+            ctx.Set<Models.Sector>()
+               .Where(e => e.SectorAddress != null && sectorIds.Contains(e.SectorAddress.Value))
+               .ToDictionary(e => e.SectorAddress!.Value, e => e.Name);
+
+        var systemDatas = new Dictionary<int, SystemData>();
+
+        foreach (var (systemId, system) in systems)
+        {
+            var name = system switch
+            {
+                { SystemNameId: long sysNameId }
+                    when systemNames.TryGetValue(-sysNameId, out var sysname)
+                    => sysname,
+                { SectorId: int sectorId, PGSuffix: string pgSuffix }
+                    when sectorsById.TryGetValue(sectorId, out var sectorName)
+                    => sectorName + pgSuffix,
+                { SectorAddress: int sectorAddr, PGSuffix: string pgSuffix }
+                    => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
+                _ => null
+            };
+
+            if (name != null)
+            {
+                systemDatas[systemId] = new DTO.SystemData
+                {
+                    Id = systemId,
+                    Name = name,
+                    SystemAddress = system.SystemAddress,
+                    Coords = system is { X: decimal x, Y: decimal y, Z: decimal z }
+                           ? new DTO.Coords(x, y, z)
+                           : null,
+                    FirstSeen = system.FirstSeen,
+                    IsRejected = system.IsRejected,
+                    LastSeen = system.LastSeen,
+                    PGName = system is { SysAddr_SectorAddress: int sa_sectorAddr, SysAddr_PGSuffix: string sa_pgsuffix }
+                           ? (sectorsByAddr.GetValueOrDefault(sa_sectorAddr) ?? Sectors.PGSectors.GetSectorName(sa_sectorAddr)) + sa_pgsuffix
+                           : null,
+                    ValidFrom = system.ValidFrom,
+                    ValidTo = system.ValidTo
+                };
+            }
+        }
+
+        return systemDatas;
+    }
+
+    private static Dictionary<long, BodyData> FillBodies(Models.EDDNContext ctx, Dictionary<long, Models.BodyInfo> bodies)
+    {
+        var bodyNameIds =
+            bodies
+                .Values
+                .Select(e => e.BodyNameId)
+                .OfType<int>()
+                .Union(bodies.Values.Select(e => e.BodyDesignationId).OfType<int>())
+                .Distinct()
+                .ToList();
+
+        var systemNameIds =
+            bodies
+                .Values
+                .Select(e => e.SystemNameId)
+                .OfType<long>()
+                .Union(bodies.Values.Select(e => e.System?.SystemNameId).OfType<long>())
+                .Distinct()
+                .ToList();
+
+        var sectorIds =
+            systemNameIds
+                .Where(e => e > 0)
+                .Select(e => (int)(e >> 40))
+                .Distinct()
+                .ToList();
+
+        var bodyNames =
+            ctx.Set<Models.BodyName>()
+               .Where(e => bodyNameIds.Contains(e.Id))
+               .ToDictionary(e => e.Id);
+
+        var bodyDesigsById =
+            ctx.Set<Models.BodyDesignation>()
+               .Where(e => bodyNameIds.Contains(-e.Id))
+               .ToDictionary(e => e.Id);
+
+        var bodyDesigsByDesigId =
+            ctx.Set<Models.BodyDesignation>()
+               .Where(e => e.DesignationId != null && bodyNameIds.Contains(e.DesignationId.Value))
+               .ToDictionary(e => e.DesignationId!.Value);
+
+        var systemNames =
+            ctx.Set<Models.SystemName>()
+               .Where(e => systemNameIds.Contains(-e.Id))
+               .ToDictionary(e => (long)e.Id, e => e.Name);
+
+        var sectorsById =
+            ctx.Set<Models.Sector>()
+               .Where(e => sectorIds.Contains(e.Id + 0x100000))
+               .ToDictionary(e => (long)e.Id + 0x100000, e => e.Name);
+
+        var sectorsByAddr =
+            ctx.Set<Models.Sector>()
+               .Where(e => e.SectorAddress != null && sectorIds.Contains(e.SectorAddress.Value))
+               .ToDictionary(e => e.SectorAddress!.Value, e => e.Name);
+
+        var bodiesData = new Dictionary<long, BodyData>();
+
+        foreach (var (id, body) in bodies)
+        {
+            var sysname = body switch
+            {
+                { SystemNameId: long sysNameId }
+                    when systemNames.TryGetValue(-sysNameId, out var sn)
+                    => sn,
+                { SysName_SectorId: int sectorId, SysName_PGSuffix: string pgSuffix }
+                    when sectorsById.TryGetValue(sectorId, out var sectorName)
+                    => sectorName + pgSuffix,
+                { SysName_SectorAddress: int sectorAddr, SysName_PGSuffix: string pgSuffix }
+                    => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
+                _ => null
+            };
+
+            var desigSysName = body.System switch
+            {
+                { SystemNameId: long sysNameId }
+                    when systemNames.TryGetValue(-sysNameId, out var sn)
+                    => sn,
+                { SectorId: int sectorId, PGSuffix: string pgSuffix }
+                    when sectorsById.TryGetValue(sectorId, out var sectorName)
+                    => sectorName + pgSuffix,
+                { SectorAddress: int sectorAddr, PGSuffix: string pgSuffix }
+                    => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
+                _ => null
+            };
+
+            if (body.BodyNameId is int bodyNameId)
+            {
+                var name = (sysname, bodyNameId) switch
+                {
+                    (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
+                    (not null, < 0) when bodyDesigsById.TryGetValue(-bodyNameId, out var bd) => sysname + bd.Designation,
+                    (not null, > 0) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => sysname + bd.Designation,
+                    _ => null
+                };
+
+                var desig = body.BodyDesignationId is not int bodyDesigId
+                          ? null
+                          : (desigSysName, bodyDesigId) switch
+                          {
+                              (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
+                              (not null, < 0) when bodyDesigsById.TryGetValue(-bodyNameId, out var bd) => desigSysName + bd.Designation,
+                              (not null, > 0) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => desigSysName + bd.Designation,
+                              _ => null
+                          };
+
+                if (name != null)
+                {
+                    bodiesData[id] = new DTO.BodyData
+                    {
+                        Name = name,
+                        Designation = desig,
+                        Id = body.Id,
+                        SystemId = body.SystemId,
+                        SystemAddress = body.System?.SystemAddress,
+                        ArgOfPeriapsis = body.ArgOfPeriapsis,
+                        SemiMajorAxis = body.SemiMajorAxis * (decimal)Math.Pow(10, body.SemiMajorAxisScale),
+                        BodyId = body.BodyId,
+                        FirstSeen = body.FirstSeen,
+                        Inclination = body.Inclination,
+                        IsRejected = body.IsRejected,
+                        LastSeen = body.LastSeen,
+                        ValidFrom = body.ValidFrom,
+                        ValidTo = body.ValidTo,
+                        Parents = body.ParentSet?.ParentJson is string parentJson
+                                ? JsonConvert.DeserializeObject<List<Dictionary<string, int>>>(parentJson)
+                                : null
+                    };
+                }
+            }
+        }
+
+        return bodiesData;
+    }
+
+    private Dictionary<long, BodyData>? GetBodies(string? systemName, long? systemAddress, string? bodyName, int? bodyId, bool includeRejected)
+    {
+        var systems = GetSystems(systemName, systemAddress, includeRejected);
+
+        if ((systems == null || bodyId == null || bodyId < 0) && string.IsNullOrWhiteSpace(bodyName))
+        {
+            return null;
+        }
+
+        var sysAndBodyNameIds = GetBodyNameIds(bodyName);
+        var sysNameIds = sysAndBodyNameIds.Select(e => e.SystemNameId).OfType<long>().ToList();
+        var bodyNameIds = sysAndBodyNameIds.Where(e => e.SystemNameId == null).Select(e => e.BodyNameId).ToList();
+        var bodyDesigIds = sysAndBodyNameIds.Where(e => e.SystemNameId != null).Select(e => e.BodyNameId).ToList();
+
+        using var ctx = ContextFactory.CreateDbContext();
+
+        IQueryable<Models.BodyInfo> query =
+            ctx.Set<Models.BodyInfo>()
+               .Include(e => e.ParentSet)
+               .Include(e => e.System);
+
+        if (bodyName != null)
+        {
+            query = query.Where(e => bodyNameIds.Contains(e.BodyNameId!.Value)
+                                  || (sysNameIds.Contains(e.SystemNameId!.Value) && bodyDesigIds.Contains(e.BodyNameId!.Value)));
+        }
+
+        if (systems != null && bodyId != null)
+        {
+            query = query.Where(e => systems.Keys.Contains(e.SystemId) && e.BodyId == bodyId);
+        }
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        var bodies = query.ToDictionary(e => e.Id);
+
+        return FillBodies(ctx, bodies);
+    }
+
+    private Dictionary<int, SystemData> GetSystems(ICollection<int> systemIds, bool includeRejected)
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        var query =
+            ctx.Set<Models.SystemInfo>()
+               .Where(e => systemIds.Contains(e.Id));
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        return FillSystems(ctx, query.ToDictionary(e => e.Id));
+    }
+
+    private Dictionary<int, Dictionary<long, BodyData>> GetSystemBodies(ICollection<int> systemIds, bool includeRejected)
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        var query =
+            ctx.Set<Models.BodyInfo>()
+               .Where(e => systemIds.Contains(e.SystemId));
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        var bodies = query.ToDictionary(e => e.Id);
+
+        return
+            FillBodies(ctx, bodies)
+                .Values
+                .GroupBy(e => e.SystemId)
+                .ToDictionary(g => g.Key, g => g.ToDictionary(e => e.Id));
+    }
+
+    private Dictionary<int, List<MatchEntry>> GetSystemMatchEntries(
+            ICollection<int> systemIds,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate
+        )
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        var routeQuery =
+            ctx.Set<Models.FileLineNavRoute>()
+               .Where(e => systemIds.Contains(e.SystemId))
+               .Join(
+                    ctx.Set<Models.FileInfo>(),
+                    o => o.FileId,
+                    i => i.Id,
+                    (o, i) => new { RouteEntry = o, File = i }
+                )
+               .Join(
+                    ctx.Set<Models.FileLineInfo>()
+                       .Include(e => e.Software)
+                       .Include(e => e.SchemaEvent)
+                       .Include(e => e.GameVersion),
+                    o => new { o.RouteEntry.FileId, o.RouteEntry.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, Info = i, o.RouteEntry }
+               )
+               .Select(e => new DTO.MatchEntry
+               {
+                   FileName = e.File.FileName,
+                   LineNo = e.RouteEntry.LineNo,
+                   EntryNum = e.RouteEntry.EntryNum,
+                   SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                   SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                   Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                   EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                   GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                   GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                   IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                   IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                   Timestamp = e.Info.Timestamp,
+                   GatewayTimestamp = e.Info.GatewayTimestamp,
+                   SystemId = e.RouteEntry.SystemId
+               });
+
+        var query =
+            ctx.Set<Models.FileLineInfo>()
+               .Where(e => systemIds.Contains(e.SystemId!.Value))
+               .Include(e => e.Software)
+               .Include(e => e.SchemaEvent)
+               .Include(e => e.GameVersion)
+               .Join(
+                    ctx.Set<Models.FileInfo>(),
+                    o => o.FileId,
+                    i => i.Id,
+                    (o, i) => new { Info = o, File = i }
+                )
+               .LeftJoin(
+                    ctx.Set<Models.FileLineBody>(),
+                    o => new { o.Info.FileId, o.Info.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, o.Info, Body = i }
+               )
+               .LeftJoin(
+                    ctx.Set<Models.FileLineStation>()
+                       .Include(e => e.Station),
+                    o => new { o.Info.FileId, o.Info.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, o.Info, o.Body, Station = i }
+               )
+               .Select(e => new DTO.MatchEntry
+               {
+                    FileName = e.File.FileName,
+                    LineNo = e.Info.LineNo,
+                    SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                    SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                    Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                    EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                    GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                    GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                    Timestamp = e.Info.Timestamp,
+                    GatewayTimestamp = e.Info.GatewayTimestamp,
+                    SystemId = e.Info.SystemId,
+                    BodyId = e.Body!.BodyId,
+                    StationId = e.Station == null ? null : e.Station.StationId
+               });
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.GatewayTimestamp >= minTS);
+            routeQuery = routeQuery.Where(e => e.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.GatewayTimestamp <= maxTS);
+            routeQuery = routeQuery.Where(e => e.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.GatewayTimestamp)
+                .Take(limitMatches ?? 5000)
+                .AsEnumerable()
+                .Concat(routeQuery.OrderByDescending(e => e.GatewayTimestamp).Take(limitMatches ?? 5000))
+                .OrderByDescending(e => e.GatewayTimestamp)
+                .Take(limitMatches ?? 5000)
+                .Where(e => e.SystemId != null)
+                .GroupBy(e => e.SystemId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private Dictionary<long, List<MatchEntry>> GetBodyMatchEntries(
+            ICollection<long> bodyIds,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate
+        )
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        var query =
+            ctx.Set<Models.FileLineBody>()
+               .Where(e => bodyIds.Contains(e.BodyId))
+               .Join(
+                    ctx.Set<Models.FileInfo>(),
+                    o => o.FileId,
+                    i => i.Id,
+                    (o, i) => new { Body = o, File = i }
+                )
+               .Join(
+                    ctx.Set<Models.FileLineInfo>()
+                       .Include(e => e.Software)
+                       .Include(e => e.SchemaEvent)
+                       .Include(e => e.GameVersion),
+                    o => new { o.Body.FileId, o.Body.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, Info = i, o.Body }
+               )
+               .LeftJoin(
+                    ctx.Set<Models.FileLineStation>()
+                       .Include(e => e.Station),
+                    o => new { o.Body.FileId, o.Body.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, o.Info, o.Body, Station = i }
+               )
+               .Select(e => new DTO.MatchEntry
+               {
+                    FileName = e.File.FileName,
+                    LineNo = e.Info.LineNo,
+                    SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                    SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                    Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                    EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                    GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                    GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                    Timestamp = e.Info.Timestamp,
+                    GatewayTimestamp = e.Info.GatewayTimestamp,
+                    SystemId = e.Info.SystemId,
+                    BodyId = e.Body.BodyId,
+                    StationId = e.Station == null ? null : e.Station.StationId
+               });
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.GatewayTimestamp)
+                .Take(limitMatches ?? 5000)
+                .AsEnumerable()
+                .Where(e => e.BodyId != null)
+                .GroupBy(e => e.BodyId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private Dictionary<int, List<MatchEntry>> GetStationMatchEntries(
+            ICollection<int> stationIds,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate
+        )
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        var query =
+            ctx.Set<Models.FileLineStation>()
+               .Where(e => stationIds.Contains(e.StationId))
+
+               .Join(
+                    ctx.Set<Models.FileInfo>(),
+                    o => o.FileId,
+                    i => i.Id,
+                    (o, i) => new { Station = o, File = i }
+                )
+               .Join(
+                    ctx.Set<Models.FileLineInfo>()
+                       .Include(e => e.Software)
+                       .Include(e => e.SchemaEvent)
+                       .Include(e => e.GameVersion),
+                    o => new { o.Station.FileId, o.Station.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, Info = i, o.Station }
+               )
+               .LeftJoin(
+                    ctx.Set<Models.FileLineBody>(),
+                    o => new { o.Station.FileId, o.Station.LineNo },
+                    i => new { i.FileId, i.LineNo },
+                    (o, i) => new { o.File, o.Info, Body = i, o.Station }
+               )
+               .Select(e => new DTO.MatchEntry
+               {
+                    FileName = e.File.FileName,
+                    LineNo = e.Info.LineNo,
+                    SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                    SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                    Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                    EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                    GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                    GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                    Timestamp = e.Info.Timestamp,
+                    GatewayTimestamp = e.Info.GatewayTimestamp,
+                    SystemId = e.Info.SystemId,
+                    BodyId = e.Body == null ? null : e.Body.BodyId,
+                    StationId = e.Station.StationId
+               });
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.GatewayTimestamp <= maxTS);
+        }
+
+        var matches =
+            query
+                .OrderByDescending(e => e.GatewayTimestamp)
+                .Take(limitMatches ?? 5000)
+                .AsEnumerable()
+                .Where(e => e.StationId != null)
+                .GroupBy(e => e.StationId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+        var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
+
+        var systems = GetSystems(systemIds, true);
+
+        return matches.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value
+                      .Select(e => e.SystemId is not int sysid
+                                || systems.GetValueOrDefault(sysid) is not { } sys
+                                ? e
+                                : e with
+                                {
+                                    SystemName = sys.Name,
+                                    SystemAddress = sys.SystemAddress
+                                }
+                      )
+                      .ToList()
+        );
+    }
+
+    private Dictionary<int, int> GetSystemMatchCounts(ICollection<int> systemIds)
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        return
+            ctx.Set<Models.FileLineInfo>()
+               .Where(e => e.SystemId != null && systemIds.Contains(e.SystemId.Value))
+               .GroupBy(e => e.SystemId!.Value)
+               .Select(g => new { SystemId = g.Key, Count = g.Count() })
+               .ToDictionary(e => e.SystemId, e => e.Count);
+    }
+
+    private Dictionary<long, int> GetBodyMatchCounts(ICollection<long> bodyIds)
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        return
+            ctx.Set<Models.FileLineBody>()
+               .Where(e => bodyIds.Contains(e.BodyId))
+               .GroupBy(e => e.BodyId)
+               .Select(g => new { BodyId = g.Key, Count = g.Count() })
+               .ToDictionary(e => e.BodyId, e => e.Count);
+    }
+
+    private Dictionary<int, int> GetStationMatchCounts(ICollection<int> stationIds)
+    {
+        using var ctx = ContextFactory.CreateDbContext();
+
+        return
+            ctx.Set<Models.FileLineStation>()
+               .Where(e => stationIds.Contains(e.StationId))
+               .GroupBy(e => e.StationId)
+               .Select(g => new { BodyId = g.Key, Count = g.Count() })
+               .ToDictionary(e => e.BodyId, e => e.Count);
+    }
+
+    /// <summary>Lookup systems</summary>
+    /// <remarks>
+    /// Use either systemName or systemAddress to search for systems
+    /// </remarks>
+    /// <param name="systemName">Name of system to search for</param>
+    /// <param name="systemAddress">System Address (id64) of system to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched system entries</returns>
+    public List<SystemData> GetSystems(
+            string? systemName,
+            long? systemAddress,
+            bool includeRejected,
+            bool brief,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate
+        )
+    {
+        if (GetSystems(systemName, systemAddress, includeRejected) is not { } systems)
+        {
+            return [];
+        }
+
+        var bodies = GetSystemBodies(systems.Keys, includeRejected);
+
+        var bodyIds =
+            bodies
+                .Values
+                .SelectMany(e => e)
+                .Select(e => e.Key)
+                .Distinct()
+                .ToList();
+
+        var systemMatches = brief
+                          ? []
+                          : GetSystemMatchEntries(systems.Keys, limitMatches, minDate, maxDate);
+        
+        var bodyMatches =
+            systemMatches
+                .Values
+                .SelectMany(e => e)
+                .Where(e => e.BodyId != null)
+                .GroupBy(e => e.BodyId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+        var systemMatchCounts = GetSystemMatchCounts(systems.Keys);
+        var bodyMatchCounts = GetBodyMatchCounts(bodyIds);
+
+        var entries = new List<SystemData>();
+
+        foreach (var (systemId, system) in systems)
+        {
+            var sysEntry = system with
+            {
+                MatchCount = systemMatchCounts.GetValueOrDefault(systemId),
+                Matches = systemMatches.GetValueOrDefault(systemId),
+                Bodies = []
+            };
+
+            entries.Add(sysEntry);
+
+            foreach (var (bodyId, body) in bodies.GetValueOrDefault(systemId) ?? [])
+            {
+                var bodyEntry = body with
+                {
+                    MatchCount = bodyMatchCounts.GetValueOrDefault(bodyId),
+                    Matches = bodyMatches.GetValueOrDefault(bodyId)
+                };
+
+                sysEntry.Bodies.Add(bodyEntry);
+            }
+        }
+
+        return entries;
+    }
+
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Use either bodyName or a combination of bodyId with either systemName or systemAddress to search for a body
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Used with bodyId; Name of the system to search for the body</param>
+    /// <param name="systemAddress">Used with bodyId; System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Used with systemName or systemId64; Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    public List<BodyData> GetBodies(
+            string? bodyName,
+            string? systemName,
+            long? systemAddress,
+            int? bodyId,
+            bool includeRejected,
+            bool brief,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate
+        )
+    {
+        if (GetBodies(systemName, systemAddress, bodyName, bodyId, includeRejected) is not { } bodies)
+        {
+            return [];
+        }
+
+        var systemIds =
+            bodies
+                .Select(e => e.Value.SystemId)
+                .ToList();
+
+        var systems = GetSystems(systemIds, includeRejected);
+
+        var bodyMatches = brief
+                        ? []
+                        : GetBodyMatchEntries(bodies.Keys, limitMatches, minDate, maxDate);
+        
+        var bodyMatchCounts = GetBodyMatchCounts(bodies.Keys);
+
+        var entries = new List<BodyData>();
+
+        foreach (var (id, body) in bodies)
+        {
+            var bodyEnt = body with
+            {
+                MatchCount = bodyMatchCounts.GetValueOrDefault(id),
+                Matches = bodyMatches.GetValueOrDefault(id),
+                System = systems.TryGetValue(body.SystemId, out var system) ? new DTO.BodySystem
+                {
+                    Name = system.Name,
+                    NameSystemAddress = system.NameSystemAddress,
+                    SystemAddress = system.SystemAddress,
+                    Coords = system.Coords,
+                    PGName = system.PGName
+                } : null
+            };
+
+            entries.Add(bodyEnt);
+        }
+
+        return entries;
+    }
+
+    /// <summary>Lookup stations</summary>
+    /// <remarks>
+    /// Use either stationName or marketId to search for a station
+    /// </remarks>
+    /// <param name="stationName">Name of the station to search for</param>
+    /// <param name="marketId">Market ID of the station to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return station and system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns></returns>
+    public List<StationData> GetStations(
+            string? stationName,
+            long? marketId,
+            bool includeRejected,
+            bool brief,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate
+        )
+    {
+        if (string.IsNullOrWhiteSpace(stationName) && (marketId == null || marketId <= 0))
+        {
+            return [];
+        }
+
+        stationName = stationName?.Trim();
+
+        using var ctx = ContextFactory.CreateDbContext();
+
+        IQueryable<Models.StationInfo> query = ctx.Set<Models.StationInfo>();
+
+        if (!string.IsNullOrWhiteSpace(stationName))
+        {
+            query = query.Where(e => e.StationName == stationName);
+        }
+
+        if (marketId != null && marketId > 0)
+        {
+            query = query.Where(e => e.MarketId == marketId);
+        }
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        var stations =
+            ctx.Set<Models.StationInfo>()
+               .Select(e => new DTO.StationData
+               {
+                   Id = e.Id,
+                   SystemAddress = e.SystemAddress,
+                   BodyName = e.BodyName,
+                   FirstSeen = e.FirstSeen,
+                   IsRejected = e.IsRejected,
+                   LastSeen = e.LastSeen,
+                   Latitude = e.Latitude,
+                   Longitude = e.Longitude,
+                   MarketId = e.MarketId,
+                   StationName = e.StationName,
+                   StationType = e.StationType,
+                   SystemName = e.SystemName,
+                   ValidFrom = e.ValidFrom,
+                   ValidTo = e.ValidTo
+               })
+               .ToDictionary(e => e.Id);
+
+        var matches = brief
+                    ? []
+                    : GetStationMatchEntries(stations.Keys, limitMatches, minDate, maxDate);
+        
+        var matchCounts = GetStationMatchCounts(stations.Keys);
+
+        var entries = new Dictionary<int, StationData>();
+
+        foreach (var (id, station) in stations)
+        {
+            entries[id] = station with
+            {
+                MatchCount = matchCounts.GetValueOrDefault(id),
+                Matches = matches.GetValueOrDefault(id)
+            };
+        }
+
+        return [];
+    }
+
+    /// <summary>Extract EDDN event</summary>
+    /// <remarks>
+    /// Extract line from indexed EDDN capture
+    /// </remarks>
+    /// <param name="filename">EDDN capture filename without path</param>
+    /// <param name="lineno">1-based Line number</param>
+    /// <returns></returns>
+    public string? ExtractLine(string filename, int lineno)
+    {
+        if (Settings.IndexedDir == null || lineno <= 0 || string.IsNullOrWhiteSpace(filename))
+        {
+            return null;
+        }
+
+        filename = filename.Trim();
+
+        lineno -= 1;
+
+        var chunkNo = lineno / 1024;
+        var itemNo = lineno % 1024;
+
+        Models.FileInfo? file;
+
+        using (var ctx = ContextFactory.CreateDbContext())
+        {
+            file = ctx.Set<Models.FileInfo>().FirstOrDefault(e => e.FileName == filename);
+
+            if (file == null)
+            {
+                return null;
+            }
+        }
+
+        lock (LineCacheLock)
+        {
+            if (LineCache.TryGetValue(file.FileName, out var fileEnts)
+                && fileEnts.Entries.TryGetValue(chunkNo, out var ents)
+                && itemNo < ents.Value.Lines.Count)
+            {
+                if (ents.Previous != null)
+                {
+                    LineCacheLRU.Remove(ents);
+                    LineCacheLRU.AddFirst(ents);
+                }
+
+                ents.ValueRef.LastUsed = DateTime.UtcNow;
+                return ents.Value.Lines[itemNo];
+            }
+        }
+
+        var indexFilename = Path.Combine(Settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
+
+        if (!File.Exists(indexFilename) || !File.Exists(file.FileName + ".index"))
+        {
+            return null;
+        }
+
+        var info = new FileInfo(indexFilename);
+        var dataLastMod = info.LastWriteTimeUtc;
+        var dataSize = info.Length;
+        Span<byte> ixStartEndPos = stackalloc byte[16];
+
+        for (int retries = 3; ; retries--)
+        {
+            using var indexStream = File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
+
+            var ixLastMod = File.GetLastWriteTimeUtc(indexStream.SafeFileHandle);
+            var ixSize = indexStream.Length;
+
+            if (chunkNo >= indexStream.Length / 8 - 1)
+            {
+                return null;
+            }
+
+            indexStream.Seek((long)chunkNo * 8, SeekOrigin.Begin);
+            long startPos = 0;
+            long endPos = 0;
+            indexStream.ReadExactly(ixStartEndPos);
+            startPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndPos);
+            endPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndPos[8..]);
+
+            if (endPos < startPos || endPos - startPos > 1048576)
+            {
+                return null;
+            }
+
+            using var dataStream = File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+            var newSize = dataStream.Length;
+            var newLastMod = File.GetLastWriteTimeUtc(dataStream.SafeFileHandle);
+
+            var ixInfo = new FileInfo(indexFilename + ".index");
+
+            if (newSize != dataSize
+                || newLastMod != dataLastMod
+                || ixInfo.LastWriteTimeUtc != ixLastMod
+                || ixInfo.Length != ixSize)
+            {
+                if (retries == 0)
+                {
+                    return null;
+                }
+
+                dataSize = newSize;
+                dataLastMod = newLastMod;
+
+                continue;
+            }
+
+            var databuf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
+            using var bzmemstream = new MemoryStream();
+
+            try
+            {
+                var dataSpan = databuf.AsSpan(0, (int)(endPos - startPos));
+                dataStream.Seek(startPos, SeekOrigin.Begin);
+                dataStream.ReadExactly(dataSpan);
+                bzmemstream.Write(dataSpan);
+                bzmemstream.Seek(0, SeekOrigin.Begin);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(databuf);
+            }
+
+            lock (LineCacheLock)
+            {
+                if (!LineCache.TryGetValue(file.FileName, out var fileEnts))
+                {
+                    LineCache[file.FileName] = fileEnts = (dataLastMod, dataSize, []);
+                }
+                else if (fileEnts.LastMod != dataLastMod || fileEnts.Length != dataSize)
+                {
+                    foreach (var ent in fileEnts.Entries.Values)
+                    {
+                        LineCacheLRU.Remove(ent);
+                    }
+
+                    LineCache[file.FileName] = fileEnts = (dataLastMod, dataSize, []);
+                }
+                else if (fileEnts.Entries.TryGetValue(chunkNo, out var chunkEnts)
+                         && itemNo < chunkEnts.Value.Lines.Count)
+                {
+                    chunkEnts.ValueRef.LastUsed = DateTime.UtcNow;
+                    return chunkEnts.Value.Lines[itemNo];
+                }
+
+                using var bzstream = new BZip2InputStream(bzmemstream);
+                using var reader = new StreamReader(bzstream);
+
+                var lines = new List<string>();
+
+                while (reader.ReadLine() is string line)
+                {
+                    lines.Add(line);
+                }
+
+                fileEnts.Entries[chunkNo] = LineCacheLRU.AddFirst((file.FileName, chunkNo, lines, DateTime.UtcNow));
+
+                return itemNo < lines.Count ? lines[itemNo] : null;
+            }
+        }
+    }
+}
