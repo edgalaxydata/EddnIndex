@@ -1,4 +1,4 @@
-﻿namespace EddnLookup.DTO;
+﻿namespace EddnIndexLookup.DTO;
 
 /// <summary>
 /// Base properties for matched items

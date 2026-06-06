@@ -1,4 +1,4 @@
-﻿namespace EddnIndexUpdate;
+﻿namespace EddnIndexUpdate.Options;
 
 public class FileProcessorSettings
 {

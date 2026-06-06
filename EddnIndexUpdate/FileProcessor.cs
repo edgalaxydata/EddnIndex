@@ -1,4 +1,5 @@
-﻿using Ionic.BZip2;
+﻿using EddnIndexUpdate.Options;
+using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

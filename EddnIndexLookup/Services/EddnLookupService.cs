@@ -1,5 +1,7 @@
-﻿using EddnIndexUpdate;
-using EddnLookup.DTO;
+﻿using EddnIndexLookup.DTO;
+using EddnIndexLookup.Options;
+using EddnIndexUpdate;
+using EddnIndexUpdate.Options;
 using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -9,7 +11,7 @@ using System.Buffers.Binary;
 using Models = EddnIndexUpdate.Models;
 using Sectors = EddnIndexUpdate.Sectors;
 
-namespace EddnLookup.Services;
+namespace EddnIndexLookup.Services;
 
 /// <summary>
 /// Backend service for EDDN lookup API
@@ -17,15 +19,15 @@ namespace EddnLookup.Services;
 /// <param name="contextFactory"></param>
 /// <param name="logger"></param>
 /// <param name="options"></param>
-public class APIService(
+public class EddnLookupService(
         IDbContextFactory<Models.EDDNContext> contextFactory,
         ILogger<FileProcessor> logger,
-        IOptions<FileProcessorSettings> options
+        IOptions<EddnLookupServiceSettings> options
     )
 {
     private readonly IDbContextFactory<Models.EDDNContext> ContextFactory = contextFactory;
     private readonly ILogger Logger = logger;
-    private readonly FileProcessorSettings Settings = options.Value;
+    private readonly EddnLookupServiceSettings Settings = options.Value;
     private readonly Dictionary<string, (DateTime LastMod, long Length, Dictionary<int, LinkedListNode<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)>> Entries)> LineCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly LinkedList<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)> LineCacheLRU = [];
     private readonly Lock LineCacheLock = new();

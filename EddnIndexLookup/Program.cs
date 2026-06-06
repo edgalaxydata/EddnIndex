@@ -1,17 +1,23 @@
 using EddnIndexUpdate;
-using EddnLookup.Services;
-using Microsoft.EntityFrameworkCore;
+using EddnIndexLookup.Services;
 using System.Reflection;
+using EddnIndexUpdate.Options;
+using EddnIndexLookup.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
+builder.Configuration.AddJsonFile("appsettings.json", optional: true);
+builder.Configuration.AddJsonFile("hosting.json", optional: true);
+builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
+
 builder.Services.AddControllers()
                 .AddJsonOptions(opts => opts.JsonSerializerOptions.PropertyNamingPolicy = null);
+
 builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
-builder.Services.Configure<FileProcessorSettings>(builder.Configuration.GetSection("FileProcessor"));
-builder.Services.AddTransient<APIService>();
+builder.Services.Configure<EddnLookupServiceSettings>(builder.Configuration.GetSection("APIService"));
+builder.Services.AddTransient<EddnLookupService>();
 builder.Services.AddSwaggerGen(options =>
 {
     options.UseAllOfForInheritance();
@@ -20,7 +26,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v2", new Microsoft.OpenApi.OpenApiInfo
     {
         Version = "v2",
-        Title = "EDDN Lookup",
+        Title = "EDDN Index Lookup",
         Description = "API for querying EDDN capture index"
     });
 
@@ -31,7 +37,7 @@ var app = builder.Build();
 
 app.UseSwagger();
 
-app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v2/swagger.json", "EDDNLookup-v2"));
+app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v2/swagger.json", "EDDN Index Lookup"));
 
 app.UseHttpsRedirection();
 

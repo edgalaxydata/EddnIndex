@@ -1,6 +1,0 @@
-@EddnLookup_HostAddress = http://localhost:5051
-
-GET {{EddnLookup_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

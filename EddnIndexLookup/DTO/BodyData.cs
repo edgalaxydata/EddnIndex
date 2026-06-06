@@ -1,49 +1,60 @@
-﻿namespace EddnLookup.DTO;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace EddnIndexLookup.DTO;
 
 /// <summary>
-/// Station details
+/// Matched body details
 /// </summary>
-public record class StationData : IMatchedItem
+public record class BodyData : IMatchedItem
 {
     /// <summary>
-    /// Unique ID of station
+    /// Body Name
     /// </summary>
-    public long? MarketId { get; init; }
+    /// <example>Rigel</example>
+    public required string Name { get; init; }
 
     /// <summary>
-    /// Name of station
+    /// System Address (AKA ID64)
     /// </summary>
-    public string? StationName { get; init; }
-
-    /// <summary>
-    /// Type of station
-    /// </summary>
-    public string? StationType { get; init; }
-
-    /// <summary>
-    /// System name for fixed stations
-    /// </summary>
-    public string? SystemName { get; init; }
-
-    /// <summary>
-    /// System Address for fixed stations
-    /// </summary>
+    [Range(0, 1L << 55, MaximumIsExclusive = true)]
     public long? SystemAddress { get; init; }
 
     /// <summary>
-    /// Name of body the SOI of which the station is fixed in
+    /// Sequential body id within a system
     /// </summary>
-    public string? BodyName { get; init; }
+    [Range(0, 511)]
+    public int? BodyId { get; init; }
 
     /// <summary>
-    /// Latitude for ground settlements
+    /// Parent heirarchy to system's root body
     /// </summary>
-    public decimal? Latitude { get; init; }
+    /// <example>[{"Planet":4},{"Star":1},{"Null":0}]</example>
+    public List<Dictionary<string, int>>? Parents { get; init; }
 
     /// <summary>
-    /// Longitude for ground settlements
+    /// Body designation if known
     /// </summary>
-    public decimal? Longitude { get; init; }
+    public string? Designation { get; init; }
+
+    /// <summary>
+    /// Orbital Argument of Periapsis
+    /// </summary>
+    public decimal? ArgOfPeriapsis { get; init; }
+
+    /// <summary>
+    /// Orbital inclination
+    /// </summary>
+    public decimal? Inclination { get; init; }
+
+    /// <summary>
+    /// Orbital Semi-Major Axis
+    /// </summary>
+    public decimal? SemiMajorAxis { get; init; }
+
+    /// <summary>
+    /// System Data
+    /// </summary>
+    public BodySystem? System { get; init; }
 
     /// <summary>
     /// Set to true if item details were determined to be invalid
@@ -82,5 +93,10 @@ public record class StationData : IMatchedItem
 
     [System.Text.Json.Serialization.JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
-    internal int Id { get; init; }
+    internal int SystemId { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    internal long Id { get; init; }
 }
+

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace EddnLookup.DTO
+namespace EddnIndexLookup.DTO
 {
     /// <summary>
     /// EDDN event body
