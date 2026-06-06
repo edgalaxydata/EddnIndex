@@ -1,34 +1,55 @@
-﻿namespace EddnIndexLookup.DTO;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace EddnIndexLookup.DTO;
 
 /// <summary>
-/// System details
+/// Matched body details
 /// </summary>
-public record class SystemData : IMatchedItem
+public record class SystemBodyData : IMatchedItem
 {
     /// <summary>
-    /// Name of system
+    /// Body Name
     /// </summary>
+    /// <example>Rigel</example>
     public required string Name { get; init; }
 
     /// <summary>
-    /// Procedurally generated name of system where available
+    /// System Address (AKA ID64)
     /// </summary>
-    public string? PGName { get; init; }
-
-    /// <summary>
-    /// Unique identifier for system from event
-    /// </summary>
+    [Range(0, 1L << 55, MaximumIsExclusive = true)]
     public long? SystemAddress { get; init; }
 
     /// <summary>
-    /// Unique identifier based on system name
+    /// Sequential body id within a system
     /// </summary>
-    public long? NameSystemAddress { get; init; }
+    [Range(0, 511)]
+    public int? BodyId { get; init; }
 
     /// <summary>
-    /// Heliocentric galactic rectangular coordinates of system in lightyears
+    /// Parent heirarchy to system's root body
     /// </summary>
-    public Coords? Coords { get; init; }
+    /// <example>[{"Planet":4},{"Star":1},{"Null":0}]</example>
+    public List<Dictionary<string, int>>? Parents { get; init; }
+
+    /// <summary>
+    /// Body designation if known
+    /// </summary>
+    public string? Designation { get; init; }
+
+    /// <summary>
+    /// Orbital Argument of Periapsis
+    /// </summary>
+    public decimal? ArgOfPeriapsis { get; init; }
+
+    /// <summary>
+    /// Orbital inclination
+    /// </summary>
+    public decimal? Inclination { get; init; }
+
+    /// <summary>
+    /// Orbital Semi-Major Axis
+    /// </summary>
+    public decimal? SemiMajorAxis { get; init; }
 
     /// <summary>
     /// Set to true if item details were determined to be invalid
@@ -65,12 +86,12 @@ public record class SystemData : IMatchedItem
     /// </summary>
     public List<MatchEntry>? Matches { get; init; }
 
-    /// <summary>
-    /// Bodies from events seen with these system details
-    /// </summary>
-    public List<SystemBodyData>? Bodies { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    internal int SystemId { get; init; }
 
     [System.Text.Json.Serialization.JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
-    internal int Id { get; init; }
+    internal long Id { get; init; }
 }
+

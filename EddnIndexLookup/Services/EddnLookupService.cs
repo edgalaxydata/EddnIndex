@@ -489,6 +489,8 @@ public class EddnLookupService(
 
         var query =
             ctx.Set<Models.BodyInfo>()
+               .Include(e => e.ParentSet)
+               .Include(e => e.System)
                .Where(e => systemIds.Contains(e.SystemId));
 
         if (!includeRejected)
@@ -887,13 +889,26 @@ public class EddnLookupService(
 
             foreach (var (bodyId, body) in bodies.GetValueOrDefault(systemId) ?? [])
             {
-                var bodyEntry = body with
+                sysEntry.Bodies.Add(new SystemBodyData
                 {
+                    Name = body.Name,
+                    ArgOfPeriapsis = body.ArgOfPeriapsis,
+                    SemiMajorAxis = body.SemiMajorAxis,
+                    BodyId = body.BodyId,
+                    SystemAddress = body.SystemAddress,
+                    Designation = body.Designation,
+                    FirstSeen = body.FirstSeen,
+                    Id = body.Id,
+                    Inclination = body.Inclination,
+                    IsRejected = body.IsRejected,
+                    LastSeen = body.LastSeen,
                     MatchCount = bodyMatchCounts.GetValueOrDefault(bodyId),
-                    Matches = bodyMatches.GetValueOrDefault(bodyId)
-                };
-
-                sysEntry.Bodies.Add(bodyEntry);
+                    Matches = bodyMatches.GetValueOrDefault(bodyId),
+                    Parents = body.Parents,
+                    SystemId = body.SystemId,
+                    ValidFrom = body.ValidFrom,
+                    ValidTo = body.ValidTo
+                });
             }
         }
 
