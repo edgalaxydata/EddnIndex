@@ -793,6 +793,11 @@ public class HomeController(EddnLookupService service) : ControllerBase
         => await Service.GetSectorsAsync(includeSphereSectors, HttpContext.RequestAborted);
 
     /// <summary>Get systems in a sector</summary>
+    /// <remarks>
+    /// Note that this will not currently search for systems that would fall inside
+    /// a hand-authored sector unless `nameOnly` is `true` and the system name starts
+    /// with the given sector name.
+    /// </remarks>
     /// <param name="sectorName">Name of the sector</param>
     /// <param name="nameOnly">Match name instead of SystemAddress</param>
     /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>

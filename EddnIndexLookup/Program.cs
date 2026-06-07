@@ -19,7 +19,17 @@ builder.Services.AddControllers()
                     opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
                 });
 
-builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
+builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(
+    opts =>
+    {
+        opts.ConfigureDB(builder.Configuration.GetSection("Database"));
+
+        if (builder.Environment.IsDevelopment())
+        {
+            opts.EnableSensitiveDataLogging(true);
+        }
+    }
+);
 builder.Services.Configure<EddnLookupServiceSettings>(builder.Configuration.GetSection("APIService"));
 builder.Services.AddTransient<EddnLookupService>();
 builder.Services.AddSwaggerGen(options =>

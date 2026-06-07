@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Buffers;
 using System.Buffers.Binary;
+using System.ComponentModel.DataAnnotations;
 using System.Runtime.CompilerServices;
 using Models = EddnIndexUpdate.Models;
 using Sectors = EddnIndexUpdate.Sectors;
@@ -247,7 +248,7 @@ public class EddnLookupService(
         var sectorsById = await
             ctx.Set<Models.Sector>()
                .Where(e => sectorIds.Contains(e.Id + 0x100000))
-               .ToDictionaryAsync(e => (long)e.Id + 0x100000, e => e.Name, cancellationToken: canceltoken);
+               .ToDictionaryAsync(e => (long)e.Id, e => e.Name, cancellationToken: canceltoken);
 
         var sectorsByAddr = await
             ctx.Set<Models.Sector>()
@@ -1277,48 +1278,55 @@ public class EddnLookupService(
             return null;
         }
 
-        Dictionary<int, Models.SystemInfo> systems;
+        IQueryable<Models.SystemInfo> query;
 
         if (nameOnly)
         {
             var minId = ((long)sector.Id << 40) + (1L << 60);
+            var maxId = minId + (1L << 40) - 1;
 
-            systems = await
+            query =
                 ctx.Set<Models.SystemInfo>()
-                   .Where(e => e.SystemNameId >= minId && e.SystemNameId <= minId + (1 << 40))
-                   .ToDictionaryAsync(e => e.Id, canceltoken);
+                   .Where(e => e.SystemNameId >= minId && e.SystemNameId <= maxId);
 
             if (sector.SectorAddress is int sectorAddress)
             {
                 var minAddr = (long)sectorAddress << 40;
+                var maxAddr = minAddr + (1L << 40) - 1;
 
-                var secAddrSystems = await
+                query = query.Concat(
                     ctx.Set<Models.SystemInfo>()
-                       .Where(e => e.SystemNameId >= minAddr && e.SystemNameId <= minAddr + (1 << 40))
-                       .ToListAsync(canceltoken);
-
-                foreach (var system in secAddrSystems)
-                {
-                    systems[system.Id] = system;
-                }
+                       .Where(e => e.SystemNameId >= minAddr && e.SystemNameId <= maxAddr)
+                );
             }
         }
         else
         {
             if (sector.SectorAddress is int sectorAddress)
             {
-               var minAddr = (long)sectorAddress << 40;
+                var minAddr = (long)sectorAddress << 40;
+                var maxAddr = minAddr + (1L << 40) - 1;
 
-                systems = await
+                query =
                     ctx.Set<Models.SystemInfo>()
-                       .Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= minAddr + (1 << 40))
-                       .ToDictionaryAsync(e => e.Id, canceltoken);
+                       .Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= maxAddr);
             }
             else
             {
                 return [];
             }
         }
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        var systems = await
+            query
+                .AsAsyncEnumerable()
+                .GroupBy(e => e.Id)
+                .ToDictionaryAsync(g => g.Key, g => g.First(), cancellationToken: canceltoken);
 
         var systemDatas = await FillSystemsAsync<SectorSystem>(ctx, systems, canceltoken);
 
@@ -1340,6 +1348,6 @@ public class EddnLookupService(
             query = query.Where(e => e.SectorAddress != null);
         }
 
-        return await query.Select(e => e.Name).ToListAsync(canceltoken);
+        return await query.Select(e => e.Name).Order().ToListAsync(canceltoken);
     }
 }
