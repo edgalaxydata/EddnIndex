@@ -18,13 +18,21 @@ public static class DBConfigurationOptionsExtensions
             csb = new MySqlConnector.MySqlConnectionStringBuilder();
             dbsettings.Remove("ServerVersion");
         }
+        else if (provider == "npgsql")
+        {
+            csb = new Npgsql.NpgsqlConnectionStringBuilder();
+        }
         else if (provider == "sqlite")
         {
             csb = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder();
         }
-        else
+        else if (provider == "mssql" || provider == null)
         {
             csb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder();
+        }
+        else
+        {
+            throw new NotSupportedException();
         }
 
         foreach (var (name, value) in dbsettings)
@@ -71,6 +79,13 @@ public static class DBConfigurationOptionsExtensions
                 dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_MySQL")
             );
             opts.AddInterceptors(new UTCTimeInterceptor());
+        }
+        else if (provider == "npgsql")
+        {
+            opts.UseNpgsql(
+                connstring,
+                dbopts => dbopts.MigrationsAssembly("EddnIndexUpdate.Migrations_Npgsql")
+            );
         }
         else if (provider == "sqlite")
         {
