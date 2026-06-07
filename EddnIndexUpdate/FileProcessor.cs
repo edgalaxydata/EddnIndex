@@ -1106,6 +1106,7 @@ public partial class FileProcessor(
             var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
             var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
             var schemaEventUpdates = new Dictionary<int, (Models.SchemaEventInfo, DateTime? FirstSeen, DateTime? LastSeen)>();
+            var sectorUpdates = new Dictionary<int, (Models.Sector Sector, DateTime? FirstSeen, DateTime? LastSeen)>();
 
             foreach (var _ent in newLines.Values)
             {
@@ -1119,6 +1120,11 @@ public partial class FileProcessor(
                 var system = _ent.System;
                 var gatewayTimestamp = _ent.GatewayTimestamp;
                 var schemaEvent = _ent.SchemaEvent;
+                var sector = _ent.System?.SectorId is int sectorId
+                           ? SectorsById.GetValueOrDefault(sectorId)
+                           : _ent.System?.SectorAddress is int sectorAddr
+                           ? SectorsByAddr.GetValueOrDefault(sectorAddr)
+                           : null;
 
                 var ent = _ent with
                 {
@@ -1136,6 +1142,7 @@ public partial class FileProcessor(
                 AddOrUpdateInfo(gameVersionUpdates, gameVersion, gatewayTimestamp);
                 AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
                 AddOrUpdateInfo(schemaEventUpdates, schemaEvent, gatewayTimestamp);
+                AddOrUpdateInfo(sectorUpdates, sector, gatewayTimestamp);
 
                 if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
                 {
@@ -1175,6 +1182,13 @@ public partial class FileProcessor(
             }
 
             foreach (var (info, firstSeen, lastSeen) in systemUpdates.Values)
+            {
+                var entry = ctx.Attach(info);
+                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+            }
+
+            foreach (var (info, firstSeen, lastSeen) in sectorUpdates.Values)
             {
                 var entry = ctx.Attach(info);
                 entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;

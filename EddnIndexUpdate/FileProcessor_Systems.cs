@@ -15,6 +15,7 @@ public partial class FileProcessor
     private readonly Dictionary<int, Models.SystemName> SystemNamesById = [];
     private readonly Dictionary<string, Models.Sector> Sectors = [];
     private readonly Dictionary<int, Models.Sector> SectorsById = [];
+    private readonly Dictionary<int, Models.Sector> SectorsByAddr = [];
 
     private void Init_Systems()
     {
@@ -130,6 +131,11 @@ public partial class FileProcessor
             foreach (var sector in Sectors.Values)
             {
                 SectorsById[sector.Id] = sector;
+
+                if (sector.SectorAddress is int sectorAddr)
+                {
+                    SectorsByAddr[sectorAddr] = sector;
+                }
             }
         }
 

@@ -1,6 +1,6 @@
 ﻿namespace EddnIndexUpdate.Models;
 
-public record class Sector : IHasId<int>
+public record class Sector : IHasId<int>, IHasFirstLastSeen
 {
     public int Id { get; init; }
     public required string Name { get; init; }
