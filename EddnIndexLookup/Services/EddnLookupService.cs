@@ -34,6 +34,7 @@ public class EddnLookupService(
     private readonly Lock LineCacheLock = new();
 
     private readonly TimeSpan MaxCacheAge = TimeSpan.FromHours(1);
+    private readonly int MaxCacheSize = 8192;
 
     private async IAsyncEnumerable<long> GetSystemNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
     {
@@ -1247,6 +1248,23 @@ public class EddnLookupService(
                 }
 
                 fileEnts.Entries[chunkNo] = LineCacheLRU.AddFirst((file.FileName, chunkNo, lines, DateTime.UtcNow));
+
+                while (LineCacheLRU.Last is { } last
+                       && (LineCacheLRU.Count > MaxCacheSize
+                           || last.Value.LastUsed < DateTime.UtcNow - MaxCacheAge))
+                {
+                    LineCacheLRU.Remove(last);
+
+                    if (LineCache.TryGetValue(last.Value.Filename, out var lastEnts))
+                    {
+                        lastEnts.Entries.Remove(last.Value.ChunkNo);
+                    }
+
+                    if (lastEnts.Entries.Count == 0)
+                    {
+                        LineCache.Remove(last.Value.Filename);
+                    }
+                }
 
                 return itemNo < lines.Count ? lines[itemNo] : null;
             }
