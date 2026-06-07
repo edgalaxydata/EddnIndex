@@ -1,14 +1,17 @@
-﻿namespace EddnIndexLookup.DTO;
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace EddnIndexLookup.DTO;
 
 /// <summary>
 /// System details
 /// </summary>
-public record class SystemData : IMatchedItem
+public record class SystemData : IMatchedItem, ISystemData
 {
     /// <summary>
     /// Name of system
     /// </summary>
-    public required string Name { get; init; }
+    [Required]
+    public string Name { get; init; } = "";
 
     /// <summary>
     /// Procedurally generated name of system where available
@@ -70,7 +73,10 @@ public record class SystemData : IMatchedItem
     /// </summary>
     public List<SystemBodyData>? Bodies { get; init; }
 
+    /// <summary>
+    /// Internal system id
+    /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
-    internal int Id { get; init; }
+    public int Id { get; init; }
 }

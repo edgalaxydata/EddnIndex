@@ -27,6 +27,13 @@ builder.Services.AddSwaggerGen(options =>
     options.UseAllOfForInheritance();
     options.UseOneOfForPolymorphism();
 
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
+    {
+        Version = "v1",
+        Title = "EDDN Index Lookup",
+        Description = "API for querying EDDN capture index"
+    });
+
     options.SwaggerDoc("v2", new Microsoft.OpenApi.OpenApiInfo
     {
         Version = "v2",
@@ -37,11 +44,51 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(Assembly.GetExecutingAssembly());
 });
 
+builder.Services.PostConfigure<ForwardedHeadersOptions>(opts =>
+{
+    var fwdhdrs = builder.Configuration.GetSection("ForwardedHeaders");
+
+    foreach (string net in fwdhdrs.GetSection("KnownIPNetworks").Get<List<string>>() ?? [])
+    {
+        if (System.Net.IPNetwork.TryParse(net, out var ipnet))
+        {
+            opts.KnownIPNetworks.Add(ipnet);
+        }
+    }
+
+    foreach (string proxy in fwdhdrs.GetSection("KnownProxies").Get<List<string>>() ?? [])
+    {
+        if (System.Net.IPAddress.TryParse(proxy, out var proxyIp))
+        {
+            opts.KnownProxies.Add(proxyIp);
+        }
+    }
+
+    fwdhdrs.Bind(opts);
+});
+
 var app = builder.Build();
+
+if (app.Configuration.GetValue<string>("ASPNETCORE_APPL_PATH") is string appPath && !string.IsNullOrWhiteSpace(appPath))
+{
+    if (app.Configuration.GetValue<string>("ASPNETCORE_APPL_HOST") is string appHost && !string.IsNullOrWhiteSpace(appHost))
+    {
+        app.UseWhen(ctx => !string.Equals(ctx.Request.Host.Host, appHost, StringComparison.OrdinalIgnoreCase), appNoHost => appNoHost.UsePathBase(appPath));
+    }
+    else
+    {
+        app.UsePathBase(appPath);
+    }
+}
 
 app.UseSwagger();
 
-app.UseSwaggerUI(opts => opts.SwaggerEndpoint("/swagger/v2/swagger.json", "EDDN Index Lookup"));
+app.UseSwaggerUI(opts =>
+{
+    opts.SwaggerEndpoint("v2/swagger.json", "EDDN Index Lookup v2");
+    opts.SwaggerEndpoint("v1/swagger.json", "EDDN Index Lookup v1 Backwards Compatibility Endpoint");
+    opts.InjectStylesheet("custom.css");
+});
 
 app.UseHttpsRedirection();
 

@@ -24,16 +24,16 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <summary>Lookup systems</summary>
     /// <remarks>
     /// Returns systems matching all of the given parameters.
-    /// 
+    ///
     /// At least one of the following parameters must be provided:
     /// * `systemName`
     /// * `systemAddress`
-    /// 
+    ///
     /// The following parameters filter systems:
     /// * `systemName`
     /// * `systemAddress`
     /// * `includeRejected`
-    /// 
+    ///
     /// The following parameters filter matches:
     /// * `brief`
     /// * `limitMatches`
@@ -48,18 +48,21 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <param name="minDate">Start of date range for matches</param>
     /// <param name="maxDate">End of date range for matches</param>
     /// <returns>Matched system entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("systems")]
     [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SystemData>>> GetSystemsAsync(
-        [FromQuery] string? systemName,
-        [FromQuery] long? systemAddress,
-        [FromQuery] bool includeRejected = false,
-        [FromQuery] bool brief = false,
-        [FromQuery] int? limitMatches = null,
-        [FromQuery] DateTimeOffset? minDate = null,
-        [FromQuery] DateTimeOffset? maxDate = null)
+            [FromQuery] string? systemName,
+            [FromQuery] long? systemAddress,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
     {
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
+        systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
 
         var systems = await Service.GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
@@ -81,22 +84,137 @@ public class HomeController(EddnLookupService service) : ControllerBase
         return Ok(systems);
     }
 
+    /// <summary>Lookup systems</summary>
+    /// <remarks>
+    /// Returns systems matching all of the given parameters.
+    ///
+    /// The following parameters filter systems:
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="systemName">Name of system to search for</param>
+    /// <param name="systemAddress">System Address (id64) of system to search for</param>
+    /// <param name="includeRejected">Set to include items marked as rejected</param>
+    /// <param name="brief">Set to only return system and body information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched system entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("systems/{systemAddress:long}")]
+    [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<SystemData>>> GetSystemsSysAddrAsync(
+            [FromQuery] string? systemName,
+            [FromRoute] long? systemAddress,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup systems</summary>
+    /// <remarks>
+    /// Returns systems matching all of the given parameters.
+    ///
+    /// The following parameters filter systems:
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="systemName">Name of system to search for</param>
+    /// <param name="systemAddress">System Address (id64) of system to search for</param>
+    /// <param name="includeRejected">Set to include items marked as rejected</param>
+    /// <param name="brief">Set to only return system and body information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched system entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("systems/{systemName}")]
+    [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<SystemData>>> GetSystemsSysNameAsync(
+            [FromRoute] string? systemName,
+            [FromQuery] long? systemAddress,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup systems (Backwards compatibility endpoint)</summary>
+    /// <remarks>
+    /// Returns systems matching all of the given parameters.
+    ///
+    /// At least one of the following parameters must be provided:
+    /// * `systemName`
+    /// * `systemAddress`
+    ///
+    /// The following parameters filter systems:
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="systemName">Name of system to search for</param>
+    /// <param name="systemAddress">System Address (id64) of system to search for</param>
+    /// <param name="includeRejected">Set to include items marked as rejected</param>
+    /// <param name="brief">Set to only return system and body information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched system entries</returns>
+    [ApiExplorerSettings(GroupName = "v1")]
+    [HttpGet("systems.php")]
+    [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<SystemData>>> GetSystemsV1Async(
+            [FromQuery] string? systemName,
+            [FromQuery(Name = "systemId64")] long? systemAddress,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate);
+
     /// <summary>Lookup bodies</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
-    /// 
+    ///
     /// At least one of the following combinations of parameters must be provided:
     /// * `bodyName`
     /// * `bodyId` and `systemName`
     /// * `bodyId` and `systemAddress`
-    /// 
+    ///
     /// The following parameters filter bodies:
     /// * `bodyName`
     /// * `systemName`
     /// * `systemAddress`
     /// * `bodyId`
     /// * `includeRejected`
-    /// 
+    ///
     /// The following parameters filter matches:
     /// * `brief`
     /// * `limitMatches`
@@ -113,20 +231,29 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <param name="minDate">Start of date range for matches</param>
     /// <param name="maxDate">End of date range for matches</param>
     /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesAsync(
-        [FromQuery] string? bodyName,
-        [FromQuery] string? systemName,
-        [FromQuery] long? systemAddress,
-        [FromQuery] int? bodyId,
-        [FromQuery] bool includeRejected = false,
-        [FromQuery] bool brief = false,
-        [FromQuery] int? limitMatches = null,
-        [FromQuery] DateTimeOffset? minDate = null,
-        [FromQuery] DateTimeOffset? maxDate = null)
+            [FromQuery] string? bodyName,
+            [FromQuery] string? systemName,
+            [FromQuery] long? systemAddress,
+            [FromQuery] int? bodyId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
     {
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
+        systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
+
+        if (systemAddress >= (1 << 55))
+        {
+            bodyId = (int)(systemAddress >> 55);
+            systemAddress &= (1 << 55) - 1;
+        }
 
         var bodies = await Service.GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
@@ -141,19 +268,323 @@ public class HomeController(EddnLookupService service) : ControllerBase
         return Ok(bodies);
     }
 
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Name of the system to search for the body</param>
+    /// <param name="systemAddress">System Address (id64) of the body</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("bodies/{systemAddress:long}")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesSysAddrAsync(
+            [FromQuery] string? bodyName,
+            [FromQuery] string? systemName,
+            [FromRoute] long? systemAddress,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, 0, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Name of the system to search for the body</param>
+    /// <param name="systemAddress">System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("bodies/{systemAddress:long}/{bodyId:int}")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesSysAddrBodyIdAsync(
+            [FromQuery] string? bodyName,
+            [FromQuery] string? systemName,
+            [FromRoute] long? systemAddress,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null,
+            [FromRoute] int bodyId = 0
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Name of the system to search for the body</param>
+    /// <param name="systemAddress">System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("bodies/{systemAddress:long}/{bodyName}")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesSysAddrBodyNameAsync(
+            [FromRoute] string? bodyName,
+            [FromQuery] string? systemName,
+            [FromRoute] long? systemAddress,
+            [FromQuery] int? bodyId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Name of the system to search for the body</param>
+    /// <param name="systemAddress">System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("bodies/{systemName}/{bodyId:int}")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesSysNameBodyIdAsync(
+            [FromQuery] string? bodyName,
+            [FromRoute] string? systemName,
+            [FromQuery] long? systemAddress,
+            [FromRoute] int? bodyId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Name of the system to search for the body</param>
+    /// <param name="systemAddress">System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("bodies/{systemName}/{bodyName}")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesSysNameBodyNameAsync(
+            [FromRoute] string? bodyName,
+            [FromRoute] string? systemName,
+            [FromQuery] long? systemAddress,
+            [FromQuery] int? bodyId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup bodies</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Name of the system to search for the body</param>
+    /// <param name="systemAddress">System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("bodies/{bodyName}")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesBodyNameAsync(
+            [FromRoute] string? bodyName,
+            [FromQuery] string? systemName,
+            [FromQuery] long? systemAddress,
+            [FromQuery] int? bodyId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup bodies (Backwards compatibility endpoint)</summary>
+    /// <remarks>
+    /// Returns bodies matching all of the given parameters
+    ///
+    /// At least one of the following combinations of parameters must be provided:
+    /// * `bodyName`
+    /// * `bodyId` and `systemName`
+    /// * `bodyId` and `systemAddress`
+    ///
+    /// The following parameters filter bodies:
+    /// * `bodyName`
+    /// * `systemName`
+    /// * `systemAddress`
+    /// * `bodyId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="bodyName">Name of the body to search for</param>
+    /// <param name="systemName">Used with `bodyId`; Name of the system to search for the body</param>
+    /// <param name="systemAddress">Used with `bodyId`; System Address (id64) of the system to search for the body</param>
+    /// <param name="bodyId">Used with `systemName` or `systemAddress`; Body ID of the body to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return body and system information without matches</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched body entries</returns>
+    [ApiExplorerSettings(GroupName = "v1")]
+    [HttpGet("bodies.php")]
+    [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BodyData>>> GetBodiesV1Async(
+            [FromQuery] string? bodyName,
+            [FromQuery] string? systemName,
+            [FromQuery(Name = "systemId64")] long? systemAddress,
+            [FromQuery] int? bodyId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
+
     /// <summary>Lookup stations</summary>
     /// <remarks>
     /// Returns stations matching all of the given parameters.
-    /// 
+    ///
     /// At least one of the following parameters must be provided:
     /// * `stationName`
     /// * `marketId`
-    /// 
+    ///
     /// The following parameters filter stations:
     /// * `stationName`
     /// * `marketId`
     /// * `includeRejected`
-    /// 
+    ///
     /// The following parameters filter matches:
     /// * `brief`
     /// * `limitMatches`
@@ -168,16 +599,18 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <param name="minDate">Start of date range for matches</param>
     /// <param name="maxDate">End of date range for matches</param>
     /// <returns>Matched station entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("stations")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetStationsAsync(
-        [FromQuery] string? stationName,
-        [FromQuery] long? marketId,
-        [FromQuery] bool includeRejected = false,
-        [FromQuery] bool brief = false,
-        [FromQuery] int? limitMatches = null,
-        [FromQuery] DateTimeOffset? minDate = null,
-        [FromQuery] DateTimeOffset? maxDate = null)
+            [FromQuery] string? stationName,
+            [FromQuery] long? marketId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
     {
         var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
@@ -189,10 +622,125 @@ public class HomeController(EddnLookupService service) : ControllerBase
                     Extract = GetExtractUrl(m.FileName, m.LineNo)
                 })]
             })
-        ];            
+        ];
 
         return Ok(stations);
     }
+
+    /// <summary>Lookup stations</summary>
+    /// <remarks>
+    /// Returns stations matching all of the given parameters.
+    ///
+    /// The following parameters filter stations:
+    /// * `stationName`
+    /// * `marketId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="stationName">Name of the station to search for</param>
+    /// <param name="marketId">Market ID of the station to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return station and system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched station entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("stations/{marketId:int}")]
+    [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<StationData>>> GetStationsMarketIdAsync(
+            [FromQuery] string? stationName,
+            [FromRoute] long? marketId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup stations</summary>
+    /// <remarks>
+    /// Returns stations matching all of the given parameters.
+    ///
+    /// The following parameters filter stations:
+    /// * `stationName`
+    /// * `marketId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="stationName">Name of the station to search for</param>
+    /// <param name="marketId">Market ID of the station to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return station and system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched station entries</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("stations/{stationName}")]
+    [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<StationData>>> GetStationsStationNameAsync(
+            [FromRoute] string? stationName,
+            [FromQuery] long? marketId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup stations (backwards compatibility endpoint)</summary>
+    /// <remarks>
+    /// Returns stations matching all of the given parameters.
+    ///
+    /// At least one of the following parameters must be provided:
+    /// * `stationName`
+    /// * `marketId`
+    ///
+    /// The following parameters filter stations:
+    /// * `stationName`
+    /// * `marketId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="stationName">Name of the station to search for</param>
+    /// <param name="marketId">Market ID of the station to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return station and system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched station entries</returns>
+    [ApiExplorerSettings(GroupName = "v1")]
+    [HttpGet("marketstations.php")]
+    [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<StationData>>> GetMarketStationsV1Async(
+            [FromQuery] string? stationName,
+            [FromQuery] long? marketId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = null,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+        => await GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate);
 
     private string? GetExtractUrl(string filename, int lineno)
     {
@@ -206,10 +754,11 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <param name="filename">EDDN capture filename without path</param>
     /// <param name="lineno">1-based Line number</param>
     /// <returns>EDDN Event JSON</returns>
-    [HttpGet("extract")]
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("events/{filename}/{lineno}")]
     [ProducesResponseType<EDDNEvent>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<EDDNEvent>> ExtractLineAsync([FromQuery] string filename, [FromQuery] int lineno)
+    public async Task<ActionResult<EDDNEvent>> ExtractLineAsync(string filename, int lineno)
     {
         if (await Service.ExtractLineAsync(filename, lineno, HttpContext.RequestAborted) is not { } line)
         {
@@ -218,4 +767,64 @@ public class HomeController(EddnLookupService service) : ControllerBase
 
         return Content(line, "application/json");
     }
+
+    /// <summary>Extract EDDN event (Backwards compatibility endpoint)</summary>
+    /// <remarks>
+    /// Extract line from indexed EDDN capture
+    /// </remarks>
+    /// <param name="filename">EDDN capture filename without path</param>
+    /// <param name="lineno">1-based Line number</param>
+    /// <returns>EDDN Event JSON</returns>
+    [ApiExplorerSettings(GroupName = "v1")]
+    [HttpGet("extract.php")]
+    [ProducesResponseType<EDDNEvent>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<EDDNEvent>> ExtractLineV1Async([FromQuery] string filename, [FromQuery] int lineno)
+        => await ExtractLineAsync(filename, lineno);
+
+    /// <summary>Get the list of known sectors</summary>
+    /// <param name="includeSphereSectors">Include sphere sectors (AKA hand-authored sectors)</param>
+    /// <returns>List of sector names</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("sectors")]
+    [ProducesResponseType<List<string>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<string>>> GetSectorNamesAsync([FromQuery] bool includeSphereSectors)
+        => await Service.GetSectorsAsync(includeSphereSectors, HttpContext.RequestAborted);
+
+    /// <summary>Get systems in a sector</summary>
+    /// <param name="sectorName">Name of the sector</param>
+    /// <param name="nameOnly">Match name instead of SystemAddress</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <returns>List of systems</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("sectors/{sectorName}")]
+    [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsAsync(
+            string sectorName,
+            [FromQuery] bool nameOnly,
+            [FromQuery] bool includeRejected
+        )
+    {
+        return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted) is { } systems
+            ? Ok(systems)
+            : NotFound();
+    }
+
+    /// <summary>Get systems in a sector</summary>
+    /// <param name="sectorName">Name of the sector</param>
+    /// <param name="nameOnly">Match name instead of SystemAddress</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <returns>List of systems</returns>
+    [ApiExplorerSettings(GroupName = "v1")]
+    [HttpGet("regions.php")]
+    [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsV1Async(
+            [FromQuery(Name = "regionName")] string sectorName,
+            [FromQuery] bool nameOnly,
+            [FromQuery] bool includeRejected
+        )
+        => await GetSectorSystemsAsync(sectorName, nameOnly, includeRejected);
 }

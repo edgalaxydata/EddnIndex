@@ -190,7 +190,8 @@ public class EddnLookupService(
         }
     }
 
-    private async Task<Dictionary<int, SystemData>?> GetSystemsAsync(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
+    private async Task<Dictionary<int, TSystem>?> GetSystemsAsync<TSystem>(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
+        where TSystem : ISystemData, new()
     {
         if (string.IsNullOrWhiteSpace(systemName) && (systemAddress == null || systemAddress <= 0))
         {
@@ -223,10 +224,11 @@ public class EddnLookupService(
                 .OrderByDescending(e => e.LastSeen)
                 .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
-        return await FillSystemsAsync(ctx, systems, canceltoken);
+        return await FillSystemsAsync<TSystem>(ctx, systems, canceltoken);
     }
 
-    private static async Task<Dictionary<int, SystemData>> FillSystemsAsync(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems, CancellationToken canceltoken)
+    private static async Task<Dictionary<int, TSystem>> FillSystemsAsync<TSystem>(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems, CancellationToken canceltoken)
+        where TSystem : ISystemData, new()
     {
         var systemNameIds = systems.Values.Select(e => e.SystemNameId).Distinct().ToList();
         var sectorIds =
@@ -252,7 +254,7 @@ public class EddnLookupService(
                .Where(e => e.SectorAddress != null && sectorIds.Contains(e.SectorAddress.Value))
                .ToDictionaryAsync(e => e.SectorAddress!.Value, e => e.Name, cancellationToken: canceltoken);
 
-        var systemDatas = new Dictionary<int, SystemData>();
+        var systemDatas = new Dictionary<int, TSystem>();
 
         foreach (var (systemId, system) in systems)
         {
@@ -271,7 +273,7 @@ public class EddnLookupService(
 
             if (name != null)
             {
-                systemDatas[systemId] = new DTO.SystemData
+                systemDatas[systemId] = new TSystem
                 {
                     Id = systemId,
                     Name = name,
@@ -432,7 +434,7 @@ public class EddnLookupService(
 
     private async Task<Dictionary<long, BodyData>?> GetBodiesAsync(string? systemName, long? systemAddress, string? bodyName, int? bodyId, bool includeRejected, CancellationToken canceltoken)
     {
-        var systems = await GetSystemsAsync(systemName, systemAddress, includeRejected, canceltoken);
+        var systems = await GetSystemsAsync<BodySystem>(systemName, systemAddress, includeRejected, canceltoken);
 
         if ((systems == null || bodyId == null || bodyId < 0) && string.IsNullOrWhiteSpace(bodyName))
         {
@@ -475,7 +477,8 @@ public class EddnLookupService(
         return await FillBodiesAsync(ctx, bodies, canceltoken);
     }
 
-    private async Task<Dictionary<int, SystemData>> GetSystemsAsync(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
+    private async Task<Dictionary<int, TSystem>> GetSystemsAsync<TSystem>(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
+        where TSystem : ISystemData, new()
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
@@ -488,7 +491,7 @@ public class EddnLookupService(
             query = query.Where(e => e.IsRejected != true);
         }
 
-        return await FillSystemsAsync(ctx, await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken), canceltoken);
+        return await FillSystemsAsync<TSystem>(ctx, await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken), canceltoken);
     }
 
     private async Task<Dictionary<int, Dictionary<long, BodyData>>> GetSystemBodiesAsync(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
@@ -781,7 +784,7 @@ public class EddnLookupService(
 
         var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
 
-        var systems = await GetSystemsAsync(systemIds, true, canceltoken);
+        var systems = await GetSystemsAsync<SystemData>(systemIds, true, canceltoken);
 
         return matches.ToDictionary(
             kvp => kvp.Key,
@@ -859,7 +862,7 @@ public class EddnLookupService(
             CancellationToken canceltoken
         )
     {
-        if (await GetSystemsAsync(systemName, systemAddress, includeRejected, canceltoken) is not { } systems)
+        if (await GetSystemsAsync<SystemData>(systemName, systemAddress, includeRejected, canceltoken) is not { } systems)
         {
             return [];
         }
@@ -968,7 +971,7 @@ public class EddnLookupService(
                 .Select(e => e.Value.SystemId)
                 .ToList();
 
-        var systems = await GetSystemsAsync(systemIds, includeRejected, canceltoken);
+        var systems = await GetSystemsAsync<BodySystem>(systemIds, includeRejected, canceltoken);
 
         var bodyMatches = brief
                         ? []
@@ -984,14 +987,7 @@ public class EddnLookupService(
             {
                 MatchCount = bodyMatchCounts.GetValueOrDefault(id),
                 Matches = bodyMatches.GetValueOrDefault(id),
-                System = systems.TryGetValue(body.SystemId, out var system) ? new DTO.BodySystem
-                {
-                    Name = system.Name,
-                    NameSystemAddress = system.NameSystemAddress,
-                    SystemAddress = system.SystemAddress,
-                    Coords = system.Coords,
-                    PGName = system.PGName
-                } : null
+                System = systems.GetValueOrDefault(body.SystemId)
             };
 
             entries.Add(bodyEnt);
@@ -1254,5 +1250,96 @@ public class EddnLookupService(
                 return itemNo < lines.Count ? lines[itemNo] : null;
             }
         }
+    }
+
+    /// <summary>Get systems in a sector</summary>
+    /// <param name="sectorName">Name of the sector</param>
+    /// <param name="nameOnly">Match name instead of SystemAddress</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="canceltoken">Cancellation token</param>
+    /// <returns>List of systems</returns>
+    public async Task<List<SectorSystem>?> GetSectorSystemsAsync(
+            string sectorName,
+            bool nameOnly,
+            bool includeRejected,
+            CancellationToken canceltoken
+        )
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        if (await ctx.Set<Models.Sector>().FirstOrDefaultAsync(e => e.Name == sectorName, canceltoken) is not { } sector)
+        {
+            return null;
+        }
+
+        if (sector.SectorAddress == null && !nameOnly)
+        {
+            return null;
+        }
+
+        Dictionary<int, Models.SystemInfo> systems;
+
+        if (nameOnly)
+        {
+            var minId = ((long)sector.Id << 40) + (1L << 60);
+
+            systems = await
+                ctx.Set<Models.SystemInfo>()
+                   .Where(e => e.SystemNameId >= minId && e.SystemNameId <= minId + (1 << 40))
+                   .ToDictionaryAsync(e => e.Id, canceltoken);
+
+            if (sector.SectorAddress is int sectorAddress)
+            {
+                var minAddr = (long)sectorAddress << 40;
+
+                var secAddrSystems = await
+                    ctx.Set<Models.SystemInfo>()
+                       .Where(e => e.SystemNameId >= minAddr && e.SystemNameId <= minAddr + (1 << 40))
+                       .ToListAsync(canceltoken);
+
+                foreach (var system in secAddrSystems)
+                {
+                    systems[system.Id] = system;
+                }
+            }
+        }
+        else
+        {
+            if (sector.SectorAddress is int sectorAddress)
+            {
+               var minAddr = (long)sectorAddress << 40;
+
+                systems = await
+                    ctx.Set<Models.SystemInfo>()
+                       .Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= minAddr + (1 << 40))
+                       .ToDictionaryAsync(e => e.Id, canceltoken);
+            }
+            else
+            {
+                return [];
+            }
+        }
+
+        var systemDatas = await FillSystemsAsync<SectorSystem>(ctx, systems, canceltoken);
+
+        return [.. systemDatas.Values];
+    }
+
+    /// <summary>Get the list of known sectors</summary>
+    /// <param name="includeSphereSectors">Include sphere sectors (AKA hand-authored sectors)</param>
+    /// <param name="canceltoken">Cancellation token</param>
+    /// <returns>List of sector names</returns>
+    public async Task<List<string>> GetSectorsAsync(bool includeSphereSectors, CancellationToken canceltoken)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        IQueryable<Models.Sector> query = ctx.Set<Models.Sector>();
+
+        if (!includeSphereSectors)
+        {
+            query = query.Where(e => e.SectorAddress != null);
+        }
+
+        return await query.Select(e => e.Name).ToListAsync(canceltoken);
     }
 }
