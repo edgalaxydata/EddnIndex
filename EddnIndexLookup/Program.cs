@@ -3,6 +3,7 @@ using EddnIndexLookup.Services;
 using System.Reflection;
 using EddnIndexUpdate.Options;
 using EddnIndexLookup.Options;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,12 +93,21 @@ if (app.Configuration.GetValue<string>("ASPNETCORE_APPL_PATH") is string appPath
 }
 
 app.UseSwagger();
+app.MapSwagger("/openapi/{documentName}.{extension:regex(^(json|ya?ml)$)}");
 
 app.UseSwaggerUI(opts =>
 {
-    opts.SwaggerEndpoint("v2/swagger.json", "EDDN Index Lookup v2");
-    opts.SwaggerEndpoint("v1/swagger.json", "EDDN Index Lookup v1 Backwards Compatibility Endpoint");
+    opts.SwaggerEndpoint("../openapi/v2.json", "EDDN Index Lookup v2");
+    opts.SwaggerEndpoint("../openapi/v1.json", "EDDN Index Lookup v1 Backwards Compatibility Endpoint");
     opts.InjectStylesheet("custom.css");
+});
+
+app.MapScalarApiReference(opts =>
+{
+    opts.AddDocument("v2", "EDDN Index Lookup v2");
+    opts.AddDocument("v1", "EDDN Index Lookup v1 Backwards Compatibility Endpoint");
+    opts.DisableAgent();
+    opts.DisableMcp();
 });
 
 app.UseHttpsRedirection();
