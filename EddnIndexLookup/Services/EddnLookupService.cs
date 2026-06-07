@@ -1240,7 +1240,19 @@ public class EddnLookupService(
                 using var memstream = new MemoryStream();
                 using (var bzstream = new BZip2InputStream(bzmemstream))
                 {
-                    bzstream.CopyTo(memstream);
+                    var block = ArrayPool<byte>.Shared.Rent(65536);
+
+                    try
+                    {
+                        while (bzstream.Read(block, 0, block.Length) is int len && len > 0)
+                        {
+                            memstream.Write(block, 0, len);
+                        }
+                    }
+                    finally
+                    {
+                        ArrayPool<byte>.Shared.Return(block);
+                    }
                 }
 
                 memstream.Seek(0, SeekOrigin.Begin);
