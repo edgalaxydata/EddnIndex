@@ -1237,8 +1237,14 @@ public class EddnLookupService(
                     return chunkEnts.Value.Lines[itemNo];
                 }
 
-                using var bzstream = new BZip2InputStream(bzmemstream);
-                using var reader = new StreamReader(bzstream);
+                using var memstream = new MemoryStream();
+                using (var bzstream = new BZip2InputStream(bzmemstream))
+                {
+                    bzstream.CopyTo(memstream);
+                }
+
+                memstream.Seek(0, SeekOrigin.Begin);
+                using var reader = new StreamReader(memstream);
 
                 var lines = new List<string>();
 
