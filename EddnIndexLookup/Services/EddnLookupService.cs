@@ -626,11 +626,11 @@ public class EddnLookupService(
         return await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 5000)
+                .Take(limitMatches ?? 1000)
                 .AsAsyncEnumerable()
-                .Concat(routeQuery.OrderByDescending(e => e.GatewayTimestamp).Take(limitMatches ?? 5000).AsAsyncEnumerable())
+                .Concat(routeQuery.OrderByDescending(e => e.GatewayTimestamp).Take(limitMatches ?? 1000).AsAsyncEnumerable())
                 .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 5000)
+                .Take(limitMatches ?? 1000)
                 .Where(e => e.SystemId != null)
                 .GroupBy(e => e.SystemId!.Value)
                 .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
@@ -703,7 +703,7 @@ public class EddnLookupService(
         return await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 5000)
+                .Take(limitMatches ?? 1000)
                 .AsAsyncEnumerable()
                 .Where(e => e.BodyId != null)
                 .GroupBy(e => e.BodyId!.Value)
@@ -777,7 +777,7 @@ public class EddnLookupService(
         var matches = await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 5000)
+                .Take(limitMatches ?? 1000)
                 .AsAsyncEnumerable()
                 .Where(e => e.StationId != null)
                 .GroupBy(e => e.StationId!.Value)

@@ -56,7 +56,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] long? systemAddress,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -115,7 +115,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromRoute] long? systemAddress,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -152,7 +152,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] long? systemAddress,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -193,7 +193,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery(Name = "systemId64")] long? systemAddress,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -241,7 +241,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] int? bodyId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -303,7 +303,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromRoute] long? systemAddress,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -345,7 +345,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromRoute] long? systemAddress,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null,
             [FromRoute] int bodyId = 0
@@ -389,7 +389,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] int? bodyId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -432,7 +432,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromRoute] int? bodyId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -475,7 +475,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] int? bodyId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -518,7 +518,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] int? bodyId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -566,7 +566,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] int? bodyId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -607,7 +607,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] long? marketId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -658,7 +658,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromRoute] long? marketId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -695,7 +695,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] long? marketId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
@@ -736,7 +736,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
             [FromQuery] long? marketId,
             [FromQuery] bool includeRejected = false,
             [FromQuery] bool brief = false,
-            [FromQuery] int? limitMatches = null,
+            [FromQuery] int? limitMatches = 100,
             [FromQuery] DateTimeOffset? minDate = null,
             [FromQuery] DateTimeOffset? maxDate = null
         )
