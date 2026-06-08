@@ -407,7 +407,7 @@ public class EddnLookupService(
                 {
                     (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
                     (not null, < 0) when bodyDesigsById.TryGetValue(-bodyNameId, out var bd) => sysname + bd.Designation,
-                    (not null, > 0) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => sysname + bd.Designation,
+                    (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => sysname + bd.Designation,
                     _ => null
                 };
 
@@ -417,7 +417,7 @@ public class EddnLookupService(
                           {
                               (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
                               (not null, < 0) when bodyDesigsById.TryGetValue(-bodyNameId, out var bd) => desigSysName + bd.Designation,
-                              (not null, > 0) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => desigSysName + bd.Designation,
+                              (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => desigSysName + bd.Designation,
                               _ => null
                           };
 
@@ -548,118 +548,123 @@ public class EddnLookupService(
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        var routeQuery =
-            ctx.Set<Models.FileLineNavRoute>()
-               .Where(e => systemIds.Contains(e.SystemId))
-               .Join(
-                    ctx.Set<Models.FileInfo>(),
-                    o => o.FileId,
-                    i => i.Id,
-                    (o, i) => new { RouteEntry = o, File = i }
-                )
-               .Join(
-                    ctx.Set<Models.FileLineInfo>()
-                       .Include(e => e.Software)
-                       .Include(e => e.SchemaEvent)
-                       .Include(e => e.GameVersion),
-                    o => new { o.RouteEntry.FileId, o.RouteEntry.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, Info = i, o.RouteEntry }
-               )
-               .Select(e => new DTO.MatchEntry
-               {
-                   FileName = e.File.FileName,
-                   LineNo = e.RouteEntry.LineNo,
-                   EntryNum = e.RouteEntry.EntryNum,
-                   SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                   SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                   Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                   EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                   GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                   GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                   IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                   IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                   Timestamp = e.Info.Timestamp,
-                   GatewayTimestamp = e.RouteEntry.GatewayTimestamp,
-                   SystemId = e.RouteEntry.SystemId
-               });
+        var matches = new Dictionary<int, List<MatchEntry>>();
 
-        var query =
-            ctx.Set<Models.FileLineInfo>()
-               .Where(e => systemIds.Contains(e.SystemId!.Value))
-               .Include(e => e.Software)
-               .Include(e => e.SchemaEvent)
-               .Include(e => e.GameVersion)
-               .Join(
-                    ctx.Set<Models.FileInfo>(),
-                    o => o.FileId,
-                    i => i.Id,
-                    (o, i) => new { Info = o, File = i }
-                )
-               .LeftJoin(
-                    ctx.Set<Models.FileLineBody>(),
-                    o => new { o.Info.FileId, o.Info.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, o.Info, Body = i }
-               )
-               .LeftJoin(
-                    ctx.Set<Models.FileLineStation>()
-                       .Include(e => e.Station),
-                    o => new { o.Info.FileId, o.Info.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, o.Info, o.Body, Station = i }
-               )
-               .Select(e => new DTO.MatchEntry
-               {
-                    FileName = e.File.FileName,
-                    LineNo = e.Info.LineNo,
-                    SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                    SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                    Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                    EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                    GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                    GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                    Timestamp = e.Info.Timestamp,
-                    GatewayTimestamp = e.Info.GatewayTimestamp,
-                    SystemId = e.Info.SystemId,
-                    BodyId = e.Body!.BodyId,
-                    StationId = e.Station == null ? null : e.Station.StationId
-               });
-
-        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        foreach (var sysid in systemIds)
         {
-            query = query.Where(e => e.GatewayTimestamp >= minTS);
-            routeQuery = routeQuery.Where(e => e.GatewayTimestamp >= minTS);
+            var routeQuery =
+                ctx.Set<Models.FileLineNavRoute>()
+                   .Where(e => e.SystemId == sysid)
+                   .Join(
+                        ctx.Set<Models.FileInfo>(),
+                        o => o.FileId,
+                        i => i.Id,
+                        (o, i) => new { RouteEntry = o, File = i }
+                    )
+                   .Join(
+                        ctx.Set<Models.FileLineInfo>()
+                           .Include(e => e.Software)
+                           .Include(e => e.SchemaEvent)
+                           .Include(e => e.GameVersion),
+                        o => new { o.RouteEntry.FileId, o.RouteEntry.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, Info = i, o.RouteEntry }
+                   )
+                   .Select(e => new DTO.MatchEntry
+                   {
+                       FileName = e.File.FileName,
+                       LineNo = e.RouteEntry.LineNo,
+                       EntryNum = e.RouteEntry.EntryNum,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
+                       GatewayTimestamp = e.RouteEntry.GatewayTimestamp,
+                       SystemId = e.RouteEntry.SystemId
+                   });
+
+            var query =
+                ctx.Set<Models.FileLineInfo>()
+                   .Where(e => e.SystemId == sysid)
+                   .Include(e => e.Software)
+                   .Include(e => e.SchemaEvent)
+                   .Include(e => e.GameVersion)
+                   .Join(
+                        ctx.Set<Models.FileInfo>(),
+                        o => o.FileId,
+                        i => i.Id,
+                        (o, i) => new { Info = o, File = i }
+                    )
+                   .LeftJoin(
+                        ctx.Set<Models.FileLineBody>(),
+                        o => new { o.Info.FileId, o.Info.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, o.Info, Body = i }
+                   )
+                   .LeftJoin(
+                        ctx.Set<Models.FileLineStation>()
+                           .Include(e => e.Station),
+                        o => new { o.Info.FileId, o.Info.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, o.Info, o.Body, Station = i }
+                   )
+                   .Select(e => new DTO.MatchEntry
+                   {
+                       FileName = e.File.FileName,
+                       LineNo = e.Info.LineNo,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
+                       GatewayTimestamp = e.Info.GatewayTimestamp,
+                       SystemId = e.Info.SystemId,
+                       BodyId = e.Body!.BodyId,
+                       StationId = e.Station == null ? null : e.Station.StationId
+                   });
+
+            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp >= minTS);
+                routeQuery = routeQuery.Where(e => e.GatewayTimestamp >= minTS);
+            }
+
+            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp <= maxTS);
+                routeQuery = routeQuery.Where(e => e.GatewayTimestamp <= maxTS);
+            }
+
+            var queryResults = await
+                query
+                    .OrderByDescending(e => e.GatewayTimestamp)
+                    .Take(limitMatches ?? 1000)
+                    .ToListAsync(canceltoken);
+
+            var routeQueryResults = await
+                routeQuery
+                    .OrderByDescending(e => e.GatewayTimestamp)
+                    .Take(limitMatches ?? 1000)
+                    .ToListAsync(canceltoken);
+
+            matches[sysid] = [..
+                queryResults
+                    .Concat(routeQueryResults)
+                    .OrderByDescending(e => e.GatewayTimestamp)
+                    .Take(limitMatches ?? 1000)
+            ];
         }
 
-        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-        {
-            query = query.Where(e => e.GatewayTimestamp <= maxTS);
-            routeQuery = routeQuery.Where(e => e.GatewayTimestamp <= maxTS);
-        }
-
-        var queryResults = await
-            query
-                .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 1000)
-                .ToListAsync(canceltoken);
-
-        var routeQueryResults = await
-            routeQuery
-                .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 1000)
-                .ToListAsync(canceltoken);
-
-        return
-            queryResults
-                .Concat(routeQueryResults)
-                .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 1000)
-                .Where(e => e.SystemId != null)
-                .GroupBy(e => e.SystemId!.Value)
-                .ToDictionary(g => g.Key, g => g.ToList());
+        return matches;
     }
 
     private async Task<Dictionary<long, List<MatchEntry>>> GetBodyMatchEntriesAsync(
@@ -672,68 +677,72 @@ public class EddnLookupService(
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        var query =
-            ctx.Set<Models.FileLineBody>()
-               .Where(e => bodyIds.Contains(e.BodyId))
-               .Join(
-                    ctx.Set<Models.FileInfo>(),
-                    o => o.FileId,
-                    i => i.Id,
-                    (o, i) => new { Body = o, File = i }
-                )
-               .Join(
-                    ctx.Set<Models.FileLineInfo>()
-                       .Include(e => e.Software)
-                       .Include(e => e.SchemaEvent)
-                       .Include(e => e.GameVersion),
-                    o => new { o.Body.FileId, o.Body.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, Info = i, o.Body }
-               )
-               .LeftJoin(
-                    ctx.Set<Models.FileLineStation>()
-                       .Include(e => e.Station),
-                    o => new { o.Body.FileId, o.Body.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, o.Info, o.Body, Station = i }
-               )
-               .Select(e => new DTO.MatchEntry
-               {
-                    FileName = e.File.FileName,
-                    LineNo = e.Info.LineNo,
-                    SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                    SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                    Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                    EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                    GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                    GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                    Timestamp = e.Info.Timestamp,
-                    GatewayTimestamp = e.Info.GatewayTimestamp,
-                    SystemId = e.Info.SystemId,
-                    BodyId = e.Body.BodyId,
-                    StationId = e.Station == null ? null : e.Station.StationId
-               });
+        var matches = new Dictionary<long, List<MatchEntry>>();
 
-        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        foreach (var bodyid in bodyIds)
         {
-            query = query.Where(e => e.GatewayTimestamp >= minTS);
+            var query =
+                ctx.Set<Models.FileLineBody>()
+                   .Where(e => e.BodyId == bodyid)
+                   .Join(
+                        ctx.Set<Models.FileInfo>(),
+                        o => o.FileId,
+                        i => i.Id,
+                        (o, i) => new { Body = o, File = i }
+                    )
+                   .Join(
+                        ctx.Set<Models.FileLineInfo>()
+                           .Include(e => e.Software)
+                           .Include(e => e.SchemaEvent)
+                           .Include(e => e.GameVersion),
+                        o => new { o.Body.FileId, o.Body.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, Info = i, o.Body }
+                   )
+                   .LeftJoin(
+                        ctx.Set<Models.FileLineStation>()
+                           .Include(e => e.Station),
+                        o => new { o.Body.FileId, o.Body.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, o.Info, o.Body, Station = i }
+                   )
+                   .Select(e => new DTO.MatchEntry
+                   {
+                       FileName = e.File.FileName,
+                       LineNo = e.Info.LineNo,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
+                       GatewayTimestamp = e.Body.GatewayTimestamp,
+                       SystemId = e.Info.SystemId,
+                       BodyId = e.Body.BodyId,
+                       StationId = e.Station == null ? null : e.Station.StationId
+                   });
+
+            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp >= minTS);
+            }
+
+            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp <= maxTS);
+            }
+
+            matches[bodyid] = await
+                query
+                    .OrderByDescending(e => e.GatewayTimestamp)
+                    .Take(limitMatches ?? 1000)
+                    .ToListAsync(canceltoken);
         }
 
-        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-        {
-            query = query.Where(e => e.GatewayTimestamp <= maxTS);
-        }
-
-        return await
-            query
-                .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 1000)
-                .AsAsyncEnumerable()
-                .Where(e => e.BodyId != null)
-                .GroupBy(e => e.BodyId!.Value)
-                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
+        return matches;
     }
 
     private async Task<Dictionary<int, List<MatchEntry>>> GetStationMatchEntriesAsync(
@@ -746,68 +755,70 @@ public class EddnLookupService(
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        var query =
-            ctx.Set<Models.FileLineStation>()
-               .Where(e => stationIds.Contains(e.StationId))
+        var matches = new Dictionary<int, List<MatchEntry>>();
 
-               .Join(
-                    ctx.Set<Models.FileInfo>(),
-                    o => o.FileId,
-                    i => i.Id,
-                    (o, i) => new { Station = o, File = i }
-                )
-               .Join(
-                    ctx.Set<Models.FileLineInfo>()
-                       .Include(e => e.Software)
-                       .Include(e => e.SchemaEvent)
-                       .Include(e => e.GameVersion),
-                    o => new { o.Station.FileId, o.Station.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, Info = i, o.Station }
-               )
-               .LeftJoin(
-                    ctx.Set<Models.FileLineBody>(),
-                    o => new { o.Station.FileId, o.Station.LineNo },
-                    i => new { i.FileId, i.LineNo },
-                    (o, i) => new { o.File, o.Info, Body = i, o.Station }
-               )
-               .Select(e => new DTO.MatchEntry
-               {
-                    FileName = e.File.FileName,
-                    LineNo = e.Info.LineNo,
-                    SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                    SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                    Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                    EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                    GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                    GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                    Timestamp = e.Info.Timestamp,
-                    GatewayTimestamp = e.Info.GatewayTimestamp,
-                    SystemId = e.Info.SystemId,
-                    BodyId = e.Body == null ? null : e.Body.BodyId,
-                    StationId = e.Station.StationId
-               });
-
-        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        foreach (var stationid in stationIds)
         {
-            query = query.Where(e => e.GatewayTimestamp >= minTS);
-        }
+            var query =
+                ctx.Set<Models.FileLineStation>()
+                   .Where(e => stationIds.Contains(e.StationId))
 
-        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-        {
-            query = query.Where(e => e.GatewayTimestamp <= maxTS);
-        }
+                   .Join(
+                        ctx.Set<Models.FileInfo>(),
+                        o => o.FileId,
+                        i => i.Id,
+                        (o, i) => new { Station = o, File = i }
+                    )
+                   .Join(
+                        ctx.Set<Models.FileLineInfo>()
+                           .Include(e => e.Software)
+                           .Include(e => e.SchemaEvent)
+                           .Include(e => e.GameVersion),
+                        o => new { o.Station.FileId, o.Station.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, Info = i, o.Station }
+                   )
+                   .LeftJoin(
+                        ctx.Set<Models.FileLineBody>(),
+                        o => new { o.Station.FileId, o.Station.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.File, o.Info, Body = i, o.Station }
+                   )
+                   .Select(e => new DTO.MatchEntry
+                   {
+                       FileName = e.File.FileName,
+                       LineNo = e.Info.LineNo,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
+                       GatewayTimestamp = e.Info.GatewayTimestamp,
+                       SystemId = e.Info.SystemId,
+                       BodyId = e.Body == null ? null : e.Body.BodyId,
+                       StationId = e.Station.StationId
+                   });
 
-        var matches = await
-            query
-                .OrderByDescending(e => e.GatewayTimestamp)
-                .Take(limitMatches ?? 1000)
-                .AsAsyncEnumerable()
-                .Where(e => e.StationId != null)
-                .GroupBy(e => e.StationId!.Value)
-                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
+            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp >= minTS);
+            }
+
+            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp <= maxTS);
+            }
+
+            matches[stationid] = await
+                query
+                    .OrderByDescending(e => e.GatewayTimestamp)
+                    .Take(limitMatches ?? 1000)
+                    .ToListAsync(canceltoken);
+        }
 
         var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
 
@@ -904,6 +915,9 @@ public class EddnLookupService(
                 .Distinct()
                 .ToList();
 
+        var systemMatchCounts = await GetSystemMatchCountsAsync(systems.Keys, canceltoken);
+        var bodyMatchCounts = await GetBodyMatchCountsAsync(bodyIds, canceltoken);
+
         var systemMatches = brief
                           ? []
                           : await GetSystemMatchEntriesAsync(systems.Keys, limitMatches, minDate, maxDate, canceltoken);
@@ -915,9 +929,6 @@ public class EddnLookupService(
                 .Where(e => e.BodyId != null)
                 .GroupBy(e => e.BodyId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
-
-        var systemMatchCounts = await GetSystemMatchCountsAsync(systems.Keys, canceltoken);
-        var bodyMatchCounts = await GetBodyMatchCountsAsync(bodyIds, canceltoken);
 
         var entries = new List<SystemData>();
 
