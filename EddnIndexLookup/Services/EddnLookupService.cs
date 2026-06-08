@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using System.Buffers;
 using System.Buffers.Binary;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Models = EddnIndexUpdate.Models;
 using Sectors = EddnIndexUpdate.Sectors;
@@ -1087,7 +1088,7 @@ public class EddnLookupService(
             };
         }
 
-        return entries.Values.ToList();
+        return [.. entries.Values];
     }
 
     /// <summary>Extract EDDN event</summary>
@@ -1294,12 +1295,14 @@ public class EddnLookupService(
     /// <param name="nameOnly">Match name instead of SystemAddress</param>
     /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
     /// <param name="canceltoken">Cancellation token</param>
+    /// <param name="boxelName">Boxel suffix without N2 (sequence number)</param>
     /// <returns>List of systems</returns>
     public async Task<List<SectorSystem>?> GetSectorSystemsAsync(
             string sectorName,
             bool nameOnly,
             bool includeRejected,
-            CancellationToken canceltoken
+            CancellationToken canceltoken,
+            string? boxelName = null
         )
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
@@ -1314,12 +1317,37 @@ public class EddnLookupService(
             return null;
         }
 
+        long range = (1L << 40) - 1;
+        long boxelid = 0;
+
+        if (boxelName != null)
+        {
+            if (!boxelName.EndsWith('-'))
+            {
+                boxelName += "-";
+            }
+
+            if (!Models.SystemInfo.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
+                || n2 != 0
+                || mid < 0
+                || mid >= 0x200000
+                || masscode < 0
+                || masscode >= 8
+                || !string.Equals(secname, sectorName))
+            {
+                return null;
+            }
+
+            boxelid = ((long)mid << 16) | ((long)masscode << 37);
+            range = (1 << 16) - 1;
+        }
+
         IQueryable<Models.SystemInfo> query;
 
         if (nameOnly)
         {
-            var minId = ((long)sector.Id << 40) + (1L << 60);
-            var maxId = minId + (1L << 40) - 1;
+            var minId = ((long)sector.Id << 40) + (1L << 60) + boxelid;
+            var maxId = minId + range;
 
             query =
                 ctx.Set<Models.SystemInfo>()
@@ -1327,8 +1355,8 @@ public class EddnLookupService(
 
             if (sector.SectorAddress is int sectorAddress)
             {
-                var minAddr = (long)sectorAddress << 40;
-                var maxAddr = minAddr + (1L << 40) - 1;
+                var minAddr = ((long)sectorAddress << 40) + boxelid;
+                var maxAddr = minAddr + range;
 
                 query = query.Concat(
                     ctx.Set<Models.SystemInfo>()
@@ -1340,8 +1368,8 @@ public class EddnLookupService(
         {
             if (sector.SectorAddress is int sectorAddress)
             {
-                var minAddr = (long)sectorAddress << 40;
-                var maxAddr = minAddr + (1L << 40) - 1;
+                var minAddr = ((long)sectorAddress << 40) + boxelid;
+                var maxAddr = minAddr + range;
 
                 query =
                     ctx.Set<Models.SystemInfo>()
@@ -1385,5 +1413,146 @@ public class EddnLookupService(
         }
 
         return await query.Select(e => e.Name).Order().ToListAsync(canceltoken);
+    }
+
+    /// <summary>Get a list of systems in the gaps between known systems in a sector</summary>
+    /// <param name="sectorName">Sector name</param>
+    /// <param name="canceltoken">Cancellation Token</param>
+    /// <param name="boxelName">Boxel suffix without N2 (sequence number)</param>
+    /// <returns>List of gap systems</returns>
+    public async IAsyncEnumerable<SystemGapData> EnumerateGapSystemsAsync(
+            string sectorName,
+            [EnumeratorCancellation] CancellationToken canceltoken,
+            string? boxelName = null
+        )
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        if (ctx.Set<Models.Sector>().FirstOrDefault(e => e.Name == sectorName) is not { } sector
+            || sector.SectorAddress is not int sectorAddress)
+        {
+            yield break;
+        }
+
+        var minAddr = (long)sectorAddress << 40;
+        var maxAddr = minAddr + (1L << 40) - 1;
+
+        if (boxelName is [.., char boxelend])
+        {
+            if (boxelend is not ('-' or (>= 'a' and <= 'h')))
+            {
+                boxelName += "-";
+            }
+
+            if (!Models.SystemInfo.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
+                || n2 != 0
+                || mid < 0
+                || mid >= 0x200000
+                || masscode < 0
+                || masscode >= 8
+                || !string.Equals(secname, sectorName))
+            {
+                yield break;
+            }
+
+            var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+            minAddr += boxelid;
+            maxAddr = minAddr + (1 << 16) - 1;
+        }
+
+        var query =
+            ctx.Set<Models.SystemInfo>()
+               .Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= maxAddr)
+               .Select(e => new
+               {
+                   e.ModSystemAddress,
+                   e.FirstSeen,
+                   e.LastSeen,
+                   e.IsRejected,
+                   HasCoords = e.X != null && e.Y != null && e.Z != null
+               })
+               .OrderBy(e => e.ModSystemAddress)
+               .AsAsyncEnumerable();
+
+        long prevSystemAddress = 0;
+        long boxelModSystemAddress = 0;
+        string? prevPrefix = null;
+        int prevSeqnum = 0;
+        DateTime? prevFirstSeen = null;
+        DateTime? prevLastSeen = null;
+
+        await foreach (var entry in query)
+        {
+            if (entry.ModSystemAddress is not long modsysaddr
+                || Models.SystemInfo.GetPGSuffix(modsysaddr, false) is not string pgsuffix)
+            {
+                continue;
+            }
+
+            var prefix = sector.Name + pgsuffix;
+            var seqnum = (int)(modsysaddr & 0xFFFF);
+
+            if (prefix != prevPrefix || seqnum != prevSeqnum)
+            {
+                if (prevPrefix != null)
+                {
+                    yield return new SystemGapData
+                    {
+                        SystemAddress = prevSystemAddress,
+                        NamePrefix = prevPrefix,
+                        SequenceNumber = prevSeqnum,
+                        FirstSeen = prevFirstSeen,
+                        LastSeen = prevLastSeen
+                    };
+                }
+
+                prevSeqnum = prefix == prevPrefix ? prevSeqnum + 1 : 0;
+                prevPrefix = prefix;
+                prevFirstSeen = null;
+                prevLastSeen = null;
+                boxelModSystemAddress = modsysaddr & ~0xFFFF;
+            }
+
+            while (prevSeqnum < seqnum)
+            {
+                var sysaddr = Models.SystemInfo.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
+
+                yield return new SystemGapData
+                {
+                    SystemAddress = sysaddr,
+                    NamePrefix = prefix,
+                    SequenceNumber = prevSeqnum
+                };
+
+                prevSeqnum++;
+            }
+
+            prevSystemAddress = Models.SystemInfo.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
+
+            if (entry.IsRejected != true && entry.HasCoords)
+            {
+                if (prevFirstSeen == null || prevFirstSeen > entry.FirstSeen)
+                {
+                    prevFirstSeen = entry.FirstSeen;
+                }
+
+                if (prevLastSeen == null || prevLastSeen < entry.LastSeen)
+                {
+                    prevLastSeen = entry.LastSeen;
+                }
+            }
+        }
+
+        if (prevPrefix != null)
+        {
+            yield return new SystemGapData
+            {
+                SystemAddress = prevSystemAddress,
+                NamePrefix = prevPrefix,
+                SequenceNumber = prevSeqnum,
+                FirstSeen = prevFirstSeen,
+                LastSeen = prevLastSeen
+            };
+        }
     }
 }

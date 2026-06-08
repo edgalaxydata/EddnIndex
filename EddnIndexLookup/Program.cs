@@ -1,7 +1,6 @@
 using EddnIndexUpdate;
 using EddnIndexLookup.Services;
 using System.Reflection;
-using EddnIndexUpdate.Options;
 using EddnIndexLookup.Options;
 using Scalar.AspNetCore;
 
@@ -35,6 +34,13 @@ builder.Services.Configure<EddnLookupServiceSettings>(builder.Configuration.GetS
 builder.Services.AddTransient<EddnLookupService>();
 builder.Services.AddSwaggerGen(options =>
 {
+    string desc = "API for querying EDDN capture index";
+
+    if (typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion is string appVersion)
+    {
+        desc += $"\n\nApplication Version: {appVersion}";
+    }
+
     options.UseAllOfForInheritance();
     options.UseOneOfForPolymorphism();
 
@@ -42,14 +48,14 @@ builder.Services.AddSwaggerGen(options =>
     {
         Version = "v1",
         Title = "EDDN Index Lookup",
-        Description = "API for querying EDDN capture index"
+        Description = desc
     });
 
     options.SwaggerDoc("v2", new Microsoft.OpenApi.OpenApiInfo
     {
         Version = "v2",
         Title = "EDDN Index Lookup",
-        Description = "API for querying EDDN capture index"
+        Description = desc
     });
 
     options.IncludeXmlComments(Assembly.GetExecutingAssembly());

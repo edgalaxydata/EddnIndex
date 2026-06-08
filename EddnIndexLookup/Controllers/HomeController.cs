@@ -1,6 +1,7 @@
 ﻿using EddnIndexLookup.DTO;
 using EddnIndexLookup.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexLookup.Controllers;
 
@@ -84,7 +85,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         return Ok(systems);
     }
 
-    /// <summary>Lookup systems</summary>
+    /// <summary>Lookup systems by SystemAddress</summary>
     /// <remarks>
     /// Returns systems matching all of the given parameters.
     ///
@@ -121,7 +122,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup systems</summary>
+    /// <summary>Lookup systems by name</summary>
     /// <remarks>
     /// Returns systems matching all of the given parameters.
     ///
@@ -158,7 +159,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup systems (Backwards compatibility endpoint)</summary>
+    /// <summary>Lookup systems</summary>
     /// <remarks>
     /// Returns systems matching all of the given parameters.
     ///
@@ -268,7 +269,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         return Ok(bodies);
     }
 
-    /// <summary>Lookup bodies</summary>
+    /// <summary>Lookup bodies by id64</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -309,7 +310,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetBodiesAsync(bodyName, systemName, systemAddress, 0, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup bodies</summary>
+    /// <summary>Lookup bodies by SystemAddress and BodyId</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -352,7 +353,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup bodies</summary>
+    /// <summary>Lookup bodies by SystemAddress and body name</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -395,7 +396,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup bodies</summary>
+    /// <summary>Lookup bodies by system name and BodyId</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -438,7 +439,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup bodies</summary>
+    /// <summary>Lookup bodies by system and body name</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -481,7 +482,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup bodies</summary>
+    /// <summary>Lookup bodies by name</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -524,7 +525,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup bodies (Backwards compatibility endpoint)</summary>
+    /// <summary>Lookup bodies</summary>
     /// <remarks>
     /// Returns bodies matching all of the given parameters
     ///
@@ -627,7 +628,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         return Ok(stations);
     }
 
-    /// <summary>Lookup stations</summary>
+    /// <summary>Lookup stations by MarketId</summary>
     /// <remarks>
     /// Returns stations matching all of the given parameters.
     ///
@@ -664,7 +665,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup stations</summary>
+    /// <summary>Lookup stations by name</summary>
     /// <remarks>
     /// Returns stations matching all of the given parameters.
     ///
@@ -701,7 +702,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
         )
         => await GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate);
 
-    /// <summary>Lookup stations (backwards compatibility endpoint)</summary>
+    /// <summary>Lookup stations</summary>
     /// <remarks>
     /// Returns stations matching all of the given parameters.
     ///
@@ -797,6 +798,8 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// Note that this will not currently search for systems that would fall inside
     /// a hand-authored sector unless `nameOnly` is `true` and the system name starts
     /// with the given sector name.
+    /// 
+    /// Warning: in sectors close to the galactic core, this can return a large number of results.
     /// </remarks>
     /// <param name="sectorName">Name of the sector</param>
     /// <param name="nameOnly">Match name instead of SystemAddress</param>
@@ -808,8 +811,8 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsAsync(
             string sectorName,
-            [FromQuery] bool nameOnly,
-            [FromQuery] bool includeRejected
+            [FromQuery] bool nameOnly = false,
+            [FromQuery] bool includeRejected = false
         )
     {
         return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted) is { } systems
@@ -817,8 +820,43 @@ public class HomeController(EddnLookupService service) : ControllerBase
             : NotFound();
     }
 
-    /// <summary>Get systems in a sector</summary>
+    /// <summary>Get systems in a sector and boxel</summary>
+    /// <remarks>
+    /// Note that this will not currently search for systems that would fall inside
+    /// a hand-authored sector unless `nameOnly` is `true` and the system name starts
+    /// with the given sector name.
+    /// </remarks>
     /// <param name="sectorName">Name of the sector</param>
+    /// <param name="boxelName">Boxel suffix without N2 (sequence number)</param>
+    /// <param name="nameOnly">Match name instead of SystemAddress</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <returns>List of systems</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("sectors/{sectorName}/{boxelName}")]
+    [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsAsync(
+            string sectorName,
+            [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string boxelName,
+            [FromQuery] bool nameOnly = false,
+            [FromQuery] bool includeRejected = false
+        )
+    {
+        return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName) is { } systems
+            ? Ok(systems)
+            : NotFound();
+    }
+
+    /// <summary>Get systems in a sector</summary>
+    /// <remarks>
+    /// Note that this will not currently search for systems that would fall inside
+    /// a hand-authored sector unless `nameOnly` is `true` and the system name starts
+    /// with the given sector name.
+    /// 
+    /// Warning: in sectors close to the galactic core, this can return a large number of results.
+    /// </remarks>
+    /// <param name="sectorName">Name of the sector</param>
+    /// <param name="boxelName">Boxel suffix without N2 (sequence number)</param>
     /// <param name="nameOnly">Match name instead of SystemAddress</param>
     /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
     /// <returns>List of systems</returns>
@@ -828,8 +866,59 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsV1Async(
             [FromQuery(Name = "regionName")] string sectorName,
-            [FromQuery] bool nameOnly,
-            [FromQuery] bool includeRejected
+            [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string? boxelName,
+            [FromQuery] bool nameOnly = false,
+            [FromQuery] bool includeRejected = false
         )
-        => await GetSectorSystemsAsync(sectorName, nameOnly, includeRejected);
+    {
+        return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName) is { } systems
+            ? Ok(systems)
+            : NotFound();
+    }
+
+    /// <summary>Get a list of systems in the gaps between known systems in a sector</summary>
+    /// <remarks>
+    /// Enumerate the systems in the boxels that have been visited.
+    /// 
+    /// Warning: in sectors close to the galactic core, this can return a large number of results.
+    /// 
+    /// Only searches the base procedural name, and not any name in a hand-authored sector.
+    /// </remarks>
+    /// <param name="sectorName">Sector name</param>
+    /// <returns>List of gap systems</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("gapsystems/{sectorName}")]
+    [ProducesResponseType<List<SystemGapData>>(StatusCodes.Status200OK)]
+    public async IAsyncEnumerable<SystemGapData> GetGapSystemsAsync(
+            string sectorName
+        )
+    {
+        await foreach (var entry in Service.EnumerateGapSystemsAsync(sectorName, HttpContext.RequestAborted))
+        {
+            yield return entry;
+        }
+    }
+
+    /// <summary>Get a list of systems in the gaps between known systems in a sector boxel</summary>
+    /// <remarks>
+    /// Enumerate the systems in the boxels that have been visited.
+    /// 
+    /// Only searches the base procedural name, and not any name in a hand-authored sector.
+    /// </remarks>
+    /// <param name="sectorName">Sector name</param>
+    /// <param name="boxelName">Boxel suffix without N2 (sequence number)</param>
+    /// <returns>List of gap systems</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("gapsystems/{sectorName}/{boxelName}")]
+    [ProducesResponseType<List<SystemGapData>>(StatusCodes.Status200OK)]
+    public async IAsyncEnumerable<SystemGapData> GetGapSystemsAsync(
+            string sectorName,
+            [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string boxelName
+        )
+    {
+        await foreach (var entry in Service.EnumerateGapSystemsAsync(sectorName, HttpContext.RequestAborted, boxelName))
+        {
+            yield return entry;
+        }
+    }
 }

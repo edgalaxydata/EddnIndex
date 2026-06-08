@@ -95,7 +95,7 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
     }
 
     [return: NotNullIfNotNull(nameof(modSystemAddress))]
-    public static string? GetPGSuffix(long? modSystemAddress)
+    public static string? GetPGSuffix(long? modSystemAddress, bool includeN2 = true)
     {
         if (modSystemAddress is not long msa || msa < 0) return null;
 
@@ -112,7 +112,7 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
             ' ',
             (char)(masscode + 'a'),
             mid >= 26 * 26 * 26 ? (mid / (26 * 26 * 26)).ToString() + "-" : "",
-            n2
+            includeN2 ? n2.ToString() : ""
         );
     }
 
