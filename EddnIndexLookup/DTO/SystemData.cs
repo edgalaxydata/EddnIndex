@@ -74,6 +74,11 @@ public record class SystemData : IMatchedItem, ISystemData
     public List<SystemBodyData>? Bodies { get; init; }
 
     /// <summary>
+    /// Stations from events matching these details
+    /// </summary>
+    public List<StationData>? Stations { get; init; }
+
+    /// <summary>
     /// Internal system id
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]

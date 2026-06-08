@@ -551,6 +551,40 @@ public class EddnLookupService(
                 .ToDictionary(g => g.Key, g => g.ToDictionary(e => e.Id));
     }
 
+    private async Task<Dictionary<int, StationData>> GetStationsAsync(ICollection<int> stationIds, bool includeRejected, CancellationToken canceltoken)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        IQueryable<Models.StationInfo> query = ctx.Set<Models.StationInfo>().Where(e => stationIds.Contains(e.Id));
+
+        if (!includeRejected)
+        {
+            query = query.Where(e => e.IsRejected != true);
+        }
+
+        return await
+            query
+               .Select(e => new DTO.StationData
+               {
+                   Id = e.Id,
+                   SystemAddress = e.SystemAddress,
+                   BodyName = e.BodyName,
+                   FirstSeen = e.FirstSeen,
+                   IsRejected = e.IsRejected,
+                   LastSeen = e.LastSeen,
+                   Latitude = e.Latitude,
+                   Longitude = e.Longitude,
+                   MarketId = e.MarketId,
+                   StationName = e.StationName,
+                   StationType = e.StationType,
+                   SystemName = e.SystemName,
+                   ValidFrom = e.ValidFrom,
+                   ValidTo = e.ValidTo
+               })
+               .OrderByDescending(e => e.LastSeen)
+               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
+    }
+
     private async Task<Dictionary<int, List<MatchEntry>>> GetSystemMatchEntriesAsync(
             ICollection<int> systemIds,
             int? limitMatches,
@@ -641,8 +675,10 @@ public class EddnLookupService(
                        Timestamp = e.Info.Timestamp,
                        GatewayTimestamp = e.Info.GatewayTimestamp,
                        SystemId = e.Info.SystemId,
-                       BodyId = e.Body!.BodyId,
-                       StationId = e.Station == null ? null : e.Station.StationId
+                       BodyId = e.Body == null ? null : e.Body.BodyId,
+                       StationId = e.Station == null ? null : e.Station.StationId,
+                       StationName = e.Station == null || e.Station.Station == null ? null : e.Station.Station.StationName,
+                       MarketId = e.Station == null || e.Station.Station == null ? null : e.Station.Station.MarketId
                    });
 
             if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
@@ -735,7 +771,9 @@ public class EddnLookupService(
                        GatewayTimestamp = e.Body.GatewayTimestamp,
                        SystemId = e.Info.SystemId,
                        BodyId = e.Body.BodyId,
-                       StationId = e.Station == null ? null : e.Station.StationId
+                       StationId = e.Station == null ? null : e.Station.StationId,
+                       StationName = e.Station == null || e.Station.Station == null ? null : e.Station.Station.StationName,
+                       MarketId = e.Station == null || e.Station.Station == null ? null : e.Station.Station.MarketId
                    });
 
             if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
@@ -943,30 +981,110 @@ public class EddnLookupService(
                 .GroupBy(e => e.BodyId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-        var entries = new List<SystemData>();
+        var stationMatches =
+            systemMatches
+                .Values
+                .SelectMany(e => e)
+                .Where(e => e.StationId != null)
+                .GroupBy(e => e.StationId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-        foreach (var (systemId, system) in systems)
-        {
-            var sysEntry = system with
-            {
-                MatchCount = systemMatchCounts.GetValueOrDefault(systemId),
-                Matches = systemMatches.GetValueOrDefault(systemId),
-                Bodies = []
-            };
+        var stations = await GetStationsAsync(stationMatches.Keys, includeRejected, canceltoken);
 
-            entries.Add(sysEntry);
+        var sysStations =
+            stationMatches
+                .Values
+                .SelectMany(e => e)
+                .Where(e => e.SystemId != null)
+                .GroupBy(e => e.SystemId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(e => e.StationId)
+                          .OfType<int>()
+                          .Distinct()
+                          .Select(stations.GetValueOrDefault)
+                          .OfType<StationData>()
+                          .ToList()
+                );
 
-            foreach (var (bodyId, body) in bodies.GetValueOrDefault(systemId) ?? [])
-            {
-                sysEntry.Bodies.Add(body with
+        var bodyStations =
+            stationMatches
+                .Values
+                .SelectMany(e => e)
+                .Where(e => e.BodyId != null)
+                .GroupBy(e => e.BodyId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(e => e.StationId)
+                          .OfType<int>()
+                          .Distinct()
+                          .Select(stations.GetValueOrDefault)
+                          .OfType<StationData>()
+                          .ToList()
+                );
+
+        return [..
+            systems
+                .Values
+                .Select(system => system with
                 {
-                    MatchCount = bodyMatchCounts.GetValueOrDefault(bodyId),
-                    Matches = bodyMatches.GetValueOrDefault(bodyId)
-                });
-            }
-        }
-
-        return entries;
+                    MatchCount = systemMatchCounts.GetValueOrDefault(system.Id),
+                    Matches =
+                        systemMatches
+                            .GetValueOrDefault(system.Id)
+                           ?.Select(e => e with
+                           {
+                               BodyName = e.BodyId is not long bodyId
+                                        ? null
+                                        : bodies.GetValueOrDefault(system.Id)
+                                               ?.GetValueOrDefault(bodyId)
+                                               ?.Name
+                           })
+                           .ToList(),
+                    Bodies =
+                        bodies
+                            .GetValueOrDefault(system.Id)
+                           ?.Values
+                            .Select(body => body with
+                            {
+                                MatchCount = bodyMatchCounts.GetValueOrDefault(body.Id),
+                                Matches = bodyMatches.GetValueOrDefault(body.Id),
+                                Stations =
+                                    bodyStations
+                                        .GetValueOrDefault(body.Id)
+                                       ?.Select(stn => stn with
+                                        {
+                                            Matches =
+                                                stationMatches
+                                                    .GetValueOrDefault(stn.Id)
+                                                   ?.Where(e => e.BodyId == body.Id)
+                                                    .Select(e => e with
+                                                    {
+                                                        StationName = null
+                                                    })
+                                                    .ToList()
+                                        })
+                                        .ToList()
+                            })
+                            .ToList(),
+                    Stations =
+                        sysStations
+                            .GetValueOrDefault(system.Id)
+                           ?.Select(stn => stn with
+                            {
+                                Matches =
+                                    stationMatches
+                                        .GetValueOrDefault(stn.Id)
+                                       ?.Where(e => e.SystemId == system.Id)
+                                        .Select(e => e with
+                                        {
+                                            StationName = null
+                                        })
+                                        .ToList()
+                            })
+                            .ToList()
+                })
+        ];
     }
 
     /// <summary>Lookup bodies</summary>
@@ -1009,27 +1127,64 @@ public class EddnLookupService(
 
         var systems = await GetSystemsAsync<BodySystem>(systemIds, includeRejected, canceltoken);
 
+        var bodyMatchCounts = await GetBodyMatchCountsAsync(bodies.Keys, canceltoken);
+
         var bodyMatches = brief
                         ? []
                         : await GetBodyMatchEntriesAsync(bodies.Keys, limitMatches, minDate, maxDate, canceltoken);
-        
-        var bodyMatchCounts = await GetBodyMatchCountsAsync(bodies.Keys, canceltoken);
 
-        var entries = new List<BodyData>();
+        var stationMatches =
+            bodyMatches
+                .Values
+                .SelectMany(e => e)
+                .Where(e => e.StationId != null)
+                .GroupBy(e => e.StationId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-        foreach (var (id, body) in bodies)
-        {
-            var bodyEnt = body with
-            {
-                MatchCount = bodyMatchCounts.GetValueOrDefault(id),
-                Matches = bodyMatches.GetValueOrDefault(id),
-                System = systems.GetValueOrDefault(body.SystemId)
-            };
+        var stations = await GetStationsAsync(stationMatches.Keys, includeRejected, canceltoken);
 
-            entries.Add(bodyEnt);
-        }
+        var bodyStations =
+            stationMatches
+                .Values
+                .SelectMany(e => e)
+                .Where(e => e.BodyId != null)
+                .GroupBy(e => e.BodyId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(e => e.StationId)
+                          .OfType<int>()
+                          .Distinct()
+                          .Select(stations.GetValueOrDefault)
+                          .OfType<StationData>()
+                          .ToList()
+                );
 
-        return entries;
+        return [..
+            bodies
+                .Values
+                .Select(body => body with
+                {
+                    MatchCount = bodyMatchCounts.GetValueOrDefault(body.Id),
+                    Matches = bodyMatches.GetValueOrDefault(body.Id),
+                    System = systems.GetValueOrDefault(body.SystemId),
+                    Stations =
+                        bodyStations
+                            .GetValueOrDefault(body.Id)
+                            ?.Select(stn => stn with
+                            {
+                                Matches =
+                                    stationMatches
+                                        .GetValueOrDefault(stn.Id)
+                                        ?.Where(e => e.BodyId == body.Id)
+                                        .Select(e => e with
+                                        {
+                                            StationName = null
+                                        })
+                                        .ToList()
+                            })
+                            .ToList()
+                })
+        ];
     }
 
     /// <summary>Lookup stations</summary>

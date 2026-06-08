@@ -61,6 +61,22 @@ public record class MatchEntry
     public long? SystemAddress { get; init; }
 
     /// <summary>
+    /// Body Name
+    /// </summary>
+    /// <example>Rigel</example>
+    public string? BodyName { get; init; }
+
+    /// <summary>
+    /// Unique ID of station
+    /// </summary>
+    public long? MarketId { get; init; }
+
+    /// <summary>
+    /// Name of station
+    /// </summary>
+    public string? StationName { get; init; }
+
+    /// <summary>
     /// True if game mode was Odyssey or later (i.e. on-foot actions are possible)
     /// </summary>
     public bool? IsOdyssey { get; init; }

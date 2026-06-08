@@ -103,6 +103,11 @@ public record class BodyData : IMatchedItem, IBodyData
     public List<MatchEntry>? Matches { get; init; }
 
     /// <summary>
+    /// Stations from events matching these details
+    /// </summary>
+    public List<StationData>? Stations { get; init; }
+
+    /// <summary>
     /// Internal system id
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -116,4 +121,3 @@ public record class BodyData : IMatchedItem, IBodyData
     [Newtonsoft.Json.JsonIgnore]
     public long Id { get; init; }
 }
-
