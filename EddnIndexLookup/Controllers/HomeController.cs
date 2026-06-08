@@ -682,7 +682,7 @@ public class HomeController(EddnLookupService service) : ControllerBase
     /// <param name="maxDate">End of date range for matches</param>
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
-    [HttpGet("stations/{marketId:int}")]
+    [HttpGet("stations/{marketId:long}")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetStationsMarketIdAsync(
             [FromQuery] string? stationName,
