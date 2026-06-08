@@ -67,20 +67,38 @@ public class HomeController(EddnLookupService service) : ControllerBase
 
         var systems = await Service.GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
-        systems = [.. systems.Select(e => e with
-        {
-            Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
+        systems = [..
+            systems.Select(e => e with
             {
-                Extract = GetExtractUrl(m.FileName, m.LineNo)
-            })],
-            Bodies = e.Bodies is null ? null : [.. e.Bodies.Select(b => b with
-            {
-                Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
-                {
-                    Extract = GetExtractUrl(m.FileName, m.LineNo)
-                })]
-            })]
-        })];
+                Matches = e.Matches is null
+                        ? null
+                        : [..
+                            e.Matches.Select(m => m with
+                            {
+                                Extract = GetExtractUrl(m.FileName, m.LineNo)
+                            })
+                        ],
+                Bodies  = e.Bodies is null
+                        ? null
+                        : [..
+                            e.Bodies.Select(b => b with
+                            {
+                                Matches = e.Matches is null
+                                        ? null
+                                        : [..
+                                            e.Matches.Select(m => m with
+                                            {
+                                                Extract = GetExtractUrl(m.FileName, m.LineNo)
+                                            })
+                                        ]
+                            })
+                            .OrderBy(e => e.BodyId)
+                            .ThenBy(e => e.Designation)
+                            .ThenBy(e => e.Name)
+                        ]
+            })
+            .OrderByDescending(e => e.LastSeen)
+        ];
 
         return Ok(systems);
     }
@@ -258,13 +276,20 @@ public class HomeController(EddnLookupService service) : ControllerBase
 
         var bodies = await Service.GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
-        bodies = [.. bodies.Select(e => e with
-        {
-            Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
+        bodies = [..
+            bodies.Select(e => e with
             {
-                Extract = GetExtractUrl(m.FileName, m.LineNo)
-            })]
-        })];
+                Matches = e.Matches is null
+                        ? null
+                        : [..
+                            e.Matches.Select(m => m with
+                            {
+                                Extract = GetExtractUrl(m.FileName, m.LineNo)
+                            })
+                        ]
+            })
+            .OrderByDescending(e => e.LastSeen)
+        ];
 
         return Ok(bodies);
     }
@@ -618,11 +643,16 @@ public class HomeController(EddnLookupService service) : ControllerBase
         stations = [..
             stations.Select(e => e with
             {
-                Matches = e.Matches is null ? null : [.. e.Matches.Select(m => m with
-                {
-                    Extract = GetExtractUrl(m.FileName, m.LineNo)
-                })]
+                Matches = e.Matches is null
+                        ? null
+                        : [..
+                            e.Matches.Select(m => m with
+                            {
+                                Extract = GetExtractUrl(m.FileName, m.LineNo)
+                            })
+                        ]
             })
+            .OrderByDescending(e => e.LastSeen)
         ];
 
         return Ok(stations);
