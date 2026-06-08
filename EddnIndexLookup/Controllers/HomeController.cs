@@ -809,15 +809,16 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [HttpGet("sectors/{sectorName}")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsAsync(
+    public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
             [FromQuery] bool nameOnly = false,
             [FromQuery] bool includeRejected = false
         )
     {
-        return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted) is { } systems
-            ? Ok(systems)
-            : NotFound();
+        await foreach (var entry in Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted))
+        {
+            yield return entry;
+        }
     }
 
     /// <summary>Get systems in a sector and boxel</summary>
@@ -835,16 +836,17 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [HttpGet("sectors/{sectorName}/{boxelName}")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsAsync(
+    public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
             [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string boxelName,
             [FromQuery] bool nameOnly = false,
             [FromQuery] bool includeRejected = false
         )
     {
-        return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName) is { } systems
-            ? Ok(systems)
-            : NotFound();
+        await foreach (var entry in Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName))
+        {
+            yield return entry;
+        }
     }
 
     /// <summary>Get systems in a sector</summary>
@@ -864,16 +866,17 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [HttpGet("regions.php")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<List<SectorSystem>>> GetSectorSystemsV1Async(
+    public async IAsyncEnumerable<SectorSystem> GetSectorSystemsV1Async(
             [FromQuery(Name = "regionName")] string sectorName,
             [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string? boxelName,
             [FromQuery] bool nameOnly = false,
             [FromQuery] bool includeRejected = false
         )
     {
-        return await Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName) is { } systems
-            ? Ok(systems)
-            : NotFound();
+        await foreach (var entry in Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName))
+        {
+            yield return entry;
+        }
     }
 
     /// <summary>Get a list of systems in the gaps between known systems in a sector</summary>

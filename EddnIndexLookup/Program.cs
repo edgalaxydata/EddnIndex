@@ -17,6 +17,7 @@ builder.Services.AddControllers()
                 {
                     opts.JsonSerializerOptions.PropertyNamingPolicy = null;
                     opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+                    opts.JsonSerializerOptions.WriteIndented = true;
                 });
 
 builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(

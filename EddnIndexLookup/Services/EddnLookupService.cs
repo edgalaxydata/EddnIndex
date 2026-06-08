@@ -230,8 +230,52 @@ public class EddnLookupService(
         return await FillSystemsAsync<TSystem>(ctx, systems, canceltoken);
     }
 
+    private static TSystem? FillSystem<TSystem>(
+            Models.SystemInfo system,
+            Dictionary<long, string> systemNames,
+            Dictionary<int, string> sectorsById,
+            Dictionary<int, string> sectorsByAddr
+        )
+        where TSystem : class, ISystemData, new()
+    {
+        var systemId = system.Id;
+
+        var name = system switch
+        {
+            { SystemNameId: long sysNameId }
+                when systemNames.TryGetValue(-sysNameId, out var sysname)
+                => sysname,
+            { SectorId: int sectorId, PGSuffix: string pgSuffix }
+                when sectorsById.TryGetValue(sectorId, out var sectorName)
+                => sectorName + pgSuffix,
+            { SectorAddress: int sectorAddr, PGSuffix: string pgSuffix }
+                => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
+            _ => null
+        };
+
+        return name == null
+            ? null
+            : new TSystem
+            {
+                Id = systemId,
+                Name = name,
+                SystemAddress = system.SystemAddress,
+                Coords = system is { X: decimal x, Y: decimal y, Z: decimal z }
+                       ? new DTO.Coords(x, y, z)
+                       : null,
+                FirstSeen = system.FirstSeen,
+                IsRejected = system.IsRejected,
+                LastSeen = system.LastSeen,
+                PGName = system is { SysAddr_SectorAddress: int sa_sectorAddr, SysAddr_PGSuffix: string sa_pgsuffix }
+                       ? (sectorsByAddr.GetValueOrDefault(sa_sectorAddr) ?? Sectors.PGSectors.GetSectorName(sa_sectorAddr)) + sa_pgsuffix
+                       : null,
+                ValidFrom = system.ValidFrom,
+                ValidTo = system.ValidTo
+            };
+    }
+
     private static async Task<Dictionary<int, TSystem>> FillSystemsAsync<TSystem>(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems, CancellationToken canceltoken)
-        where TSystem : ISystemData, new()
+        where TSystem : class, ISystemData, new()
     {
         var systemNameIds = systems.Values.Select(e => e.SystemNameId).Distinct().ToList();
         var sectorIds =
@@ -250,7 +294,7 @@ public class EddnLookupService(
         var sectorsById = await
             ctx.Set<Models.Sector>()
                .Where(e => sectorIds.Contains(e.Id + 0x100000))
-               .ToDictionaryAsync(e => (long)e.Id, e => e.Name, cancellationToken: canceltoken);
+               .ToDictionaryAsync(e => e.Id, e => e.Name, cancellationToken: canceltoken);
 
         var sectorsByAddr = await
             ctx.Set<Models.Sector>()
@@ -261,38 +305,9 @@ public class EddnLookupService(
 
         foreach (var (systemId, system) in systems)
         {
-            var name = system switch
+            if (FillSystem<TSystem>(system, systemNames, sectorsById, sectorsByAddr) is { } entry)
             {
-                { SystemNameId: long sysNameId }
-                    when systemNames.TryGetValue(-sysNameId, out var sysname)
-                    => sysname,
-                { SectorId: int sectorId, PGSuffix: string pgSuffix }
-                    when sectorsById.TryGetValue(sectorId, out var sectorName)
-                    => sectorName + pgSuffix,
-                { SectorAddress: int sectorAddr, PGSuffix: string pgSuffix }
-                    => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
-                _ => null
-            };
-
-            if (name != null)
-            {
-                systemDatas[systemId] = new TSystem
-                {
-                    Id = systemId,
-                    Name = name,
-                    SystemAddress = system.SystemAddress,
-                    Coords = system is { X: decimal x, Y: decimal y, Z: decimal z }
-                           ? new DTO.Coords(x, y, z)
-                           : null,
-                    FirstSeen = system.FirstSeen,
-                    IsRejected = system.IsRejected,
-                    LastSeen = system.LastSeen,
-                    PGName = system is { SysAddr_SectorAddress: int sa_sectorAddr, SysAddr_PGSuffix: string sa_pgsuffix }
-                           ? (sectorsByAddr.GetValueOrDefault(sa_sectorAddr) ?? Sectors.PGSectors.GetSectorName(sa_sectorAddr)) + sa_pgsuffix
-                           : null,
-                    ValidFrom = system.ValidFrom,
-                    ValidTo = system.ValidTo
-                };
+                systemDatas[systemId] = entry;
             }
         }
 
@@ -481,7 +496,7 @@ public class EddnLookupService(
     }
 
     private async Task<Dictionary<int, TSystem>> GetSystemsAsync<TSystem>(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
-        where TSystem : ISystemData, new()
+        where TSystem : class, ISystemData, new()
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
@@ -1297,11 +1312,11 @@ public class EddnLookupService(
     /// <param name="canceltoken">Cancellation token</param>
     /// <param name="boxelName">Boxel suffix without N2 (sequence number)</param>
     /// <returns>List of systems</returns>
-    public async Task<List<SectorSystem>?> GetSectorSystemsAsync(
+    public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
             bool nameOnly,
             bool includeRejected,
-            CancellationToken canceltoken,
+            [EnumeratorCancellation] CancellationToken canceltoken,
             string? boxelName = null
         )
     {
@@ -1309,12 +1324,12 @@ public class EddnLookupService(
 
         if (await ctx.Set<Models.Sector>().FirstOrDefaultAsync(e => e.Name == sectorName, canceltoken) is not { } sector)
         {
-            return null;
+            yield break;
         }
 
         if (sector.SectorAddress == null && !nameOnly)
         {
-            return null;
+            yield break;
         }
 
         long range = (1L << 40) - 1;
@@ -1335,66 +1350,82 @@ public class EddnLookupService(
                 || masscode >= 8
                 || !string.Equals(secname, sectorName))
             {
-                return null;
+                yield break;
             }
 
             boxelid = ((long)mid << 16) | ((long)masscode << 37);
             range = (1 << 16) - 1;
         }
 
-        IQueryable<Models.SystemInfo> query;
+        var sectorsById =
+            ctx.Set<Models.Sector>()
+               .Select(e => new { e.Id, e.Name })
+               .ToDictionary(e => e.Id, e => e.Name);
 
-        if (nameOnly)
-        {
-            var minId = ((long)sector.Id << 40) + (1L << 60) + boxelid;
-            var maxId = minId + range;
+        var sectorsByAddr =
+            ctx.Set<Models.Sector>()
+               .Where(e => e.SectorAddress != null)
+               .Select(e => new { Id = e.SectorAddress!.Value, e.Name })
+               .ToDictionary(e => e.Id, e => e.Name);
 
-            query =
-                ctx.Set<Models.SystemInfo>()
-                   .Where(e => e.SystemNameId >= minId && e.SystemNameId <= maxId);
+        var systemNames =
+            ctx.Set<Models.SystemName>()
+               .ToDictionary(e => (long)e.Id, e => e.Name);
 
-            if (sector.SectorAddress is int sectorAddress)
-            {
-                var minAddr = ((long)sectorAddress << 40) + boxelid;
-                var maxAddr = minAddr + range;
-
-                query = query.Concat(
-                    ctx.Set<Models.SystemInfo>()
-                       .Where(e => e.SystemNameId >= minAddr && e.SystemNameId <= maxAddr)
-                );
-            }
-        }
-        else
-        {
-            if (sector.SectorAddress is int sectorAddress)
-            {
-                var minAddr = ((long)sectorAddress << 40) + boxelid;
-                var maxAddr = minAddr + range;
-
-                query =
-                    ctx.Set<Models.SystemInfo>()
-                       .Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= maxAddr);
-            }
-            else
-            {
-                return [];
-            }
-        }
+        IQueryable<Models.SystemInfo> query = ctx.Set<Models.SystemInfo>();
 
         if (!includeRejected)
         {
             query = query.Where(e => e.IsRejected != true);
         }
 
-        var systems = await
-            query
-                .AsAsyncEnumerable()
-                .GroupBy(e => e.Id)
-                .ToDictionaryAsync(g => g.Key, g => g.First(), cancellationToken: canceltoken);
+        if (nameOnly)
+        {
+            var minId = ((long)sector.Id << 40) + (1L << 60) + boxelid;
+            var maxId = minId + range;
 
-        var systemDatas = await FillSystemsAsync<SectorSystem>(ctx, systems, canceltoken);
+            await foreach (var system in query.Where(e => e.SystemNameId >= minId && e.SystemNameId <= maxId).AsAsyncEnumerable())
+            {
+                if (FillSystem<SectorSystem>(system, systemNames, sectorsById, sectorsByAddr) is { } entry)
+                {
+                    yield return entry;
+                }
+            }
 
-        return [.. systemDatas.Values];
+            if (sector.SectorAddress is int sectorAddress)
+            {
+                var minAddr = ((long)sectorAddress << 40) + boxelid;
+                var maxAddr = minAddr + range;
+
+                await foreach (var system in query.Where(e => e.ModSystemAddress >= minId && e.ModSystemAddress <= maxId && e.ModSystemAddress != e.SystemNameId).AsAsyncEnumerable())
+                {
+                    if (FillSystem<SectorSystem>(system, systemNames, sectorsById, sectorsByAddr) is { } entry)
+                    {
+                        yield return entry;
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (sector.SectorAddress is int sectorAddress)
+            {
+                var minId = ((long)sectorAddress << 40) + boxelid;
+                var maxId = minId + range;
+
+                await foreach (var system in query.Where(e => e.ModSystemAddress >= minId && e.ModSystemAddress <= maxId).AsAsyncEnumerable())
+                {
+                    if (FillSystem<SectorSystem>(system, systemNames, sectorsById, sectorsByAddr) is { } entry)
+                    {
+                        yield return entry;
+                    }
+                }
+            }
+            else
+            {
+                yield break;
+            }
+        }
     }
 
     /// <summary>Get the list of known sectors</summary>
