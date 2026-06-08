@@ -314,7 +314,12 @@ public class EddnLookupService(
         return systemDatas;
     }
 
-    private static async Task<Dictionary<long, BodyData>> FillBodiesAsync(Models.EDDNContext ctx, Dictionary<long, Models.BodyInfo> bodies, CancellationToken canceltoken)
+    private static async Task<Dictionary<long, TBodyData>> FillBodiesAsync<TBodyData>(
+            Models.EDDNContext ctx,
+            Dictionary<long, Models.BodyInfo> bodies,
+            CancellationToken canceltoken
+        )
+        where TBodyData : class, IBodyData, new()
     {
         var bodyNameIds =
             bodies
@@ -371,7 +376,7 @@ public class EddnLookupService(
                .Where(e => e.SectorAddress != null && sectorIds.Contains(e.SectorAddress.Value))
                .ToDictionaryAsync(e => e.SectorAddress!.Value, e => e.Name, cancellationToken: canceltoken);
 
-        var bodiesData = new Dictionary<long, BodyData>();
+        var bodiesData = new Dictionary<long, TBodyData>();
 
         foreach (var (id, body) in bodies)
         {
@@ -411,19 +416,20 @@ public class EddnLookupService(
                     _ => null
                 };
 
-                var desig = body.BodyDesignationId is not int bodyDesigId
-                          ? null
-                          : (desigSysName, bodyDesigId) switch
-                          {
-                              (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
-                              (not null, < 0) when bodyDesigsById.TryGetValue(-bodyNameId, out var bd) => desigSysName + bd.Designation,
-                              (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => desigSysName + bd.Designation,
-                              _ => null
-                          };
+                (string? desig, string? desigType) =
+                    body.BodyDesignationId is not int bodyDesigId
+                    ? (null, null)
+                    : (desigSysName, bodyDesigId) switch
+                    {
+                        (_, > 0) when bodyNames.TryGetValue(bodyDesigId, out var bn) => (bn.Name, null),
+                        (not null, < 0) when bodyDesigsById.TryGetValue(-bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
+                        (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
+                        _ => (null, null)
+                    };
 
                 if (name != null)
                 {
-                    bodiesData[id] = new DTO.BodyData
+                    bodiesData[id] = new TBodyData
                     {
                         Name = name,
                         Designation = desig,
@@ -441,7 +447,9 @@ public class EddnLookupService(
                         ValidTo = body.ValidTo,
                         Parents = body.ParentSet?.ParentJson is string parentJson
                                 ? JsonConvert.DeserializeObject<List<Dictionary<string, int>>>(parentJson)
-                                : null
+                                : null,
+                        BodyType = body.ParentSet?.BodyType,
+                        DesignationType = desigType
                     };
                 }
             }
@@ -492,7 +500,7 @@ public class EddnLookupService(
                 .OrderByDescending(e => e.LastSeen)
                 .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
-        return await FillBodiesAsync(ctx, bodies, canceltoken);
+        return await FillBodiesAsync<BodyData>(ctx, bodies, canceltoken);
     }
 
     private async Task<Dictionary<int, TSystem>> GetSystemsAsync<TSystem>(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
@@ -512,7 +520,12 @@ public class EddnLookupService(
         return await FillSystemsAsync<TSystem>(ctx, await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken), canceltoken);
     }
 
-    private async Task<Dictionary<int, Dictionary<long, BodyData>>> GetSystemBodiesAsync(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
+    private async Task<Dictionary<int, Dictionary<long, TBodyData>>> GetSystemBodiesAsync<TBodyData>(
+            ICollection<int> systemIds,
+            bool includeRejected,
+            CancellationToken canceltoken
+        )
+        where TBodyData : class, IBodyData, new()
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
@@ -529,7 +542,7 @@ public class EddnLookupService(
 
         var bodies = await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
-        var bodies2 = await FillBodiesAsync(ctx, bodies, canceltoken);
+        var bodies2 = await FillBodiesAsync<TBodyData>(ctx, bodies, canceltoken);
 
         return
             bodies2
@@ -905,7 +918,7 @@ public class EddnLookupService(
             return [];
         }
 
-        var bodies = await GetSystemBodiesAsync(systems.Keys, includeRejected, canceltoken);
+        var bodies = await GetSystemBodiesAsync<SystemBodyData>(systems.Keys, includeRejected, canceltoken);
 
         var bodyIds =
             bodies
@@ -945,25 +958,10 @@ public class EddnLookupService(
 
             foreach (var (bodyId, body) in bodies.GetValueOrDefault(systemId) ?? [])
             {
-                sysEntry.Bodies.Add(new SystemBodyData
+                sysEntry.Bodies.Add(body with
                 {
-                    Name = body.Name,
-                    ArgOfPeriapsis = body.ArgOfPeriapsis,
-                    SemiMajorAxis = body.SemiMajorAxis,
-                    BodyId = body.BodyId,
-                    SystemAddress = body.SystemAddress,
-                    Designation = body.Designation,
-                    FirstSeen = body.FirstSeen,
-                    Id = body.Id,
-                    Inclination = body.Inclination,
-                    IsRejected = body.IsRejected,
-                    LastSeen = body.LastSeen,
                     MatchCount = bodyMatchCounts.GetValueOrDefault(bodyId),
-                    Matches = bodyMatches.GetValueOrDefault(bodyId),
-                    Parents = body.Parents,
-                    SystemId = body.SystemId,
-                    ValidFrom = body.ValidFrom,
-                    ValidTo = body.ValidTo
+                    Matches = bodyMatches.GetValueOrDefault(bodyId)
                 });
             }
         }

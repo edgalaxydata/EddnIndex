@@ -5,13 +5,13 @@ namespace EddnIndexLookup.DTO;
 /// <summary>
 /// Matched body details
 /// </summary>
-public record class SystemBodyData : IMatchedItem
+public record class SystemBodyData : IMatchedItem, IBodyData
 {
     /// <summary>
     /// Body Name
     /// </summary>
     /// <example>Rigel</example>
-    public required string Name { get; init; }
+    public string Name { get; init; } = "";
 
     /// <summary>
     /// System Address (AKA ID64)
@@ -32,9 +32,20 @@ public record class SystemBodyData : IMatchedItem
     public List<Dictionary<string, int>>? Parents { get; init; }
 
     /// <summary>
+    /// Body type
+    /// </summary>
+    /// <example>Star</example>
+    public string? BodyType { get; init; }
+
+    /// <summary>
     /// Body designation if known
     /// </summary>
     public string? Designation { get; init; }
+
+    /// <summary>
+    /// Body designation type
+    /// </summary>
+    public string? DesignationType { get; init; }
 
     /// <summary>
     /// Orbital Argument of Periapsis
@@ -86,12 +97,18 @@ public record class SystemBodyData : IMatchedItem
     /// </summary>
     public List<MatchEntry>? Matches { get; init; }
 
+    /// <summary>
+    /// Internal system id
+    /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
-    internal int SystemId { get; init; }
+    public int SystemId { get; init; }
 
+    /// <summary>
+    /// Internal body id
+    /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
-    internal long Id { get; init; }
+    public long Id { get; init; }
 }
 
