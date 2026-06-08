@@ -194,7 +194,7 @@ public class EddnLookupService(
     }
 
     private async Task<Dictionary<int, TSystem>?> GetSystemsAsync<TSystem>(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
-        where TSystem : ISystemData, new()
+        where TSystem : class, ISystemData, new()
     {
         if (string.IsNullOrWhiteSpace(systemName) && (systemAddress == null || systemAddress <= 0))
         {
