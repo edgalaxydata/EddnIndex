@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/Solution Items/">
+    <File Path=".github/workflows/docker-publish.yml" />
     <File Path="EddnIndexLookup.Dockerfile" />
     <File Path="EddnIndexUpdate.Dockerfile" />
   </Folder>
