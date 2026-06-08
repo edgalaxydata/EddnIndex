@@ -580,7 +580,7 @@ public class EddnLookupService(
                    IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
                    IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
                    Timestamp = e.Info.Timestamp,
-                   GatewayTimestamp = e.Info.GatewayTimestamp,
+                   GatewayTimestamp = e.RouteEntry.GatewayTimestamp,
                    SystemId = e.RouteEntry.SystemId
                });
 
@@ -640,17 +640,26 @@ public class EddnLookupService(
             routeQuery = routeQuery.Where(e => e.GatewayTimestamp <= maxTS);
         }
 
-        return await
+        var queryResults = await
             query
                 .OrderByDescending(e => e.GatewayTimestamp)
                 .Take(limitMatches ?? 1000)
-                .AsAsyncEnumerable()
-                .Concat(routeQuery.OrderByDescending(e => e.GatewayTimestamp).Take(limitMatches ?? 1000).AsAsyncEnumerable())
+                .ToListAsync(canceltoken);
+
+        var routeQueryResults = await
+            routeQuery
+                .OrderByDescending(e => e.GatewayTimestamp)
+                .Take(limitMatches ?? 1000)
+                .ToListAsync(canceltoken);
+
+        return
+            queryResults
+                .Concat(routeQueryResults)
                 .OrderByDescending(e => e.GatewayTimestamp)
                 .Take(limitMatches ?? 1000)
                 .Where(e => e.SystemId != null)
                 .GroupBy(e => e.SystemId!.Value)
-                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
+                .ToDictionary(g => g.Key, g => g.ToList());
     }
 
     private async Task<Dictionary<long, List<MatchEntry>>> GetBodyMatchEntriesAsync(

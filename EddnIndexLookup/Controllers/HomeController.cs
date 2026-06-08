@@ -808,7 +808,6 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("sectors/{sectorName}")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
             [FromQuery] bool nameOnly = false,
@@ -835,7 +834,6 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("sectors/{sectorName}/{boxelName}")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
             [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string boxelName,
@@ -865,7 +863,6 @@ public class HomeController(EddnLookupService service) : ControllerBase
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("regions.php")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async IAsyncEnumerable<SectorSystem> GetSectorSystemsV1Async(
             [FromQuery(Name = "regionName")] string sectorName,
             [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string? boxelName,
