@@ -3,6 +3,7 @@ using EddnIndexLookup.Services;
 using System.Reflection;
 using EddnIndexLookup.Options;
 using Scalar.AspNetCore;
+using EddnIndexLookup.Conventions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,7 +13,10 @@ builder.Configuration.AddJsonFile("appsettings.json", optional: true);
 builder.Configuration.AddJsonFile("hosting.json", optional: true);
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
 
-builder.Services.AddControllersWithViews()
+builder.Services.AddControllersWithViews(opts =>
+                {
+                    opts.Conventions.Add(new HideHeadRoutesConvention());
+                })
                 .AddJsonOptions(opts =>
                 {
                     opts.JsonSerializerOptions.PropertyNamingPolicy = null;
