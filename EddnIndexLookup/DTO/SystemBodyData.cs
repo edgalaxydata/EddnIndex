@@ -106,6 +106,8 @@ public record class SystemBodyData : IMatchedItem, IBodyData
     /// <summary>
     /// Body designation data
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
     public BodyDesignation? BodyDesignation { get; init; }
 
     /// <summary>
