@@ -24,7 +24,7 @@ namespace EddnIndexLookup.Controllers
         /// <summary>
         /// Render table of storage usage
         /// </summary>
-        [HttpGet("/tableinfo.php")]
+        [Route("/tableinfo.php")]
         public async Task<IActionResult> TableInfo()
         {
             return View(await Service.GetStorageStats(HttpContext.RequestAborted));

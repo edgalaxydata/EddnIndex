@@ -766,7 +766,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
 
     private string? GetExtractUrl(string filename, int lineno)
     {
-        return Url.Action("ExtractLine", "Home", new { filename, lineno }, Request.Scheme);
+        return Url.Action("ExtractLine", "Lookup", new { filename, lineno }, Request.Scheme);
     }
 
     /// <summary>Extract EDDN event</summary>
