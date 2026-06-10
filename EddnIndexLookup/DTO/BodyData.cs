@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using EddnIndexUpdate.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexLookup.DTO;
 
@@ -106,6 +107,11 @@ public record class BodyData : IMatchedItem, IBodyData
     /// Stations from events matching these details
     /// </summary>
     public List<StationData>? Stations { get; init; }
+
+    /// <summary>
+    /// Body designation data
+    /// </summary>
+    public BodyDesignation? BodyDesignation { get; init; }
 
     /// <summary>
     /// Internal system id

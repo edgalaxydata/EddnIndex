@@ -1,4 +1,5 @@
 ﻿using EddnIndexLookup.DTO;
+using EddnIndexLookup.Filters;
 using EddnIndexLookup.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -88,9 +89,9 @@ public class LookupController(EddnLookupService service) : ControllerBase
                                             })
                                         ]
                             })
-                            .OrderBy(e => e.BodyId)
-                            .ThenBy(e => e.Designation)
-                            .ThenBy(e => e.Name)
+                            .OrderBy(b => b.BodyId ?? int.MaxValue)
+                            .ThenBy(b => b, new BodyDesignationComparer(e.Name))
+                            .ThenBy(b => b.Name)
                         ]
             })
             .OrderByDescending(e => e.LastSeen)

@@ -330,6 +330,14 @@ public class EddnLookupService(
                 .Distinct()
                 .ToList();
 
+        var bodyDesigIds =
+            bodies
+                .Values
+                .Select(e => e.BodyDesignationId)
+                .OfType<int>()
+                .Distinct()
+                .ToList();
+
         var systemNameIds =
             bodies
                 .Values
@@ -353,7 +361,7 @@ public class EddnLookupService(
 
         var bodyDesigsById = await
             ctx.Set<Models.BodyDesignation>()
-               .Where(e => bodyNameIds.Contains(-e.Id))
+               .Where(e => bodyDesigIds.Contains(e.Id))
                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
         var bodyDesigsByDesigId = await
@@ -415,14 +423,14 @@ public class EddnLookupService(
                     _ => null
                 };
 
-                (string? desig, string? desigType) =
+                (string? desig, string? desigType, Models.BodyDesignation? desigData) =
                     body.BodyDesignationId is not int bodyDesigId
-                    ? (null, null)
+                    ? (null, null, null)
                     : (desigSysName, bodyDesigId) switch
                     {
-                        (not null, > 0) when bodyDesigsById.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
-                        (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
-                        _ => (null, null)
+                        (not null, > 0) when bodyDesigsById.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString(), bd),
+                        (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString(), bd),
+                        _ => (null, null, null)
                     };
 
                 if (name != null)
@@ -447,7 +455,8 @@ public class EddnLookupService(
                                 ? JsonConvert.DeserializeObject<List<Dictionary<string, int>>>(parentJson)
                                 : null,
                         BodyType = body.ParentSet?.BodyType,
-                        DesignationType = desigType
+                        DesignationType = desigType,
+                        BodyDesignation = desigData
                     };
                 }
             }

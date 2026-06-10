@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using EddnIndexUpdate.Models;
+using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexLookup.DTO
 {
@@ -86,6 +87,11 @@ namespace EddnIndexLookup.DTO
         /// GatewayTimestamp when item was last seen with these details
         /// </summary>
         DateTime? LastSeen { get; init; }
+
+        /// <summary>
+        /// Body designation data
+        /// </summary>
+        BodyDesignation? BodyDesignation { get; init; }
 
         /// <summary>
         /// Internal system id
