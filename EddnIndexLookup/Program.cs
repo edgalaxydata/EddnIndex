@@ -12,7 +12,7 @@ builder.Configuration.AddJsonFile("appsettings.json", optional: true);
 builder.Configuration.AddJsonFile("hosting.json", optional: true);
 builder.Configuration.AddUserSecrets(Assembly.GetExecutingAssembly(), optional: true);
 
-builder.Services.AddControllers()
+builder.Services.AddControllersWithViews()
                 .AddJsonOptions(opts =>
                 {
                     opts.JsonSerializerOptions.PropertyNamingPolicy = null;

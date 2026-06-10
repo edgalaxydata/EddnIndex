@@ -9,5 +9,10 @@
         /// Path to indexed EDDN captures
         /// </summary>
         public string? IndexedDir { get; set; }
+
+        /// <summary>
+        /// Dump directories to enumerate for tableinfo
+        /// </summary>
+        public Dictionary<string, string> DumpDirs { get; set; } = [];
     }
 }

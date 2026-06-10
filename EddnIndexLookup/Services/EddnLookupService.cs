@@ -1759,4 +1759,140 @@ public class EddnLookupService(
             };
         }
     }
+
+    /// <summary>Get table info</summary>
+    /// <param name="canceltoken">Cancellation Token</param>
+    /// <returns>Table info</returns>
+    public async Task<Dictionary<string, TableInfo>> GetTableInfo(CancellationToken canceltoken)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        if (ctx.Database.IsMySql())
+        {
+            var results = await ctx.Database.SqlQueryRaw<TableInfo>("""
+                SELECT
+                    TABLE_NAME AS TableName,
+                    TABLE_ROWS AS RowCount,
+                    DATA_LENGTH AS DataSize,
+                    INDEX_LENGTH AS IndexSize,
+                    DATA_LENGTH + INDEX_LENGTH AS TotalSize,
+                    IF(TABLE_ROWS = 0, 0, (DATA_LENGTH + INDEX_LENGTH) * 1.0 / TABLE_ROWS) AS BytesPerRow
+                FROM INFORMATION_SCHEMA.TABLES
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME NOT IN ('__EFMigrationsHistory')
+            """).ToListAsync(canceltoken);
+
+            return results.ToDictionary(e => e.TableName, StringComparer.OrdinalIgnoreCase);
+        }
+        else if (ctx.Database.IsSqlServer())
+        {
+            return await ctx.Database.SqlQueryRaw<TableInfo>("""
+                SELECT
+                    t.TableName,
+                    t.[RowCount],
+                    t.DataSize,
+                    t.IndexSize,
+                    t.TotalSize,
+                    IIF(t.[RowCount] = 0, 0, t.TotalSize * 1.0 / t.[RowCount]) AS BytesPerRow
+                FROM (
+                SELECT
+                    t.name AS TableName,
+                    SUM(CASE WHEN i.index_id IN (0, 1) THEN p.rows ELSE 0 END) AS [RowCount],
+                    SUM(CASE WHEN i.index_id IN (0, 1) THEN au.total_pages ELSE 0 END) * 8192 AS [DataSize],
+                    SUM(CASE WHEN i.index_id > 1 THEN au.total_pages ELSE 0 END) * 8192 AS [IndexSize],
+                    SUM(au.total_pages) * 8192 AS [TotalSize]
+                FROM sys.tables t
+                INNER JOIN sys.schemas s
+                    ON s.schema_id = t.schema_id
+                INNER JOIN sys.indexes i
+                    ON i.object_id = t.object_id
+                INNER JOIN sys.partitions p
+                    ON p.object_id = i.object_id
+                   AND p.index_id = i.index_id
+                INNER JOIN sys.allocation_units au
+                    ON au.container_id =
+                       CASE au.type
+                           WHEN 2 THEN p.partition_id
+                           ELSE p.hobt_id
+                       END
+                WHERE t.is_ms_shipped = 0
+                  AND s.name = (SELECT default_schema_name FROM sys.database_principals WHERE name = USER_NAME())
+                  AND t.name NOT IN ('__EFMigrationsHistory')
+                GROUP BY
+                    s.name,
+                    t.name
+                ) t
+            """).ToDictionaryAsync(e => e.TableName, StringComparer.OrdinalIgnoreCase, canceltoken);
+        }
+        else if (ctx.Database.IsNpgsql())
+        {
+            return await ctx.Database.SqlQueryRaw<TableInfo>("""
+                SELECT
+                    c.relname AS "TableName",
+                    COALESCE(s.n_live_tup, c.reltuples)::bigint AS "RowCount",
+                    pg_relation_size(c.oid)::bigint AS "DataSize",
+                    pg_indexes_size(c.oid)::bigint AS "IndexSize",
+                    pg_total_relation_size(c.oid)::bigint AS "TotalSize",
+                    CASE
+                        WHEN COALESCE(s.n_live_tup, c.reltuples) > 0
+                            THEN pg_relation_size(c.oid)::double precision / COALESCE(s.n_live_tup, c.reltuples)
+                        ELSE 0
+                    END AS "BytesPerRow"
+                FROM pg_class AS c
+                JOIN pg_namespace AS n
+                    ON n.oid = c.relnamespace
+                LEFT JOIN pg_stat_user_tables AS s
+                    ON s.relid = c.oid
+                WHERE c.relkind = 'r'
+                  AND n.nspname = current_schema()
+                  AND c.relname NOT IN ('__EFMigrationsHistory')
+            """).ToDictionaryAsync(e => e.TableName, StringComparer.OrdinalIgnoreCase, canceltoken);
+        }
+        else
+        {
+            return [];
+        }
+    }
+
+    /// <summary>Get directory usage stats</summary>
+    /// <param name="canceltoken">Cancellation Token</param>
+    /// <returns>Directory usage stats</returns>
+    public async Task<Dictionary<string, DumpDirectoryUsage>> GetDirectoryUsages(CancellationToken canceltoken)
+    {
+        var dirusages = new Dictionary<string, DumpDirectoryUsage>();
+
+        foreach (var (name, path) in Settings.DumpDirs)
+        {
+            long size = 0;
+            int filecount = 0;
+
+            foreach (var file in Directory.EnumerateFiles(path))
+            {
+                var info = new FileInfo(file);
+                size += info.Length;
+                filecount++;
+            }
+
+            dirusages[name] = new DumpDirectoryUsage
+            {
+                DirectoryName = name,
+                DataSize = size,
+                FileCount = filecount
+            };
+        }
+
+        return dirusages;
+    }
+
+    /// <summary>Get storage statistics</summary>
+    /// <param name="canceltoken">Cancellation Token</param>
+    /// <returns>Storage stats</returns>
+    public async Task<StorageStats> GetStorageStats(CancellationToken canceltoken)
+    {
+        return new StorageStats
+        {
+            Tables = await GetTableInfo(canceltoken),
+            DumpUsages = await GetDirectoryUsages(canceltoken)
+        };
+    }
 }

@@ -1,0 +1,66 @@
+﻿@model EddnIndexLookup.DTO.StorageStats;
+
+<html>
+    <head>
+        <style type="text/css">
+            table, th, td {
+                border: 1px solid black;
+                border-collapse: collapse;
+            }
+            th, td {
+                padding: 0.25em;
+            }
+            td.num {
+                text-align: end;
+            }
+        </style>
+    </head>
+    <body>
+        <h2>Tables</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Table</th>
+                    <th>Rows</th>
+                    <th>Data Size</th>
+                    <th>Index Size</th>
+                    <th>Total Size</th>
+                    <th>Bytes per row</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tbl in Model.Tables.Values)
+                {
+                    <tr>
+                        <td>@tbl.TableName</td>
+                        <td class="num">@tbl.RowCount.ToString("N0")</td>
+                        <td class="num">@((tbl.DataSize / 1048576.0).ToString("N2")) MB</td>
+                        <td class="num">@((tbl.IndexSize / 1048576.0).ToString("N2")) MB</td>
+                        <td class="num">@((tbl.TotalSize / 1048576.0).ToString("N2")) MB</td>
+                        <td class="num">@tbl.BytesPerRow.ToString("N2")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <h2>Dumps</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>File Count</th>
+                    <th>Size</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tbl in Model.DumpUsages.Values)
+                {
+                    <tr>
+                        <td>@tbl.DirectoryName</td>
+                        <td class="num">@tbl.FileCount.ToString("N0")</td>
+                        <td class="num">@(tbl.DataSize / 1048576.0).ToString("N2") MB</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </body>
+</html>
