@@ -41,6 +41,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched system entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("systems")]
+    [HttpHead("systems")]
     [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SystemData>>> GetSystemsAsync(
             [FromQuery] string? systemName,
@@ -54,6 +55,11 @@ public class LookupController(EddnLookupService service) : ControllerBase
     {
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
         systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
+
+        if (Request.Method == "HEAD")
+        {
+            brief = true;
+        }
 
         var systems = await Service.GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
@@ -118,6 +124,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched system entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("systems/{systemAddress:long}")]
+    [HttpHead("systems/{systemAddress:long}")]
     [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SystemData>>> GetSystemsSysAddrAsync(
             [FromQuery] string? systemName,
@@ -155,6 +162,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched system entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("systems/{systemName}")]
+    [HttpHead("systems/{systemName}")]
     [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SystemData>>> GetSystemsSysNameAsync(
             [FromRoute] string? systemName,
@@ -196,6 +204,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched system entries</returns>
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("systems.php")]
+    [HttpHead("systems.php")]
     [ProducesResponseType<List<SystemData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<SystemData>>> GetSystemsV1Async(
             [FromQuery] string? systemName,
@@ -242,6 +251,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies")]
+    [HttpHead("bodies")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesAsync(
             [FromQuery] string? bodyName,
@@ -262,6 +272,11 @@ public class LookupController(EddnLookupService service) : ControllerBase
         {
             bodyId = (int)(systemAddress >> 55);
             systemAddress &= (1 << 55) - 1;
+        }
+
+        if (Request.Method == "HEAD")
+        {
+            brief = true;
         }
 
         var bodies = await Service.GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
@@ -312,6 +327,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies/{systemAddress:long}")]
+    [HttpHead("bodies/{systemAddress:long}")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesSysAddrAsync(
             [FromQuery] string? bodyName,
@@ -354,6 +370,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies/{systemAddress:long}/{bodyId:int}")]
+    [HttpHead("bodies/{systemAddress:long}/{bodyId:int}")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesSysAddrBodyIdAsync(
             [FromQuery] string? bodyName,
@@ -397,6 +414,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies/{systemAddress:long}/{bodyName}")]
+    [HttpHead("bodies/{systemAddress:long}/{bodyName}")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesSysAddrBodyNameAsync(
             [FromRoute] string? bodyName,
@@ -440,6 +458,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies/{systemName}/{bodyId:int}")]
+    [HttpHead("bodies/{systemName}/{bodyId:int}")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesSysNameBodyIdAsync(
             [FromQuery] string? bodyName,
@@ -483,6 +502,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies/{systemName}/{bodyName}")]
+    [HttpHead("bodies/{systemName}/{bodyName}")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesSysNameBodyNameAsync(
             [FromRoute] string? bodyName,
@@ -526,6 +546,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("bodies/{bodyName}")]
+    [HttpHead("bodies/{bodyName}")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesBodyNameAsync(
             [FromRoute] string? bodyName,
@@ -574,6 +595,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched body entries</returns>
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("bodies.php")]
+    [HttpHead("bodies.php")]
     [ProducesResponseType<List<BodyData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<BodyData>>> GetBodiesV1Async(
             [FromQuery] string? bodyName,
@@ -617,6 +639,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("stations")]
+    [HttpHead("stations")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetStationsAsync(
             [FromQuery] string? stationName,
@@ -628,6 +651,11 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] DateTimeOffset? maxDate = null
         )
     {
+        if (Request.Method == "HEAD")
+        {
+            brief = true;
+        }
+
         var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         stations = [..
@@ -673,6 +701,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("stations/{marketId:long}")]
+    [HttpHead("stations/{marketId:long}")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetStationsMarketIdAsync(
             [FromQuery] string? stationName,
@@ -710,6 +739,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("stations/{stationName}")]
+    [HttpHead("stations/{stationName}")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetStationsStationNameAsync(
             [FromRoute] string? stationName,
@@ -751,6 +781,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("marketstations.php")]
+    [HttpHead("marketstations.php")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetMarketStationsV1Async(
             [FromQuery] string? stationName,
@@ -792,6 +823,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("stations.php")]
+    [HttpHead("stations.php")]
     [ProducesResponseType<List<OldStationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<OldStationData>>> GetStationsV1Async(
             [FromQuery] string? stationName,
@@ -803,6 +835,11 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] DateTimeOffset? maxDate = null
         )
     {
+        if (Request.Method == "HEAD")
+        {
+            brief = true;
+        }
+
         var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         return Ok(
@@ -836,6 +873,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>EDDN Event JSON</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("events/{filename}/{lineno}")]
+    [HttpHead("events/{filename}/{lineno}")]
     [ProducesResponseType<EDDNEvent>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EDDNEvent>> ExtractLineAsync(string filename, int lineno)
@@ -857,6 +895,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>EDDN Event JSON</returns>
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("extract.php")]
+    [HttpHead("extract.php")]
     [ProducesResponseType<EDDNEvent>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EDDNEvent>> ExtractLineV1Async([FromQuery] string filename, [FromQuery] int lineno)
@@ -867,6 +906,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>List of sector names</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("sectors")]
+    [HttpHead("sectors")]
     [ProducesResponseType<List<string>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<List<string>>> GetSectorNamesAsync([FromQuery] bool includeSphereSectors)
@@ -886,6 +926,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>List of systems</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("sectors/{sectorName}")]
+    [HttpHead("sectors/{sectorName}")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
     public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
@@ -912,6 +953,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>List of systems</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("sectors/{sectorName}/{boxelName}")]
+    [HttpHead("sectors/{sectorName}/{boxelName}")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
     public async IAsyncEnumerable<SectorSystem> GetSectorSystemsAsync(
             string sectorName,
@@ -941,6 +983,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>List of systems</returns>
     [ApiExplorerSettings(GroupName = "v1")]
     [HttpGet("regions.php")]
+    [HttpHead("regions.php")]
     [ProducesResponseType<List<SectorSystem>>(StatusCodes.Status200OK)]
     public async IAsyncEnumerable<SectorSystem> GetSectorSystemsV1Async(
             [FromQuery(Name = "regionName")] string sectorName,
@@ -967,6 +1010,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>List of gap systems</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("gapsystems/{sectorName}")]
+    [HttpHead("gapsystems/{sectorName}")]
     [ProducesResponseType<List<SystemGapData>>(StatusCodes.Status200OK)]
     public async IAsyncEnumerable<SystemGapData> GetGapSystemsAsync(
             string sectorName
@@ -989,6 +1033,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <returns>List of gap systems</returns>
     [ApiExplorerSettings(GroupName = "v2")]
     [HttpGet("gapsystems/{sectorName}/{boxelName}")]
+    [HttpHead("gapsystems/{sectorName}/{boxelName}")]
     [ProducesResponseType<List<SystemGapData>>(StatusCodes.Status200OK)]
     public async IAsyncEnumerable<SystemGapData> GetGapSystemsAsync(
             string sectorName,
