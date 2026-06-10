@@ -750,7 +750,6 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <param name="maxDate">End of date range for matches</param>
     /// <returns>Matched station entries</returns>
     [ApiExplorerSettings(GroupName = "v1")]
-    [HttpGet("stations.php")]
     [HttpGet("marketstations.php")]
     [ProducesResponseType<List<StationData>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<List<StationData>>> GetMarketStationsV1Async(
@@ -763,6 +762,65 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] DateTimeOffset? maxDate = null
         )
         => await GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate);
+
+    /// <summary>Lookup stations</summary>
+    /// <remarks>
+    /// Returns stations matching all of the given parameters.
+    ///
+    /// At least one of the following parameters must be provided:
+    /// * `stationName`
+    /// * `marketId`
+    ///
+    /// The following parameters filter stations:
+    /// * `stationName`
+    /// * `marketId`
+    /// * `includeRejected`
+    ///
+    /// The following parameters filter matches:
+    /// * `brief`
+    /// * `limitMatches`
+    /// * `minDate`
+    /// * `maxDate`
+    /// </remarks>
+    /// <param name="stationName">Name of the station to search for</param>
+    /// <param name="marketId">Market ID of the station to search for</param>
+    /// <param name="includeRejected">Set includeRejected to include items marked as rejected</param>
+    /// <param name="brief">Set brief to only return station and system information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>Matched station entries</returns>
+    [ApiExplorerSettings(GroupName = "v1")]
+    [HttpGet("stations.php")]
+    [ProducesResponseType<List<OldStationData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<OldStationData>>> GetStationsV1Async(
+            [FromQuery] string? stationName,
+            [FromQuery] long? marketId,
+            [FromQuery] bool includeRejected = false,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = 100,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+    {
+        var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+
+        return Ok(
+            stations.Select(e => OldStationData.From(e with
+            {
+                Matches = e.Matches is null
+                        ? null
+                        : [..
+                            e.Matches.Select(m => m with
+                            {
+                                Extract = GetExtractUrl(m.FileName, m.LineNo)
+                            })
+                        ]
+            }))
+            .OrderByDescending(e => e.LastSeen)
+            .ToList()
+        );
+    }
 
     private string? GetExtractUrl(string filename, int lineno)
     {
