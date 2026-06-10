@@ -202,6 +202,12 @@ public class EddnLookupService(
         }
 
         List<long> sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
+        long? modsysaddr = Models.SystemInfo.SystemAddressToModSystemAddress(systemAddress);
+
+        if ((modsysaddr == null && systemAddress != null) || (sysNameIds.Count == 0 && systemName != null))
+        {
+            return null;
+        }
 
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
@@ -212,7 +218,7 @@ public class EddnLookupService(
             query = query.Where(e => e.SystemNameId != null && sysNameIds.Contains(e.SystemNameId.Value));
         }
 
-        if (Models.SystemInfo.SystemAddressToModSystemAddress(systemAddress) is long modsysaddr)
+        if (modsysaddr != null)
         {
             query = query.Where(e => e.ModSystemAddress == modsysaddr);
         }
