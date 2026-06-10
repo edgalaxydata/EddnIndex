@@ -29,11 +29,7 @@ builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(
     opts =>
     {
         opts.ConfigureDB(builder.Configuration.GetSection("Database"));
-
-        if (builder.Environment.IsDevelopment())
-        {
-            opts.EnableSensitiveDataLogging(true);
-        }
+        opts.EnableSensitiveDataLogging(true);
     }
 );
 builder.Services.Configure<EddnLookupServiceSettings>(builder.Configuration.GetSection("APIService"));
