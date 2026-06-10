@@ -4,6 +4,7 @@ using System.Reflection;
 using EddnIndexLookup.Options;
 using Scalar.AspNetCore;
 using EddnIndexLookup.Conventions;
+using EddnIndexLookup.Swagger;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +49,7 @@ builder.Services.AddSwaggerGen(options =>
 
     options.UseAllOfForInheritance();
     options.UseOneOfForPolymorphism();
+    options.DocumentFilter<HideHeadOperationsDocumentFilter>();
 
     options.SwaggerDoc("v1", new Microsoft.OpenApi.OpenApiInfo
     {
