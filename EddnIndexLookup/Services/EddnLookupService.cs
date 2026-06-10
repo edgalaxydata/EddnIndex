@@ -411,7 +411,6 @@ public class EddnLookupService(
                 var name = (sysname, bodyNameId) switch
                 {
                     (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
-                    (not null, < 0) when bodyDesigsById.TryGetValue(-bodyNameId, out var bd) => sysname + bd.Designation,
                     (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => sysname + bd.Designation,
                     _ => null
                 };
@@ -421,8 +420,7 @@ public class EddnLookupService(
                     ? (null, null)
                     : (desigSysName, bodyDesigId) switch
                     {
-                        (_, > 0) when bodyNames.TryGetValue(bodyDesigId, out var bn) => (bn.Name, null),
-                        (not null, < 0) when bodyDesigsById.TryGetValue(-bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
+                        (not null, > 0) when bodyDesigsById.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
                         (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyDesigId, out var bd) => (desigSysName + bd.Designation, bd.DesignationType.ToString()),
                         _ => (null, null)
                     };
