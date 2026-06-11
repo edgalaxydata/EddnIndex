@@ -105,7 +105,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
         {
             m.ToTable("FileLineBodies");
             m.HasKey(e => new { e.FileId, e.LineNo, e.EntryNum });
-            m.HasIndex(e => e.BodyId);
+            m.HasIndex(e => new { e.BodyId, e.GatewayTimestamp });
             m.HasOne(e => e.Body).WithMany().HasForeignKey(e => e.BodyId).HasPrincipalKey(e => e.Id);
             m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
@@ -114,8 +114,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
         {
             m.ToTable("FileLineBodySignals");
             m.HasKey(e => new { e.FileId, e.LineNo, e.EntryNum });
-            m.HasIndex(e => e.BodyId);
-            m.HasIndex(e => e.BodySignalId);
+            m.HasIndex(e => new { e.BodyId, e.GatewayTimestamp });
+            m.HasIndex(e => new { e.BodySignalId, e.GatewayTimestamp });
             m.Property(e => e.Latitude).HasPrecision(9, 6);
             m.Property(e => e.Longitude).HasPrecision(9, 6);
             m.Property(e => e.GatewayTimestamp).HasPrecision(6);
@@ -127,7 +127,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
         {
             m.ToTable("FileLineInfo");
             m.HasKey(e => new { e.FileId, e.LineNo });
-            m.HasIndex(e => e.SystemId);
+            m.HasIndex(e => new { e.SystemId, e.GatewayTimestamp });
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.Software).WithMany().HasForeignKey(e => e.SoftwareId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.GameVersion).WithMany().HasForeignKey(e => e.GameVersionId).HasPrincipalKey(e => e.Id);
@@ -139,7 +139,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
         {
             m.ToTable("FileLineNavRoutes");
             m.HasKey(e => new { e.FileId, e.LineNo, e.EntryNum });
-            m.HasIndex(e => e.SystemId);
+            m.HasIndex(e => new { e.SystemId, e.GatewayTimestamp });
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
             m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
@@ -148,8 +148,8 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
         {
             m.ToTable("FileLineSignals");
             m.HasKey(e => new { e.FileId, e.LineNo });
-            m.HasIndex(e => e.SignalSetId);
-            m.HasIndex(e => e.SystemId);
+            m.HasIndex(e => new { e.SignalSetId, e.GatewayTimestamp });
+            m.HasIndex(e => new { e.SystemId, e.GatewayTimestamp });
             m.HasOne(e => e.SignalInfoSet).WithMany().HasForeignKey(e => e.SignalSetId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
             m.Property(e => e.GatewayTimestamp).HasPrecision(6);
@@ -159,7 +159,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
         {
             m.ToTable("FileLineStations");
             m.HasKey(e => new { e.FileId, e.LineNo });
-            m.HasIndex(e => e.StationId);
+            m.HasIndex(e => new { e.StationId, e.GatewayTimestamp });
             m.HasOne(e => e.Station).WithMany().HasForeignKey(e => e.StationId).HasPrincipalKey(e => e.Id);
             m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });

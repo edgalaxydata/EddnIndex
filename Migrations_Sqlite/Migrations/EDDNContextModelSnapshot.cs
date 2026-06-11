@@ -15,9 +15,64 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.8");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.8");
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.Body", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.BodyDesignation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("BarycentreLength")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ClusterNum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CometNum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Designation")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DesignationId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("DesignationType")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("Moon1Num")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Moon2Num")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("Moon3Num")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PlanetNum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RingNum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("StarNum")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("StellarBarycentreLength")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Designation");
+
+                    b.ToTable("BodyDesignations", (string)null);
+                });
+
+            modelBuilder.Entity("EddnIndexUpdate.Models.BodyInfo", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -86,61 +141,6 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.HasIndex("BodyNameId", "SystemId", "ParentSetId");
 
                     b.ToTable("Bodies", (string)null);
-                });
-
-            modelBuilder.Entity("EddnIndexUpdate.Models.BodyDesignation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("BarycentreLength")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("ClusterNum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("CometNum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Designation")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("DesignationId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("DesignationType")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("Moon1Num")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("Moon2Num")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("Moon3Num")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("PlanetNum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("RingNum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("StarNum")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int?>("StellarBarycentreLength")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Designation");
-
-                    b.ToTable("BodyDesignations", (string)null);
                 });
 
             modelBuilder.Entity("EddnIndexUpdate.Models.BodyName", b =>
@@ -271,7 +271,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("BodySignalInfo", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.File", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.FileInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -370,7 +370,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
-                    b.HasIndex("BodyId");
+                    b.HasIndex("BodyId", "GatewayTimestamp");
 
                     b.ToTable("FileLineBodies", (string)null);
                 });
@@ -406,9 +406,9 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
-                    b.HasIndex("BodyId");
+                    b.HasIndex("BodyId", "GatewayTimestamp");
 
-                    b.HasIndex("BodySignalId");
+                    b.HasIndex("BodySignalId", "GatewayTimestamp");
 
                     b.ToTable("FileLineBodySignals", (string)null);
                 });
@@ -473,7 +473,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasIndex("SoftwareId");
 
-                    b.HasIndex("SystemId");
+                    b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineInfo", (string)null);
                 });
@@ -498,7 +498,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
-                    b.HasIndex("SystemId");
+                    b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineNavRoutes", (string)null);
                 });
@@ -523,9 +523,9 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasKey("FileId", "LineNo");
 
-                    b.HasIndex("SignalSetId");
+                    b.HasIndex("SignalSetId", "GatewayTimestamp");
 
-                    b.HasIndex("SystemId");
+                    b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineSignals", (string)null);
                 });
@@ -553,7 +553,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasKey("FileId", "LineNo");
 
-                    b.HasIndex("StationId");
+                    b.HasIndex("StationId", "GatewayTimestamp");
 
                     b.ToTable("FileLineStations", (string)null);
                 });
@@ -887,7 +887,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("Software", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.Station", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.StationInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -952,7 +952,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("Stations", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.System", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.SystemInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1096,13 +1096,13 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("SystemNameOverrides", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.Body", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.BodyInfo", b =>
                 {
                     b.HasOne("EddnIndexUpdate.Models.ParentSet", "ParentSet")
                         .WithMany()
                         .HasForeignKey("ParentSetId");
 
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1113,7 +1113,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Navigation("System");
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.File", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.FileInfo", b =>
                 {
                     b.HasOne("EddnIndexUpdate.Models.SchemaEventInfo", "PrimarySchemaEvent")
                         .WithMany()
@@ -1124,7 +1124,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineBody", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.Body", "Body")
+                    b.HasOne("EddnIndexUpdate.Models.BodyInfo", "Body")
                         .WithMany()
                         .HasForeignKey("BodyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1135,7 +1135,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineBodySignal", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.Body", "Body")
+                    b.HasOne("EddnIndexUpdate.Models.BodyInfo", "Body")
                         .WithMany()
                         .HasForeignKey("BodyId");
 
@@ -1164,7 +1164,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .WithMany()
                         .HasForeignKey("SoftwareId");
 
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId");
 
@@ -1179,7 +1179,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineNavRoute", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1196,7 +1196,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId");
 
@@ -1207,7 +1207,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineStation", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.Station", "Station")
+                    b.HasOne("EddnIndexUpdate.Models.StationInfo", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Cascade)

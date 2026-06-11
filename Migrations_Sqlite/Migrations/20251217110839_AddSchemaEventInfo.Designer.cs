@@ -20,7 +20,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "9.0.8");
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.Body", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.BodyInfo", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -274,7 +274,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("BodySignalInfo", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.File", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.FileInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -875,7 +875,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("Software", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.Station", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.StationInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -940,7 +940,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("Stations", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.System", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.SystemInfo", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -1084,13 +1084,13 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("SystemNameOverrides", (string)null);
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.Body", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.BodyInfo", b =>
                 {
                     b.HasOne("EddnIndexUpdate.Models.ParentSet", "ParentSet")
                         .WithMany()
                         .HasForeignKey("ParentSetId");
 
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1101,7 +1101,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Navigation("System");
                 });
 
-            modelBuilder.Entity("EddnIndexUpdate.Models.File", b =>
+            modelBuilder.Entity("EddnIndexUpdate.Models.FileInfo", b =>
                 {
                     b.HasOne("EddnIndexUpdate.Models.SchemaEventInfo", "PrimarySchemaEvent")
                         .WithMany()
@@ -1112,7 +1112,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineBody", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.Body", "Body")
+                    b.HasOne("EddnIndexUpdate.Models.BodyInfo", "Body")
                         .WithMany()
                         .HasForeignKey("BodyId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1123,7 +1123,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineBodySignal", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.Body", "Body")
+                    b.HasOne("EddnIndexUpdate.Models.BodyInfo", "Body")
                         .WithMany()
                         .HasForeignKey("BodyId");
 
@@ -1152,7 +1152,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .WithMany()
                         .HasForeignKey("SoftwareId");
 
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId");
 
@@ -1167,7 +1167,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineNavRoute", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -1184,7 +1184,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("EddnIndexUpdate.Models.System", "System")
+                    b.HasOne("EddnIndexUpdate.Models.SystemInfo", "System")
                         .WithMany()
                         .HasForeignKey("SystemId");
 
@@ -1195,7 +1195,7 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
             modelBuilder.Entity("EddnIndexUpdate.Models.FileLineStation", b =>
                 {
-                    b.HasOne("EddnIndexUpdate.Models.Station", "Station")
+                    b.HasOne("EddnIndexUpdate.Models.StationInfo", "Station")
                         .WithMany()
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Cascade)

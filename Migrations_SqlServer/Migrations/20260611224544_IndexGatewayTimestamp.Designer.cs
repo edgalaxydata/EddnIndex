@@ -12,18 +12,76 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 {
     [DbContext(typeof(EDDNContext))]
-    [Migration("20251217110827_AddSchemaEventInfo")]
-    partial class AddSchemaEventInfo
+    [Migration("20260611224544_IndexGatewayTimestamp")]
+    partial class IndexGatewayTimestamp
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.8")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("EddnIndexUpdate.Models.BodyDesignation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("BarycentreLength")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ClusterNum")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("CometNum")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Designation")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<int?>("DesignationId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DesignationType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int?>("Moon1Num")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Moon2Num")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("Moon3Num")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PlanetNum")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RingNum")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StarNum")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("StellarBarycentreLength")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Designation");
+
+                    b.ToTable("BodyDesignations", (string)null);
+                });
 
             modelBuilder.Entity("EddnIndexUpdate.Models.BodyInfo", b =>
                 {
@@ -96,64 +154,6 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.HasIndex("BodyNameId", "SystemId", "ParentSetId");
 
                     b.ToTable("Bodies", (string)null);
-                });
-
-            modelBuilder.Entity("EddnIndexUpdate.Models.BodyDesignation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("BarycentreLength")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("ClusterNum")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("CometNum")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Designation")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
-
-                    b.Property<int?>("DesignationId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DesignationType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<int?>("Moon1Num")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("Moon2Num")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("Moon3Num")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("PlanetNum")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("RingNum")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("StarNum")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("StellarBarycentreLength")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Designation");
-
-                    b.ToTable("BodyDesignations", (string)null);
                 });
 
             modelBuilder.Entity("EddnIndexUpdate.Models.BodyName", b =>
@@ -391,7 +391,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
-                    b.HasIndex("BodyId");
+                    b.HasIndex("BodyId", "GatewayTimestamp");
 
                     b.ToTable("FileLineBodies", (string)null);
                 });
@@ -427,9 +427,9 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
-                    b.HasIndex("BodyId");
+                    b.HasIndex("BodyId", "GatewayTimestamp");
 
-                    b.HasIndex("BodySignalId");
+                    b.HasIndex("BodySignalId", "GatewayTimestamp");
 
                     b.ToTable("FileLineBodySignals", (string)null);
                 });
@@ -442,6 +442,9 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<int>("LineNo")
                         .HasColumnType("int");
 
+                    b.Property<int?>("BodySignalCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("GameVersionId")
                         .HasColumnType("int");
 
@@ -449,16 +452,28 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .HasPrecision(6)
                         .HasColumnType("datetime2(6)");
 
+                    b.Property<bool?>("HasBody")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("HasStation")
+                        .HasColumnType("bit");
+
                     b.Property<bool?>("IsBad")
                         .HasColumnType("bit");
 
                     b.Property<int>("LineLength")
                         .HasColumnType("int");
 
+                    b.Property<int?>("NavRouteSystemCount")
+                        .HasColumnType("int");
+
                     b.Property<int?>("ProcessedVersion")
                         .HasColumnType("int");
 
                     b.Property<int?>("SchemaEventId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SignalCount")
                         .HasColumnType("int");
 
                     b.Property<int?>("SoftwareId")
@@ -479,7 +494,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasIndex("SoftwareId");
 
-                    b.HasIndex("SystemId");
+                    b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineInfo", (string)null);
                 });
@@ -504,7 +519,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
-                    b.HasIndex("SystemId");
+                    b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineNavRoutes", (string)null);
                 });
@@ -529,9 +544,9 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo");
 
-                    b.HasIndex("SignalSetId");
+                    b.HasIndex("SignalSetId", "GatewayTimestamp");
 
-                    b.HasIndex("SystemId");
+                    b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineSignals", (string)null);
                 });
@@ -559,7 +574,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo");
 
-                    b.HasIndex("StationId");
+                    b.HasIndex("StationId", "GatewayTimestamp");
 
                     b.ToTable("FileLineStations", (string)null);
                 });

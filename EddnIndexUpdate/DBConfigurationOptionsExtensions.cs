@@ -26,7 +26,7 @@ public static class DBConfigurationOptionsExtensions
         {
             csb = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder();
         }
-        else if (provider == "mssql" || provider == null)
+        else if (provider == "mssql" || provider == "sqlserver" || provider == null)
         {
             csb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder();
         }
