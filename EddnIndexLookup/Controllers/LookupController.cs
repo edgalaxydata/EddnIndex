@@ -1,12 +1,14 @@
 ﻿using EddnIndexLookup.DTO;
 using EddnIndexLookup.Filters;
 using EddnIndexLookup.Services;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexLookup.Controllers;
 
 /// <inheritdoc/>
+[EnableCors]
 [Route("")]
 [ApiController]
 public class LookupController(EddnLookupService service) : ControllerBase

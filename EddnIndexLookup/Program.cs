@@ -68,6 +68,15 @@ builder.Services.AddSwaggerGen(options =>
     options.IncludeXmlComments(Assembly.GetExecutingAssembly());
 });
 
+builder.Services.AddCors(opts =>
+{
+    opts.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin();
+        policy.WithMethods("GET");
+    });
+});
+
 builder.Services.PostConfigure<ForwardedHeadersOptions>(opts =>
 {
     var fwdhdrs = builder.Configuration.GetSection("ForwardedHeaders");
@@ -124,6 +133,8 @@ app.MapScalarApiReference(opts =>
 });
 
 app.UseHttpsRedirection();
+
+app.UseCors();
 
 app.UseAuthorization();
 
