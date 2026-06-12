@@ -159,35 +159,18 @@ namespace EddnIndexLookup.Filters
         /// <inheritdoc/>
         public int Compare(IBodyData? x, IBodyData? y)
         {
-            if (x?.Designation == y?.Designation)
+            return (x?.Designation?.StartsWith(SystemName), y?.Designation?.StartsWith(SystemName), x?.BodyDesignation, y?.BodyDesignation) switch
             {
-                return 0;
-            }
-
-            switch (x?.Designation?.StartsWith(SystemName), y?.Designation?.StartsWith(SystemName))
-            {
-                case (null, null):
-                    return 0;
-                case (null, _):
-                    return 1;
-                case (_, null):
-                    return -1;
-                case (false, false):
-                    return x.Designation.CompareTo(y.Designation);
-                case (false, _):
-                    return 1;
-                case (_, false):
-                    return -1;
-            }
-
-            switch (x.BodyDesignation, y.BodyDesignation)
-            {
-                case (null, _):
-                case (_, null):
-                    return x.Designation.CompareTo(y.Designation);
-            }
-
-            return Compare(x.BodyDesignation, y.BodyDesignation);
+                (null, null, _, _) => 0,
+                (null, not null, _, _) => 1,
+                (not null, null, _, _) => -1,
+                (not null, not null, _, _) when (x.Designation == y.Designation) => 0,
+                (false, false, _, _) => x.Designation.CompareTo(y.Designation),
+                (false, _, _, _) => 1,
+                (_, false, _, _) => -1,
+                (_, _, null, _) or (_, _, _, null) => x.Designation.CompareTo(y.Designation),
+                _ => Compare(x.BodyDesignation, y.BodyDesignation)
+            };
         }
     }
 }
