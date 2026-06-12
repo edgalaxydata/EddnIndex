@@ -193,23 +193,17 @@ public partial class FileProcessor
                 {
                     if (JsonConvert.DeserializeObject<Models.BodyNameOverride>(line) is { } ent)
                     {
-                        if (!string.IsNullOrWhiteSpace(ent.SinceVersion) && GameVersionDates.TryGetValue(ent.SinceVersion, out var ver))
+                        ent = ent with
                         {
-                            ent = ent with { ValidFrom = ver.UpdateTime };
-                        }
-                        else
-                        {
-                            ent = ent with { ValidFrom = new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc) };
-                        }
-
-                        if (!string.IsNullOrWhiteSpace(ent.UntilVersion) && GameVersionDates.TryGetValue(ent.UntilVersion, out ver))
-                        {
-                            ent = ent with { ValidTo = ver.UpdateTime };
-                        }
-                        else
-                        {
-                            ent = ent with { ValidTo = DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc) };
-                        }
+                            ValidFrom = string.IsNullOrWhiteSpace(ent.SinceVersion)
+                                     || !GameVersionDates.TryGetValue(ent.SinceVersion, out var ver)
+                                      ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                                      : ver.UpdateTime,
+                            ValidTo   = string.IsNullOrWhiteSpace(ent.UntilVersion)
+                                     || !GameVersionDates.TryGetValue(ent.UntilVersion, out ver)
+                                      ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+                                      : ver.UpdateTime
+                        };
 
                         if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                         {
@@ -278,7 +272,6 @@ public partial class FileProcessor
     private void DownloadBodyNameOverrides(string filename)
     {
         var settings = Settings.BodyOverridesCsv;
-        var fields = settings.Fields;
 
         var byName = new Dictionary<string, List<Models.BodyNameOverride>>();
 
@@ -300,14 +293,11 @@ public partial class FileProcessor
             {
                 using var writer = new StreamWriter(outfile, new UTF8Encoding(false));
 
-                foreach (var overrides in byName.Values)
+                foreach (var overrides in byName.Values.Where(e => e.Any(o => o.BodyName != o.BodyDesignation)))
                 {
-                    if (overrides.Any(o => o.BodyName != o.BodyDesignation))
+                    foreach (var ent in overrides)
                     {
-                        foreach (var ent in overrides)
-                        {
-                            writer.WriteLine(JsonConvert.SerializeObject(ent, Formatting.None));
-                        }
+                        writer.WriteLine(JsonConvert.SerializeObject(ent, Formatting.None));
                     }
                 }
             }
@@ -344,7 +334,7 @@ public partial class FileProcessor
                     bodyType = isStar switch
                     {
                         "Y" => BodyType.Star,
-                        "R" when bodyDesig.EndsWith(" Belt") == true => BodyType.StellarRing,
+                        "R" when bodyDesig.EndsWith(" Belt") => BodyType.StellarRing,
                         "R" => BodyType.PlanetaryRing,
                         "N" => BodyType.Planet,
                         "BC" => BodyType.AsteroidCluster,

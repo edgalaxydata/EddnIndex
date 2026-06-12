@@ -22,23 +22,11 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
     public SystemInfo? System { get; set; }
     public ParentSet? ParentSet { get; set; }
 
-    public int? SysName_SectorId
-    {
-        get => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
-        private set;
-    }
+    public int? SysName_SectorId => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
 
-    public int? SysName_SectorAddress
-    {
-        get => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
-        private set;
-    }
+    public int? SysName_SectorAddress => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
 
-    public string? SysName_PGSuffix
-    {
-        get => Models.SystemInfo.GetPGSuffix(SystemNameId);
-        private set;
-    }
+    public string? SysName_PGSuffix => SystemInfo.GetPGSuffix(SystemNameId);
 
     public virtual bool Equals(BodyInfo? other)
     {

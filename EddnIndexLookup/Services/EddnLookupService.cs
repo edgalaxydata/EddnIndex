@@ -1586,7 +1586,7 @@ public class EddnLookupService(
                 var minAddr = ((long)sectorAddress << 40) + boxelid;
                 var maxAddr = minAddr + range;
 
-                await foreach (var system in query.Where(e => e.ModSystemAddress >= minId && e.ModSystemAddress <= maxId && e.ModSystemAddress != e.SystemNameId).AsAsyncEnumerable())
+                await foreach (var system in query.Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= maxAddr && e.ModSystemAddress != e.SystemNameId).AsAsyncEnumerable())
                 {
                     if (FillSystem<SectorSystem>(system, systemNames, sectorsById, sectorsByAddr) is { } entry)
                     {
@@ -1879,15 +1879,11 @@ public class EddnLookupService(
 
         foreach (var (name, path) in Settings.DumpDirs)
         {
-            long size = 0;
-            int filecount = 0;
-
-            foreach (var file in Directory.EnumerateFiles(path))
-            {
-                var info = new FileInfo(file);
-                size += info.Length;
-                filecount++;
-            }
+            var (size, filecount) =
+                Directory
+                    .EnumerateFiles(path, "*", SearchOption.AllDirectories)
+                    .Select(e => new FileInfo(e))
+                    .Aggregate((size: 0L, filecount: 0), (a, e) => (a.size + e.Length, a.filecount + 1));
 
             dirusages[name] = new DumpDirectoryUsage
             {

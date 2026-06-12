@@ -236,11 +236,11 @@ public partial class FileProcessor(
             Stations[(stationName, marketId, stationType, systemName, systemAddress, bodyName)] = stnlist = [];
         }
 
-        foreach (var stn in stnlist)
+        if (stnlist.FirstOrDefault(e => e.Latitude > latitude - 0.001m
+                                     && e.Latitude < latitude + 0.001m
+                                     && e.Longitude > longitude - 0.001m
+                                     && e.Longitude < longitude + 0.001m) is { } stn)
         {
-            if (stn.Latitude <= latitude - 0.001m || stn.Latitude >= latitude + 0.001m) continue;
-            if (stn.Longitude <= longitude - 0.001m || stn.Longitude >= longitude + 0.001m) continue;
-
             return stn;
         }
 
@@ -503,7 +503,6 @@ public partial class FileProcessor(
             using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
             using var memStream = new MemoryStream();
             var bz2stream = new BZip2OutputStream(memStream, true);
-            var segments = new List<(byte[] buffer, ReadOnlyMemory<byte> memory)>();
             Span<byte> idxspan = stackalloc byte[8];
             BinaryPrimitives.WriteInt64LittleEndian(idxspan, 0);
             rawFileIndexStream.Write(idxspan);
@@ -542,8 +541,6 @@ public partial class FileProcessor(
 
                     BinaryPrimitives.WriteInt64LittleEndian(idxspan, rawFileStream.Position);
                     rawFileIndexStream.Write(idxspan);
-
-                    segments.Clear();
 
                     Console.Error.Write(".");
                     Console.Error.Flush();
@@ -643,7 +640,7 @@ public partial class FileProcessor(
 
             if (primarySchema?.PrimarySchema != null)
             {
-                primarySchemaEvent = GetOrAddSchemaEvent(primarySchema.PrimarySchema, primarySchema?.EventType ?? eventType);
+                primarySchemaEvent = GetOrAddSchemaEvent(primarySchema.PrimarySchema, primarySchema.EventType ?? eventType);
             }
 
             using var ctx = ContextFactory.CreateDbContext();
@@ -1037,14 +1034,7 @@ public partial class FileProcessor(
     {
         using (var ctx = ContextFactory.CreateDbContext())
         {
-            foreach (var ent in SystemCache.Values)
-            {
-                if (ent.Id <= 0)
-                {
-                    ctx.Add(ent);
-                }
-            }
-
+            ctx.AddRange(SystemCache.Values.Where(e => e.Id <= 0));
             ctx.SaveChanges();
         }
 

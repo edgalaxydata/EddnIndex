@@ -269,19 +269,7 @@ public static class PGSectors
         }
 
         int offset = (pos.Z << 14) + (pos.Y << 7) + pos.X;
-        string? sectorname;
-
-        if (IsC1Sector(offset))
-        {
-            sectorname = GetC1Name(offset);
-        }
-        else
-        {
-            sectorname = GetC2Name(offset);
-        }
-
-        CachedSectorsByCoords[pos] = sectorname;
-        return sectorname;
+        return CachedSectorsByCoords[pos] = IsC1Sector(offset) ? GetC1Name(offset) : GetC2Name(offset);
     }
 
     public static string GetSectorName(int sectorid)

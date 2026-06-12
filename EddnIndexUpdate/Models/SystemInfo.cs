@@ -17,65 +17,25 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
     public DateTime? FirstSeen { get; set; }
     public DateTime? LastSeen { get; set; }
 
-    public int? SectorId
-    {
-        get => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
-        private set;
-    }
+    public int? SectorId => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
 
-    public int? SectorAddress
-    {
-        get => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
-        private set;
-    }
+    public int? SectorAddress => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
 
-    public string? PGSuffix
-    {
-        get => GetPGSuffix(SystemNameId);
-        private set;
-    }
+    public string? PGSuffix => GetPGSuffix(SystemNameId);
 
-    public bool? IsNamedSystem
-    {
-        get => SystemNameId < 0;
-        private set;
-    }
+    public bool? IsNamedSystem=> SystemNameId < 0;
 
-    public bool? IsHASystem
-    {
-        get => SystemNameId >= (1L << 60);
-        private set;
-    }
+    public bool? IsHASystem => SystemNameId >= (1L << 60);
 
-    public long? SystemAddress
-    {
-        get => ModSystemAddressToSystemAddress(ModSystemAddress);
-        private set;
-    }
+    public long? SystemAddress => ModSystemAddressToSystemAddress(ModSystemAddress);
 
-    public string? SysAddr_PGSuffix
-    {
-        get => GetPGSuffix(ModSystemAddress);
-        private set;
-    }
+    public string? SysAddr_PGSuffix => GetPGSuffix(ModSystemAddress);
 
-    public string? NameSysAddr_PGSuffix
-    {
-        get => GetPGSuffix(NameModSystemAddress);
-        private set;
-    }
+    public string? NameSysAddr_PGSuffix => GetPGSuffix(NameModSystemAddress);
 
-    public int? SysAddr_SectorAddress
-    {
-        get => (int?)(ModSystemAddress >> 40);
-        private set;
-    }
+    public int? SysAddr_SectorAddress => (int?)(ModSystemAddress >> 40);
 
-    public int? NameSysAddr_SectorAddress
-    {
-        get => (int?)(NameModSystemAddress >> 40);
-        private set;
-    }
+    public int? NameSysAddr_SectorAddress => (int?)(NameModSystemAddress >> 40);
 
     public virtual bool Equals(SystemInfo? other)
     {
@@ -111,7 +71,7 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
             (char)(((mid / (26 * 26)) % 26) + 'A'),
             ' ',
             (char)(masscode + 'a'),
-            mid >= 26 * 26 * 26 ? (mid / (26 * 26 * 26)).ToString() + "-" : "",
+            mid >= 26 * 26 * 26 ? $"{mid / (26 * 26 * 26)}-" : "",
             includeN2 ? n2.ToString() : ""
         );
     }

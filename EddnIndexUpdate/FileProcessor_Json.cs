@@ -153,12 +153,9 @@ public partial class FileProcessor
                 itemnum++;
             }
 
-            if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3)
+            if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3 && name != null)
             {
-                if (name != null)
-                {
-                    data.Signals[itemnum] = GetOrAddSignal(name, type, isStation);
-                }
+                data.Signals[itemnum] = GetOrAddSignal(name, type, isStation);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -204,12 +201,9 @@ public partial class FileProcessor
                 itemnum++;
             }
 
-            if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3)
+            if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3 && type != null)
             {
-                if (type != null)
-                {
-                    data.BodySignals[itemnum] = GetOrAddBodySignal(type, count);
-                }
+                data.BodySignals[itemnum] = GetOrAddBodySignal(type, count);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -252,12 +246,9 @@ public partial class FileProcessor
                 itemnum++;
             }
 
-            if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3)
+            if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3 && ringName != null)
             {
-                if (ringName != null)
-                {
-                    data.RingData[itemnum] = (ringName, innerRadius, outerRadius);
-                }
+                data.RingData[itemnum] = (ringName, innerRadius, outerRadius);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -481,13 +472,15 @@ public partial class FileProcessor
                 data.SubBodies[itemnum] = GetOrAddBody(name, systemName, null, null, null, 0, 0, (innerRad + outerRad) / 2, data.Timestamp, data.GameVersion, system);
             }
         }
-        else if (bodyName != null)
+        else
         {
-            Fail("Body Name without System Name");
-        }
-        else if (stationName != null)
-        {
-            if (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials_capi/1") != true
+            if (bodyName != null)
+            {
+                Fail("Body Name without System Name");
+            }
+
+            if (stationName != null
+                && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials_capi/1") != true
                 && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials/1") != true
                 && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/dockingdenied/1") != true
                 && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/dockinggranted/1") != true

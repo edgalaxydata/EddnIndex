@@ -405,7 +405,7 @@ public partial class FileProcessor
             var parentEntry = parentJson[1..^1];
             string? parentParentJson = null;
 
-            if (parentJson?.Contains("},") == true)
+            if (parentJson.Contains("},") == true)
             {
                 var parentIndex = parentJson.IndexOf("},") + 2;
                 parentParentJson = "[" + parentJson[parentIndex..].Trim();
