@@ -126,18 +126,18 @@ public record class MatchEntry
     /// <summary>
     /// Internal System Id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public int? SystemId { get; init; }
 
     /// <summary>
     /// Internal Body Id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public long? BodyId { get; init; }
 
     /// <summary>
     /// Internal Station Id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public int? StationId { get; init; }
 }

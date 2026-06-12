@@ -98,6 +98,6 @@ public record class StationData : IMatchedItem
     [DataMember(Name = "Matches")]
     public List<MatchEntry>? Matches { get; init; }
 
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     internal int Id { get; init; }
 }

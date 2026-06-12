@@ -97,6 +97,6 @@ public record class SystemData : IMatchedItem, ISystemData
     /// <summary>
     /// Internal system id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public int Id { get; init; }
 }

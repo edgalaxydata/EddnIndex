@@ -46,36 +46,36 @@ public class BodySystem : ISystemData
     /// <summary>
     /// Set to true if item details were determined to be invalid
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public bool? IsRejected { get; init; }
 
     /// <summary>
     /// Set if the system was renamed or reassigned; Date from which details are valid
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public DateTime? ValidFrom { get; init; }
 
     /// <summary>
     /// Set if the system was renamed or reassigned; Date until which details were valid
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public DateTime? ValidTo { get; init; }
 
     /// <summary>
     /// GatewayTimestamp when item was first seen with these details
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public DateTime? FirstSeen { get; init; }
 
     /// <summary>
     /// GatewayTimestamp when item was last seen with these details
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public DateTime? LastSeen { get; init; }
 
     /// <summary>
     /// Internal system id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public int Id { get; init; }
 }

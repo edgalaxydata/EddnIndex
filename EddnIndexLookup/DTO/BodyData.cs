@@ -132,18 +132,18 @@ public record class BodyData : IMatchedItem, IBodyData
     /// <summary>
     /// Body designation data
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public BodyDesignation? BodyDesignation { get; init; }
 
     /// <summary>
     /// Internal system id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public int SystemId { get; init; }
 
     /// <summary>
     /// Internal body id
     /// </summary>
-    [IgnoreDataMember]
+    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public long Id { get; init; }
 }
