@@ -1305,7 +1305,10 @@ public class EddnLookupService(
     /// <returns></returns>
     public async Task<string?> ExtractLineAsync(string filename, int lineno, CancellationToken canceltoken)
     {
-        if (Settings.IndexedDir == null || lineno <= 0 || string.IsNullOrWhiteSpace(filename))
+        if (Settings.IndexedDir == null
+            || lineno <= 0
+            || string.IsNullOrWhiteSpace(filename)
+            || filename.ContainsAny(Path.GetInvalidFileNameChars()))
         {
             return null;
         }
@@ -1323,7 +1326,7 @@ public class EddnLookupService(
         {
             file = await ctx.Set<Models.FileInfo>().FirstOrDefaultAsync(e => e.FileName == filename, cancellationToken: canceltoken);
 
-            if (file == null)
+            if (file == null || string.IsNullOrWhiteSpace(file.FileName) || file.FileName.ContainsAny(Path.GetInvalidFileNameChars()))
             {
                 return null;
             }

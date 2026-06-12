@@ -14,13 +14,21 @@ public partial class FileProcessor
     private readonly Dictionary<string, Models.GameVersionDate> GameVersionDates = [];
     private readonly Dictionary<string, Models.FilePrefixSchema> SchemasByFilePrefix = [];
 
-    private string BodyOverridesFile => Path.Combine(Settings.BaseDir, Settings.BodyOverridesFile);
+    private string BodyOverridesFile => Path.IsPathRooted(Settings.BodyOverridesFile)
+                                      ? Settings.BodyOverridesFile
+                                      : Path.Combine(Settings.BaseDir, Settings.BodyOverridesFile);
 
-    private string SystemOverridesFile => Path.Combine(Settings.BaseDir, Settings.SystemOverridesFile);
+    private string SystemOverridesFile => Path.IsPathRooted(Settings.SystemOverridesFile)
+                                        ? Settings.SystemOverridesFile
+                                        : Path.Combine(Settings.BaseDir, Settings.SystemOverridesFile);
 
-    private string GameVersionDatesFile => Path.Combine(Settings.BaseDir, Settings.GameVersionDatesFile);
+    private string GameVersionDatesFile => Path.IsPathRooted(Settings.GameVersionDatesFile)
+                                         ? Settings.GameVersionDatesFile
+                                         : Path.Combine(Settings.BaseDir, Settings.GameVersionDatesFile);
 
-    private string MessageTypesFile => Path.Combine(Settings.BaseDir, Settings.MessageTypesFile);
+    private string MessageTypesFile => Path.IsPathRooted(Settings.MessageTypesFile)
+                                     ? Settings.MessageTypesFile
+                                     : Path.Combine(Settings.BaseDir, Settings.MessageTypesFile);
 
     private void Init_Overrides()
     {
