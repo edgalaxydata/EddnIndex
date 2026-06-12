@@ -32,7 +32,7 @@ public record class BodyData : IMatchedItem, IBodyData
     public int? BodyId { get; init; }
 
     /// <summary>
-    /// Parent heirarchy to system's root body
+    /// Parent hierarchy to system's root body
     /// </summary>
     /// <example>[{"Planet":4},{"Star":1},{"Null":0}]</example>
     [DataMember(Name = "Parents")]
