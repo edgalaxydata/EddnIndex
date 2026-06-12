@@ -74,11 +74,11 @@ public partial class FileProcessor(
         }
     }
 
-    private void Init()
+    private async Task InitAsync()
     {
         if (InitComplete) return;
 
-        Init_Overrides();
+        await Init_OverridesAsync();
 
         Init_Systems();
 
@@ -569,9 +569,9 @@ public partial class FileProcessor(
         File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
     }
 
-    public void ProcessFile(string filepath)
+    public async Task ProcessFileAsync(string filepath)
     {
-        Init();
+        await InitAsync();
 
         if (!File.Exists(filepath))
         {

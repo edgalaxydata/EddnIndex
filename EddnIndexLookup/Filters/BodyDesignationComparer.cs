@@ -98,7 +98,7 @@ namespace EddnIndexLookup.Filters
             if (y.DesignationType is EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster
                 && x.DesignationType is not (EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster))
             {
-                return -1;
+                return 1;
             }
 
             if (x.DesignationType is EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster
@@ -126,7 +126,7 @@ namespace EddnIndexLookup.Filters
                         && xnum <= ynum
                         && xnum + x.BarycentreLength >= ynum + (y.DesignationType == bctype ? y.BarycentreLength : 1))
                     {
-                        return - 1;
+                        return -1;
                     }
 
                     if (y.DesignationType == bctype

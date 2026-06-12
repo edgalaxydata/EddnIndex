@@ -345,7 +345,12 @@ public partial class FileProcessor
 
         if (name.StartsWith(systemName) && (name.Contains("Comet") || name.Contains("Belt Cluster")))
         {
-            Debugger.Break();
+            if (Debugger.IsAttached)
+            {
+                Debugger.Break();
+            }
+
+            Logger.LogWarning("Encountered potential anomalous body name parsing case. Name: {BodyName}, SystemName: {SystemName}", name, systemName);
         }
 
         if (BodyNames.TryGetValue(name, out var bodyName))
@@ -631,7 +636,15 @@ public partial class FileProcessor
 
             if (overrides.Count > 1)
             {
-                Debugger.Break();
+                if (Debugger.IsAttached)
+                {
+                    Debugger.Break();
+                }
+
+                Logger.LogWarning(
+                    "Multiple body designation overrides matched. SystemName={SystemName}, BodyId={BodyId}, BodyType={BodyType}, Timestamp={Timestamp}, MatchCount={MatchCount}",
+                    systemName, bodyId, bodyType, timestamp, overrides.Count
+                );
             }
 
             if (overrides is [{ } ovr] && TryGetBodyDesignation(ovr.BodyDesignation, systemName, bodyId, bodyType, argOfPeriapsis, inclination, out var desig))

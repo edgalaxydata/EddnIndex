@@ -512,7 +512,7 @@ public static class PGSectors
     {
         if (fragments[0].IsC1VowelPrefix == fragments[1].IsVowelInfix || fragments[1].IsVowelInfix == fragments[2].IsVowelSuffix)
         {
-            //return ByteXYZ.Invalid;
+            return ByteXYZ.Invalid;
         }
 
         int offset = fragments[2].SuffixIndex;

@@ -109,6 +109,6 @@ foreach (var dirname in dirnames)
 
     foreach (var filename in filenames)
     {
-        processor.ProcessFile(filename);
+        await processor.ProcessFileAsync(filename);
     }
 }
