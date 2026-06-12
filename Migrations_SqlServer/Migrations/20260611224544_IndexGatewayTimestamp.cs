@@ -13,42 +13,42 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineStations_StationId_GatewayTimestamp",
                 table: "FileLineStations",
-                columns: new[] { "StationId", "GatewayTimestamp" });
+                columns: ["StationId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineSignals_SignalSetId_GatewayTimestamp",
                 table: "FileLineSignals",
-                columns: new[] { "SignalSetId", "GatewayTimestamp" });
+                columns: ["SignalSetId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineSignals_SystemId_GatewayTimestamp",
                 table: "FileLineSignals",
-                columns: new[] { "SystemId", "GatewayTimestamp" });
+                columns: ["SystemId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineNavRoutes_SystemId_GatewayTimestamp",
                 table: "FileLineNavRoutes",
-                columns: new[] { "SystemId", "GatewayTimestamp" });
+                columns: ["SystemId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineInfo_SystemId_GatewayTimestamp",
                 table: "FileLineInfo",
-                columns: new[] { "SystemId", "GatewayTimestamp" });
+                columns: ["SystemId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineBodySignals_BodyId_GatewayTimestamp",
                 table: "FileLineBodySignals",
-                columns: new[] { "BodyId", "GatewayTimestamp" });
+                columns: ["BodyId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineBodySignals_BodySignalId_GatewayTimestamp",
                 table: "FileLineBodySignals",
-                columns: new[] { "BodySignalId", "GatewayTimestamp" });
+                columns: ["BodySignalId", "GatewayTimestamp"]);
 
             migrationBuilder.CreateIndex(
                 name: "IX_FileLineBodies_BodyId_GatewayTimestamp",
                 table: "FileLineBodies",
-                columns: new[] { "BodyId", "GatewayTimestamp" });
+                columns: ["BodyId", "GatewayTimestamp"]);
         }
 
         /// <inheritdoc />
