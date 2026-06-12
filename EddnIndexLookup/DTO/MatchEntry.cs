@@ -12,7 +12,7 @@ public record class MatchEntry
     /// EDDN capture filename containing this event
     /// </summary>
     [DataMember(Name = "FileName", IsRequired = true)]
-    public string? FileName { get; init; }
+    public required string FileName { get; init; }
 
     /// <summary>
     /// Line number of this event in the EDDN capture file

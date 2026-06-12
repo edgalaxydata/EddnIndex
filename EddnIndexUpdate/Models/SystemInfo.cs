@@ -20,61 +20,61 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
     public int? SectorId
     {
         get => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
-        set { }
+        private set;
     }
 
     public int? SectorAddress
     {
         get => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
-        set { }
+        private set;
     }
 
     public string? PGSuffix
     {
         get => GetPGSuffix(SystemNameId);
-        set { }
+        private set;
     }
 
     public bool? IsNamedSystem
     {
         get => SystemNameId < 0;
-        set { }
+        private set;
     }
 
     public bool? IsHASystem
     {
         get => SystemNameId >= (1L << 60);
-        set { }
+        private set;
     }
 
     public long? SystemAddress
     {
         get => ModSystemAddressToSystemAddress(ModSystemAddress);
-        set { }
+        private set;
     }
 
     public string? SysAddr_PGSuffix
     {
         get => GetPGSuffix(ModSystemAddress);
-        set { }
+        private set;
     }
 
     public string? NameSysAddr_PGSuffix
     {
         get => GetPGSuffix(NameModSystemAddress);
-        set { }
+        private set;
     }
 
     public int? SysAddr_SectorAddress
     {
         get => (int?)(ModSystemAddress >> 40);
-        set { }
+        private set;
     }
 
     public int? NameSysAddr_SectorAddress
     {
         get => (int?)(NameModSystemAddress >> 40);
-        set { }
+        private set;
     }
 
     public virtual bool Equals(SystemInfo? other)
