@@ -615,13 +615,13 @@ public class EddnLookupService(
             var routeQuery =
                 ctx.Set<Models.FileLineNavRoute>()
                    .Where(e => e.SystemId == sysid)
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileInfo>(),
                         o => o.FileId,
                         i => i.Id,
                         (o, i) => new { RouteEntry = o, File = i }
                     )
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileLineInfo>()
                            .Include(e => e.Software)
                            .Include(e => e.SchemaEvent)
@@ -630,20 +630,20 @@ public class EddnLookupService(
                         i => new { i.FileId, i.LineNo },
                         (o, i) => new { o.File, Info = i, o.RouteEntry }
                    )
-                   .Select(e => new DTO.MatchEntry
+                   .Select(e => new MatchEntry
                    {
-                       FileName = e.File.FileName,
+                       FileName = e.File!.FileName,
                        LineNo = e.RouteEntry.LineNo,
                        EntryNum = e.RouteEntry.EntryNum,
-                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                       Timestamp = e.Info.Timestamp,
+                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info!.Timestamp,
                        GatewayTimestamp = e.RouteEntry.GatewayTimestamp,
                        SystemId = e.RouteEntry.SystemId
                    });
@@ -654,7 +654,7 @@ public class EddnLookupService(
                    .Include(e => e.Software)
                    .Include(e => e.SchemaEvent)
                    .Include(e => e.GameVersion)
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileInfo>(),
                         o => o.FileId,
                         i => i.Id,
@@ -673,9 +673,9 @@ public class EddnLookupService(
                         i => new { i.FileId, i.LineNo },
                         (o, i) => new { o.File, o.Info, o.Body, Station = i }
                    )
-                   .Select(e => new DTO.MatchEntry
+                   .Select(e => new MatchEntry
                    {
-                       FileName = e.File.FileName,
+                       FileName = e.File!.FileName,
                        LineNo = e.Info.LineNo,
                        SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
                        SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
@@ -710,12 +710,14 @@ public class EddnLookupService(
                 query
                     .OrderByDescending(e => e.GatewayTimestamp)
                     .Take(limitMatches ?? 1000)
+                    .Where(e => e.FileName != null)
                     .ToListAsync(canceltoken);
 
             var routeQueryResults = await
                 routeQuery
                     .OrderByDescending(e => e.GatewayTimestamp)
                     .Take(limitMatches ?? 1000)
+                    .Where(e => e.FileName != null)
                     .ToListAsync(canceltoken);
 
             matches[sysid] = [..
@@ -746,13 +748,13 @@ public class EddnLookupService(
             var query =
                 ctx.Set<Models.FileLineBody>()
                    .Where(e => e.BodyId == bodyid)
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileInfo>(),
                         o => o.FileId,
                         i => i.Id,
                         (o, i) => new { Body = o, File = i }
                     )
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileLineInfo>()
                            .Include(e => e.Software)
                            .Include(e => e.SchemaEvent)
@@ -768,21 +770,21 @@ public class EddnLookupService(
                         i => new { i.FileId, i.LineNo },
                         (o, i) => new { o.File, o.Info, o.Body, Station = i }
                    )
-                   .Select(e => new DTO.MatchEntry
+                   .Select(e => new MatchEntry
                    {
-                       FileName = e.File.FileName,
-                       LineNo = e.Info.LineNo,
-                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                       Timestamp = e.Info.Timestamp,
+                       FileName = e.File!.FileName,
+                       LineNo = e.Body.LineNo,
+                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info!.Timestamp,
                        GatewayTimestamp = e.Body.GatewayTimestamp,
-                       SystemId = e.Info.SystemId,
+                       SystemId = e.Info!.SystemId,
                        BodyId = e.Body.BodyId,
                        StationId = e.Station == null ? null : e.Station.StationId,
                        StationName = e.Station == null || e.Station.Station == null ? null : e.Station.Station.StationName,
@@ -803,6 +805,7 @@ public class EddnLookupService(
                 query
                     .OrderByDescending(e => e.GatewayTimestamp)
                     .Take(limitMatches ?? 1000)
+                    .Where(e => e.FileName != null)
                     .ToListAsync(canceltoken);
         }
 
@@ -826,14 +829,13 @@ public class EddnLookupService(
             var query =
                 ctx.Set<Models.FileLineStation>()
                    .Where(e => stationIds.Contains(e.StationId))
-
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileInfo>(),
                         o => o.FileId,
                         i => i.Id,
                         (o, i) => new { Station = o, File = i }
                     )
-                   .Join(
+                   .LeftJoin(
                         ctx.Set<Models.FileLineInfo>()
                            .Include(e => e.Software)
                            .Include(e => e.SchemaEvent)
@@ -848,21 +850,21 @@ public class EddnLookupService(
                         i => new { i.FileId, i.LineNo },
                         (o, i) => new { o.File, o.Info, Body = i, o.Station }
                    )
-                   .Select(e => new DTO.MatchEntry
+                   .Select(e => new MatchEntry
                    {
-                       FileName = e.File.FileName,
-                       LineNo = e.Info.LineNo,
-                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
-                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
-                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                       Timestamp = e.Info.Timestamp,
-                       GatewayTimestamp = e.Info.GatewayTimestamp,
-                       SystemId = e.Info.SystemId,
+                       FileName = e.File!.FileName,
+                       LineNo = e.Station!.LineNo,
+                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info!.Timestamp,
+                       GatewayTimestamp = e.Station.GatewayTimestamp,
+                       SystemId = e.Info!.SystemId,
                        BodyId = e.Body == null ? null : e.Body.BodyId,
                        StationId = e.Station.StationId
                    });
@@ -881,6 +883,7 @@ public class EddnLookupService(
                 query
                     .OrderByDescending(e => e.GatewayTimestamp)
                     .Take(limitMatches ?? 1000)
+                    .Where(e => e.FileName != null)
                     .ToListAsync(canceltoken);
         }
 
