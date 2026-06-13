@@ -228,13 +228,13 @@ public static class PGSectors
 
     private static void AddOrUpdateFragment(Dictionary<string, FragmentInfo> frags, string value, Func<FragmentInfo, string, FragmentInfo> modifyAction)
     {
-        string p = value.ToLowerInvariant();
+        value = value.ToLowerInvariant();
 
-        var frag = frags.TryGetValue(p, out FragmentInfo v)
+        var frag = frags.TryGetValue(value, out FragmentInfo v)
                  ? v
-                 : new FragmentInfo { Value = p };
+                 : new FragmentInfo { Value = value };
 
-        frags[p] = modifyAction(frag, p);
+        frags[value] = modifyAction(frag, value);
     }
 
     private static FragmentInfo[] FillFragments(string[] prefixes, string[] vowelInfixes, string[] nonVowelInfixes, string[] vowelSuffixes, string[] nonVowelSuffixes)
@@ -344,16 +344,16 @@ public static class PGSectors
         }
     }
 
-    private static string ExtractC1Prefix(int offset, out int next_idx, out bool isVowel)
+    private static string ExtractC1Prefix(int offset, out int nextOffset, out bool isVowel)
     {
         int prefix_cnt = Math.DivRem(offset, PrefixTotalRunLength, out int rem);
         string prefix = Prefixes.Last(p => PrefixOffsets[p] <= rem);
-        next_idx = prefix_cnt * PrefixRunLengths[prefix] + rem - PrefixOffsets[prefix];
+        nextOffset = prefix_cnt * PrefixRunLengths[prefix] + rem - PrefixOffsets[prefix];
         isVowel = C1VowelPrefixes.Contains(prefix);
         return prefix;
     }
 
-    private static string ExtractC1Infix(int offset, bool isVowel, out int next_idx)
+    private static string ExtractC1Infix(int offset, bool isVowel, out int nextOffset)
     {
         int infix_total_len = isVowel ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
         string[] infixes = isVowel ? NonVowelInfixes : VowelInfixes;
@@ -361,7 +361,7 @@ public static class PGSectors
         string infix = infixes.Last(p => InfixOffsets[p] <= cur_offset);
         cur_offset -= InfixOffsets[infix];
         int infix1_run_len = InfixRunLengths[infix];
-        next_idx = infix1_run_len * infix_cnt + cur_offset;
+        nextOffset = infix1_run_len * infix_cnt + cur_offset;
         return infix;
     }
 
@@ -440,7 +440,7 @@ public static class PGSectors
                     IsInfix = false
                 };
             }
-            else if (fragments is [.., { } last] && frag.IsInfix && frag.IsVowelInfix != last.IsVowelInfix)
+            else if (frag.IsInfix && fragments.Count > 0 && frag.IsVowelInfix == !fragments[^1].IsVowelInfix)
             {
                 frag = frag with { IsPrefix = false };
             }
