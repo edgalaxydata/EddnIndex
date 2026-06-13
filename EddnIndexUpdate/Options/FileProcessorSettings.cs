@@ -1,10 +1,14 @@
-﻿namespace EddnIndexUpdate.Options;
+﻿using Microsoft.Extensions.Options;
+using System.ComponentModel.DataAnnotations;
 
-public class FileProcessorSettings
+namespace EddnIndexUpdate.Options;
+
+public class FileProcessorSettings : IValidatableObject
 {
     public class OverridesURISettings<T>
         where T : notnull, new()
     {
+        [Url]
         public string? URI { get; set; }
         public string? Filename { get; set; }
         public T Fields { get; set; } = new T();
@@ -65,14 +69,19 @@ public class FileProcessorSettings
         public string Version { get; set; } = "-";
     }
 
+    [ValidateObjectMembers]
     public OverridesURISettings<BodyOverridesCsvFieldSettings> BodyOverridesCsv { get; set; } = new();
 
+    [ValidateObjectMembers]
     public OverridesURISettings<SystemRenamesCsvFieldSettings> SystemRenamesCsv { get; set; } = new();
 
+    [ValidateObjectMembers]
     public OverridesURISettings<SystemOverridesCsvFieldSettings> SystemOverridesCsv { get; set; } = new();
 
+    [ValidateObjectMembers]
     public OverridesURISettings<SystemOverridesJsonFieldSettings> SystemOverridesJson { get; set; } = new();
 
+    [ValidateObjectMembers]
     public OverridesURISettings<GameVersionDatesCsvFieldSettings> GameVersionDatesCsv { get; set; } = new();
 
     public string BodyOverridesFile { get; set; } = "body-name-overrides.jsonl";
@@ -84,4 +93,12 @@ public class FileProcessorSettings
     public bool? BreakOnBadData { get; set; }
     public bool? ExitOnBadData { get; set; }
     public bool? Reprocess { get; set; }
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        if (!Directory.Exists(BaseDir))
+        {
+            yield return new ValidationResult("BaseDir points to a non-existent directory", [nameof(BaseDir)]);
+        }
+    }
 }

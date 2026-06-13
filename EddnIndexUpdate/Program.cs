@@ -2,6 +2,7 @@
 using EddnIndexUpdate.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -57,31 +58,26 @@ for (int i = 0; i < args.Length; i++)
     }
 }
 
-var config = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json", optional: true)
-    .AddJsonFile("hosting.json", optional: true)
-    .AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true)
-    .AddInMemoryCollection(cmdlineargs)
-    .Build();
+var builder = Host.CreateApplicationBuilder(args);
+builder.Configuration.AddJsonFile("appsettings.json", optional: true);
+builder.Configuration.AddJsonFile("hosting.json", optional: true);
+builder.Configuration.AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true);
+builder.Configuration.AddInMemoryCollection(cmdlineargs);
 
-var services = new ServiceCollection();
+builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
+builder.Services.AddOptions<FileProcessorSettings>()
+                .BindConfiguration("FileProcessor")
+                .ValidateDataAnnotations()
+                .ValidateOnStart();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
-services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(config.GetSection("Database")));
-services.Configure<FileProcessorSettings>(config.GetSection("FileProcessor"));
-services.AddTransient<FileProcessor>();
-
-services.AddLogging(logging =>
-{
-    logging.AddConsole();
-    logging.AddDebug();
-    logging.AddConfiguration(config.GetSection("Logging"));
-});
-
-var svcprov = services.BuildServiceProvider();
+using var host = builder.Build();
+var svcprov = host.Services;
 
 var processor = svcprov.GetRequiredService<FileProcessor>();
 
-if (config.GetValue<bool?>("WaitForDebugger") == true)
+if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
 {
     while (!Debugger.IsAttached)
     {
