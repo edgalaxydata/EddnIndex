@@ -5,6 +5,7 @@
     <File Path="EddnIndexUpdate.Dockerfile" />
   </Folder>
   <Project Path="EddnIndexUpdate/EddnIndexUpdate.csproj" />
+  <Project Path="EddnIndex.Tests/EddnIndex.Tests.csproj" Id="35ce140b-9134-4b1c-843a-b5494b0f2f9c" />
   <Project Path="EddnIndexLookup/EddnIndexLookup.csproj" Id="2f2d695c-07ac-472c-90bc-f406c49ef88b" />
   <Project Path="Migrations_MariaDB/EddnIndexUpdate.Migrations_MariaDB.csproj" />
   <Project Path="Migrations_Sqlite/EddnIndexUpdate.Migrations_Sqlite.csproj" />

@@ -1,4 +1,5 @@
 ﻿using EddnIndexUpdate.Models;
+using System.Diagnostics;
 
 namespace EddnIndexUpdate.Sectors;
 
@@ -73,8 +74,7 @@ public static class PGSectors
     private readonly record struct FragmentInfo(
             string Value,
             bool IsPrefix = false,
-            bool IsC1VowelPrefix = false,
-            bool IsC2VowelPrefix = false,
+            bool IsVowelPrefix = false,
             int PrefixIndex = 0,
             bool IsInfix = false,
             bool IsVowelInfix = false,
@@ -156,15 +156,8 @@ public static class PGSectors
         "qs",  "rps", "gy",  "wns", "lz",  "nth", "phs"
     ];
 
-    // Vowelish C2 prefixes
-    private static readonly HashSet<string> C2VowelPrefixes = new(
-    [
-        "Eo",  "Oo",  "Eu",  "Ou",  "Ae",  "Ai",  "Eae", "Ao",
-        "Au",  "Aae"
-    ], StringComparer.OrdinalIgnoreCase);
-
-    // Vowelish C1 prefixes
-    private static readonly HashSet<string> C1VowelPrefixes = new(
+    // Vowelish prefixes
+    private static readonly HashSet<string> VowelPrefixes = new(
     [
         "Eo",  "Oo",  "Eu",  "Ou",  "Ae",  "Ai",  "Eae", "Ao",
         "Au",  "Aae", "A",   "Io",  "E",   "I",   "O",   "Ea",
@@ -246,8 +239,7 @@ public static class PGSectors
             AddOrUpdateFragment(frags, prefixes[i], (e, p) => e with
             {
                 IsPrefix = true,
-                IsC1VowelPrefix = C1VowelPrefixes.Contains(p),
-                IsC2VowelPrefix = C2VowelPrefixes.Contains(p),
+                IsVowelPrefix = VowelPrefixes.Contains(p),
                 PrefixIndex = i
             });
         }
@@ -295,7 +287,7 @@ public static class PGSectors
         return [.. frags.Values.OrderByDescending(f => f.Value.Length).ThenBy(f => f.Value)];
     }
 
-    // Sector coords to sector name - based on https://bitbucket.org/Esvandiary/edts/src/master/pgnames.py
+    // Sector coords to sector name - based on https://bitbucket.org/Esvandiary/edts/src/develop/pgnames.py
     public static string GetSectorName(ByteXYZ pos)
     {
         if (CachedSectorsByCoords.TryGetValue(pos, out string? value))
@@ -349,7 +341,7 @@ public static class PGSectors
         int offsetNumerator = Math.DivRem(offset, PrefixTotalRunLength, out int prefixOffset);
         string prefix = Prefixes.Last(p => PrefixOffsets[p] <= prefixOffset);
         nextOffset = offsetNumerator * PrefixRunLengths[prefix] + prefixOffset - PrefixOffsets[prefix];
-        isVowel = C1VowelPrefixes.Contains(prefix);
+        isVowel = VowelPrefixes.Contains(prefix);
         return prefix;
     }
 
@@ -357,7 +349,7 @@ public static class PGSectors
     {
         int infixTotalLen = isVowel ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
         int offsetNumerator = Math.DivRem(offset, infixTotalLen, out int infixOffset);
-        string[] infixes = isVowel ? NonVowelInfixes : VowelInfixes;
+        string[] infixes = isVowel ? VowelInfixes : NonVowelInfixes;
         string infix = infixes.Last(p => InfixOffsets[p] <= infixOffset);
         nextOffset = offsetNumerator * InfixRunLengths[infix] + infixOffset - InfixOffsets[infix];
         return infix;
@@ -380,7 +372,13 @@ public static class PGSectors
 
         if (offset >= suffixes.Length)
         {
-            throw new InvalidOperationException("Bad C1 name offset");
+            frags.Add(ExtractC1Infix(offset, !prefixIsVowel, out offset));
+            suffixes = prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
+        }
+
+        if (offset >= suffixes.Length)
+        {
+            throw new NotSupportedException("Bad C1 name offset");
         }
 
         frags.Add(suffixes[offset]);
@@ -391,19 +389,69 @@ public static class PGSectors
     {
         var (offset1, offset2) = Deinterleave2((uint)offset);
         string prefix1 = Prefixes.Last(p => PrefixOffsets[p] <= offset1);
-        string prefix2 = Prefixes.Last(p => PrefixOffsets[p] <= offset1);
-        string[] suffixes1 = C2VowelPrefixes.Contains(prefix1) ? NonVowelSuffixes : VowelSuffixes;
-        string[] suffixes2 = C2VowelPrefixes.Contains(prefix2) ? NonVowelSuffixes : VowelSuffixes;
-        string suffix1 = suffixes1[offset1 - PrefixOffsets[prefix1]];
-        string suffix2 = suffixes2[offset2 - PrefixOffsets[prefix2]];
+        string prefix2 = Prefixes.Last(p => PrefixOffsets[p] <= offset2);
+        var prefix1Frag = FindFragment(prefix1, true);
+        var prefix2Frag = FindFragment(prefix2, true);
+
+        if (!string.Equals(prefix1Frag.Value, prefix1, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Bad C2 name prefix 1 offset");
+        }
+
+        if (!string.Equals(prefix2Frag.Value, prefix2, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Bad C2 name prefix 2 offset");
+        }
+
+        string[] suffixes1 = VowelPrefixes.Contains(prefix1) ? NonVowelSuffixes : VowelSuffixes;
+        string[] suffixes2 = VowelPrefixes.Contains(prefix2) ? NonVowelSuffixes : VowelSuffixes;
+        var suffix1Offset = offset1 - PrefixOffsets[prefix1];
+        var suffix2Offset = offset2 - PrefixOffsets[prefix2];
+
+        if (suffix1Offset < 0 || suffix1Offset >= suffixes1.Length)
+        {
+            throw new NotSupportedException("Bad C2 name 1 offset");
+        }
+
+        if (suffix2Offset < 0 || suffix2Offset >= suffixes2.Length)
+        {
+            throw new NotSupportedException("Bad C2 name 2 offset");
+        }
+
+        string suffix1 = suffixes1[suffix1Offset];
+        string suffix2 = suffixes2[suffix2Offset];
+
+        var suffix1Frag = FindFragment(suffix1);
+        var suffix2Frag = FindFragment(suffix2);
+
+        if (!string.Equals(suffix1Frag.Value, suffix1, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Bad C2 name suffix 1 offset");
+        }
+
+        if (!string.Equals(suffix2Frag.Value, suffix2, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException("Bad C2 name suffix 2 offset");
+        }
+
+        if (suffix1Frag.IsVowelSuffix == prefix1Frag.IsVowelPrefix)
+        {
+            throw new NotSupportedException("Bad C2 name 1");
+        }
+
+        if (suffix2Frag.IsVowelSuffix == prefix2Frag.IsVowelPrefix)
+        {
+            throw new NotSupportedException("Bad C2 name 2");
+        }
+
         return $"{prefix1}{suffix1} {prefix2}{suffix2}";
     }
 
-    private static FragmentInfo FindFragment(ReadOnlySpan<char> current)
+    private static FragmentInfo FindFragment(ReadOnlySpan<char> current, bool isPrefix = false)
     {
         foreach (var item in Fragments)
         {
-            if (current.StartsWith(item.Value))
+            if (current.StartsWith(item.Value, StringComparison.OrdinalIgnoreCase) && (!isPrefix || item.IsPrefix))
             {
                 return item;
             }
@@ -417,20 +465,21 @@ public static class PGSectors
         name = name.ToLowerInvariant();
         List<FragmentInfo> fragments = [];
         ReadOnlySpan<char> current = name;
+        bool isPrefix = true;
 
         while (!current.IsEmpty)
         {
-            bool spacestart = current.StartsWith(" ");
+            isPrefix |= current.StartsWith(" ");
             current = current.Trim();
 
-            FragmentInfo frag = FindFragment(current);
+            FragmentInfo frag = FindFragment(current, isPrefix);
 
             if (frag.Value == null)
             {
                 return null;
             }
 
-            if (spacestart)
+            if (isPrefix)
             {
                 frag = frag with
                 {
@@ -445,6 +494,7 @@ public static class PGSectors
 
             fragments.Add(frag);
             current = current[frag.Value.Length..];
+            isPrefix = false;
         }
 
         return fragments;
@@ -466,6 +516,8 @@ public static class PGSectors
                 => CachedSectorsByName[name] = GetC1SectorPos3(p, i, s),
             [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsSuffix: true } s]
                 => CachedSectorsByName[name] = GetC1SectorPos4(p, i1, i2, s),
+            [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsInfix: true } i3, { IsSuffix: true } s]
+                => CachedSectorsByName[name] = GetC1SectorPos5(p, i1, i2, i3, s),
             _ => ByteXYZ.Invalid
         };
     }
@@ -488,7 +540,7 @@ public static class PGSectors
 
     private static ByteXYZ GetC2SectorPos(FragmentInfo prefix1, FragmentInfo suffix1, FragmentInfo prefix2, FragmentInfo suffix2)
     {
-        if (prefix1.IsC2VowelPrefix == suffix1.IsVowelSuffix || prefix2.IsC2VowelPrefix == suffix2.IsVowelSuffix)
+        if (prefix1.IsVowelPrefix == suffix1.IsVowelSuffix || prefix2.IsVowelPrefix == suffix2.IsVowelSuffix)
         {
             return ByteXYZ.Invalid;
         }
@@ -514,20 +566,40 @@ public static class PGSectors
          + prefixOffset
          + PrefixOffsets[frag.Value];
 
-    private static int C1ProcessSuffix4Fragment(FragmentInfo suffix, FragmentInfo infix2)
-        => suffix.SuffixIndex
-         + suffix.SuffixIndex / InfixRunLengths[infix2.Value] * InfixTotalRunLength(infix2);
-
     private static ByteXYZ GetC1SectorPos4(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo suffix)
     {
-        if (prefix.IsC1VowelPrefix == infix1.IsVowelInfix
+        if (prefix.IsVowelPrefix == infix1.IsVowelInfix
             || infix1.IsVowelInfix == infix2.IsVowelInfix
             || infix2.IsVowelInfix == suffix.IsVowelSuffix)
         {
             return ByteXYZ.Invalid;
         }
 
-        int offset = C1ProcessSuffix4Fragment(suffix, infix2);
+        int offset = suffix.SuffixIndex;
+        offset = C1ProcessInfixFragment(infix2, offset);
+        offset = C1ProcessInfixFragment(infix1, offset);
+        offset = C1ProcessPrefixFragment(prefix, offset);
+
+        if (offset >= 1 << (OrdBits * 3))
+        {
+            throw new NotSupportedException("C1 offset out of range");
+        }
+
+        return ByteXYZ.FromOrdinal(offset);
+    }
+
+    private static ByteXYZ GetC1SectorPos5(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo infix3, FragmentInfo suffix)
+    {
+        if (prefix.IsVowelPrefix == infix1.IsVowelInfix
+            || infix1.IsVowelInfix == infix2.IsVowelInfix
+            || infix2.IsVowelInfix == infix3.IsVowelSuffix
+            || infix3.IsVowelInfix == suffix.IsVowelSuffix)
+        {
+            return ByteXYZ.Invalid;
+        }
+
+        int offset = suffix.SuffixIndex;
+        offset = C1ProcessInfixFragment(infix3, offset);
         offset = C1ProcessInfixFragment(infix2, offset);
         offset = C1ProcessInfixFragment(infix1, offset);
         offset = C1ProcessPrefixFragment(prefix, offset);
@@ -536,7 +608,7 @@ public static class PGSectors
 
     private static ByteXYZ GetC1SectorPos3(FragmentInfo prefix, FragmentInfo infix, FragmentInfo suffix)
     {
-        if (prefix.IsC1VowelPrefix == infix.IsVowelInfix || infix.IsVowelInfix == suffix.IsVowelSuffix)
+        if (prefix.IsVowelPrefix == infix.IsVowelInfix || infix.IsVowelInfix == suffix.IsVowelSuffix)
         {
             return ByteXYZ.Invalid;
         }
