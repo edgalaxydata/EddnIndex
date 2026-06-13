@@ -19,6 +19,7 @@ public record class BodyData : IMatchedItem, IBodyData
 
     /// <summary>
     /// System Address (AKA ID64)
+    /// This is the system part (i.e. lower 55 bits) of the body's SystemAddress
     /// </summary>
     [Range(0, 1L << 55, MaximumIsExclusive = true)]
     [DataMember(Name = "SystemAddress")]
@@ -26,6 +27,7 @@ public record class BodyData : IMatchedItem, IBodyData
 
     /// <summary>
     /// Sequential body id within a system
+    /// This would be the body part (i.e. upper 9 bits) of the body's SystemAddress
     /// </summary>
     [Range(0, 511)]
     [DataMember(Name = "BodyId")]
