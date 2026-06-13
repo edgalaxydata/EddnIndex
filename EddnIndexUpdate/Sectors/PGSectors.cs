@@ -25,13 +25,8 @@ public static class PGSectors
     private const int YStride = XStride << XBits;
     private const int ZStride = YStride << YBits;
 
-    [System.Diagnostics.DebuggerDisplay("({X},{Y},{Z})")]
-    public readonly struct ByteXYZ(sbyte x, sbyte y, sbyte z) : IComparable<ByteXYZ>
+    public readonly record struct ByteXYZ(sbyte X, sbyte Y, sbyte Z) : IComparable<ByteXYZ>
     {
-        public readonly sbyte X = x;
-        public readonly sbyte Y = y;
-        public readonly sbyte Z = z;
-
         public readonly bool IsValid => X >= 0 && X <= XMask
                                      && Y >= 0 && Y <= YMask
                                      && Z >= 0 && Z <= ZMask;
@@ -48,27 +43,7 @@ public static class PGSectors
 
         public readonly int CompareTo(ByteXYZ other)
         {
-            return Ord.CompareTo(other.Ord);
-        }
-
-        public override readonly bool Equals(object? obj)
-        {
-            return obj != null && obj is ByteXYZ xyz && Ord.Equals(xyz.Ord);
-        }
-
-        public override int GetHashCode()
-        {
-            return Ord.GetHashCode();
-        }
-
-        public static bool operator ==(ByteXYZ left, ByteXYZ right)
-        {
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(ByteXYZ left, ByteXYZ right)
-        {
-            return !left.Equals(right);
+            return (X, Y, Z).CompareTo((other.X, other.Y, other.Z));
         }
 
         public static readonly ByteXYZ Invalid = new(sbyte.MinValue, sbyte.MinValue, sbyte.MinValue);
@@ -465,7 +440,7 @@ public static class PGSectors
                     IsInfix = false
                 };
             }
-            else if (fragments.Count != 0 && frag.IsInfix && frag.IsVowelInfix != fragments[^1].IsVowelInfix)
+            else if (fragments is [.., { } last] && frag.IsInfix && frag.IsVowelInfix != last.IsVowelInfix)
             {
                 frag = frag with { IsPrefix = false };
             }
@@ -501,9 +476,9 @@ public static class PGSectors
     {
         var pos = GetSectorPos(name);
 
-        if (pos.X < 0 || pos.Y < 0 || pos.Z < 0)
+        if (!pos.IsValid)
         {
-            sectorid = 0;
+            sectorid = default;
             return false;
         }
         else
