@@ -63,7 +63,7 @@ public partial class FileProcessor(
             Debugger.Break();
         }
 
-        throw new InvalidOperationException(message);
+        throw new BadDataException(message, extraData);
     }
 
     public void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] string? message = null, object? extraData = null)
@@ -793,19 +793,16 @@ public partial class FileProcessor(
                         errorCount++;
                     }
                 }
-                catch (Exception ex)
+                catch (System.Text.Json.JsonException ex)
                 {
-                    Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
+                    HandleBadData(filepath, lineCount, ex);
 
-                    if (Settings.BreakOnBadData != false && Debugger.IsAttached)
-                    {
-                        Debugger.Break();
-                    }
-
-                    if (Settings.ExitOnBadData != false)
-                    {
-                        Environment.Exit(1);
-                    }
+                    data.IsBad = true;
+                    errorCount++;
+                }
+                catch (BadDataException ex)
+                {
+                    HandleBadData(filepath, lineCount, ex);
 
                     data.IsBad = true;
                     errorCount++;
@@ -998,6 +995,21 @@ public partial class FileProcessor(
         SignalInfoCounts.Clear();
         BodySignalInfoCache.Clear();
         BodySignalInfoCounts.Clear();
+    }
+
+    private void HandleBadData(string filepath, int lineCount, Exception ex)
+    {
+        Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
+
+        if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+        {
+            Debugger.Break();
+        }
+
+        if (Settings.ExitOnBadData != false)
+        {
+            Environment.Exit(1);
+        }
     }
 
     private static void AddOrUpdateInfo<T, TId>(Dictionary<TId, (T Info, DateTime? FirstSeen, DateTime? LastSeen)> updates, T? entry, DateTime? gatewayTimestamp)
