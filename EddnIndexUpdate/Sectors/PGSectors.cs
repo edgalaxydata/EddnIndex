@@ -494,7 +494,9 @@ public static class PGSectors
 
     private static ByteXYZ GetC1SectorPos4(List<FragmentInfo> fragments)
     {
-        if (fragments[0].IsC1VowelPrefix == fragments[1].IsVowelInfix || fragments[1].IsVowelInfix == fragments[2].IsVowelInfix || fragments[2].IsVowelInfix == fragments[3].IsVowelSuffix)
+        if (fragments[0].IsC1VowelPrefix == fragments[1].IsVowelInfix
+            || fragments[1].IsVowelInfix == fragments[2].IsVowelInfix
+            || fragments[2].IsVowelInfix == fragments[3].IsVowelSuffix)
         {
             return ByteXYZ.Invalid;
         }

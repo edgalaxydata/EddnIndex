@@ -1349,7 +1349,7 @@ public class EddnLookupService(
             }
         }
 
-        var indexFilename = Path.Combine(Settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
+        var indexFilename = Path.Join(Settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
 
         if (!File.Exists(indexFilename) || !File.Exists(indexFilename + ".index"))
         {

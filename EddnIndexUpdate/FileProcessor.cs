@@ -680,7 +680,7 @@ public partial class FileProcessor(
 
         if (Settings.IndexedDir != null)
         {
-            WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename), file.LineCount, fileinfo.Length > file.UncompressedSize);
+            WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), file.LineCount, fileinfo.Length > file.UncompressedSize);
         }
 
         Logger.LogInformation("Processing {Filename}", filename);
@@ -977,7 +977,7 @@ public partial class FileProcessor(
 
         if (Settings.IndexedDir != null && !filepath.EndsWith(".bz2") && reader.Position > fileinfo.Length)
         {
-            WriteIndexedFile(filepath, Path.Combine(Settings.IndexedDir, indexFilename), null, true);
+            WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), null, true);
         }
 
         SystemCache.Clear();

@@ -16,19 +16,19 @@ public partial class FileProcessor
 
     private string BodyOverridesFile => Path.IsPathRooted(Settings.BodyOverridesFile)
                                       ? Settings.BodyOverridesFile
-                                      : Path.Combine(Settings.BaseDir, Settings.BodyOverridesFile);
+                                      : Path.Join(Settings.BaseDir, Settings.BodyOverridesFile);
 
     private string SystemOverridesFile => Path.IsPathRooted(Settings.SystemOverridesFile)
                                         ? Settings.SystemOverridesFile
-                                        : Path.Combine(Settings.BaseDir, Settings.SystemOverridesFile);
+                                        : Path.Join(Settings.BaseDir, Settings.SystemOverridesFile);
 
     private string GameVersionDatesFile => Path.IsPathRooted(Settings.GameVersionDatesFile)
                                          ? Settings.GameVersionDatesFile
-                                         : Path.Combine(Settings.BaseDir, Settings.GameVersionDatesFile);
+                                         : Path.Join(Settings.BaseDir, Settings.GameVersionDatesFile);
 
     private string MessageTypesFile => Path.IsPathRooted(Settings.MessageTypesFile)
                                      ? Settings.MessageTypesFile
-                                     : Path.Combine(Settings.BaseDir, Settings.MessageTypesFile);
+                                     : Path.Join(Settings.BaseDir, Settings.MessageTypesFile);
 
     private async Task Init_OverridesAsync()
     {
