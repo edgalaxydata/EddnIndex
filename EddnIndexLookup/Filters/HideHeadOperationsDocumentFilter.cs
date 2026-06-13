@@ -1,7 +1,7 @@
 ﻿using Microsoft.OpenApi;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
-namespace EddnIndexLookup.Swagger;
+namespace EddnIndexLookup.Filters;
 
 /// <summary>
 /// Removes HEAD operations from the generated OpenAPI document.

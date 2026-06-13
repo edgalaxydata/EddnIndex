@@ -4,7 +4,7 @@ using System.Reflection;
 using EddnIndexLookup.Options;
 using Scalar.AspNetCore;
 using EddnIndexLookup.Conventions;
-using EddnIndexLookup.Swagger;
+using EddnIndexLookup.Filters;
 
 var builder = WebApplication.CreateBuilder(args);
 
