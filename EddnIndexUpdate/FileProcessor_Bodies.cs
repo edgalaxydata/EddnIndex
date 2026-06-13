@@ -454,6 +454,14 @@ public partial class FileProcessor
         return (sbyte)(dv * DecimalRecipPow10(log10) <= 1 - error / 2 ? log10 + 1 : log10);
     }
 
+    private static decimal NormalizeAngle(decimal angle)
+    {
+        while (angle <= -180) angle += 360;
+        while (angle > 180) angle -= 360;
+
+        return angle;
+    }
+
     private bool TryGetMatchingBody(
             List<Models.BodyInfo> bodiesList,
             decimal? argOfPeriapsis,
@@ -470,40 +478,35 @@ public partial class FileProcessor
         inclinationError = null;
         semiMajorAxisError = null;
 
-        foreach (var item in bodiesList)
+        foreach (var (item, smadiff, aopdiff, incdiff) in bodiesList
+                                       .Where(e => e.SemiMajorAxis.HasValue == semiMajorAxis.HasValue
+                                                && e.ArgOfPeriapsis.HasValue == argOfPeriapsis.HasValue
+                                                && e.Inclination.HasValue == inclination.HasValue)
+                                       .Select(e => (
+                                            Body: e,
+                                            SMADiff: (semiMajorAxis ?? 0) * DecimalRecipPow10(e.SemiMajorAxisScale) - (e.SemiMajorAxis ?? 0),
+                                            AOPDiff: NormalizeAngle((argOfPeriapsis ?? 0) - (e.ArgOfPeriapsis ?? 0)),
+                                            IncDiff: NormalizeAngle((inclination ?? 0) - (e.Inclination ?? 0))
+                                       ))
+                                       .Where(e => e is
+                                       {
+                                            SMADiff: > -0.001m and < 0.001m,
+                                            AOPDiff: > -0.001m and < 0.001m,
+                                            IncDiff: > -0.001m and < 0.001m
+                                       }))
         {
-            if (item.SemiMajorAxis.HasValue != semiMajorAxis.HasValue) continue;
-            if (item.ArgOfPeriapsis.HasValue != argOfPeriapsis.HasValue) continue;
-            if (item.Inclination.HasValue != inclination.HasValue) continue;
 
-            var smadiff = (semiMajorAxis ?? 0) * DecimalRecipPow10(item.SemiMajorAxisScale) - (item.SemiMajorAxis ?? 0);
-
-            if (smadiff <= -0.001m || smadiff >= 0.001m) continue;
             semiMajorAxisError = (short)Math.Round(smadiff * 1000000);
-
-            var aopdiff = (argOfPeriapsis ?? 0) - (item.ArgOfPeriapsis ?? 0);
-
-            while (aopdiff <= -180) aopdiff += 360;
-            while (aopdiff > 180) aopdiff -= 360;
-
-            if (aopdiff <= -0.001m || aopdiff >= 0.001m) continue;
             argOfPeriapsisError = (short)Math.Round(aopdiff * 1000000);
-
-            var incdiff = (inclination ?? 0) - (item.Inclination ?? 0);
-
-            while (incdiff <= -180) incdiff += 360;
-            while (incdiff > 180) incdiff -= 360;
-
-            if (incdiff <= -0.001m || incdiff >= 0.001m) continue;
             inclinationError = (short)Math.Round(incdiff * 1000000);
 
             Assert(body == null, extraData: bodiesList);
-            Assert(incdiff >= -0.001m
-                && incdiff <= 0.001m
-                && aopdiff >= -0.001m
-                && aopdiff <= 0.001m
-                && smadiff >= -0.001m
-                && smadiff <= 0.001m,
+            Assert(incdiff > -0.001m
+                && incdiff < 0.001m
+                && aopdiff > -0.001m
+                && aopdiff < 0.001m
+                && smadiff > -0.001m
+                && smadiff < 0.001m,
                 extraData: new
                 {
                     Current = new

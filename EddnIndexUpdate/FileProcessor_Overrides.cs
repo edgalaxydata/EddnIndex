@@ -140,25 +140,24 @@ public partial class FileProcessor
 
             if (File.Exists(SystemOverridesFile))
             {
-                foreach (var line in File.ReadLines(SystemOverridesFile))
+                foreach (var ent in File.ReadLines(SystemOverridesFile)
+                                        .Select(JsonConvert.DeserializeObject<Models.SystemNameOverride>)
+                                        .OfType<Models.SystemNameOverride>())
                 {
-                    if (JsonConvert.DeserializeObject<Models.SystemNameOverride>(line) is { } ent)
+                    if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
                     {
-                        if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
-                        {
-                            SystemNameOverrides[ent.Name] = overrides = [];
-                        }
+                        SystemNameOverrides[ent.Name] = overrides = [];
+                    }
 
-                        if (!overrides.Any(e => e.SystemAddress == ent.SystemAddress
-                                             && (e.X == null || ent.X == null || e.X == ent.X)
-                                             && (e.Y == null || ent.Y == null || e.Y == ent.Y)
-                                             && (e.Z == null || ent.Z == null || e.Z == ent.Z)
-                                             && (e.ValidFrom == null || ent.ValidFrom == null || e.ValidFrom == ent.ValidFrom)
-                                             && (e.ValidTo == null || ent.ValidTo == null || e.ValidTo == ent.ValidTo)))
-                        {
-                            overrides.Add(ent);
-                            ctx.Add(ent);
-                        }
+                    if (!overrides.Any(e => e.SystemAddress == ent.SystemAddress
+                                         && (e.X == null || ent.X == null || e.X == ent.X)
+                                         && (e.Y == null || ent.Y == null || e.Y == ent.Y)
+                                         && (e.Z == null || ent.Z == null || e.Z == ent.Z)
+                                         && (e.ValidFrom == null || ent.ValidFrom == null || e.ValidFrom == ent.ValidFrom)
+                                         && (e.ValidTo == null || ent.ValidTo == null || e.ValidTo == ent.ValidTo)))
+                    {
+                        overrides.Add(ent);
+                        ctx.Add(ent);
                     }
                 }
             }
@@ -197,72 +196,75 @@ public partial class FileProcessor
 
             if (File.Exists(BodyOverridesFile))
             {
-                foreach (var line in File.ReadLines(BodyOverridesFile))
+                foreach (var line in File.ReadLines(BodyOverridesFile)
+                                         .Select(e => JsonConvert.DeserializeObject<Models.BodyNameOverride>(e))
+                                         .OfType<Models.BodyNameOverride>())
                 {
-                    if (JsonConvert.DeserializeObject<Models.BodyNameOverride>(line) is { } ent)
+                    var ent = line with
                     {
-                        ent = ent with
-                        {
-                            ValidFrom = string.IsNullOrWhiteSpace(ent.SinceVersion)
-                                     || !GameVersionDates.TryGetValue(ent.SinceVersion, out var ver)
-                                      ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-                                      : ver.UpdateTime,
-                            ValidTo   = string.IsNullOrWhiteSpace(ent.UntilVersion)
-                                     || !GameVersionDates.TryGetValue(ent.UntilVersion, out ver)
-                                      ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
-                                      : ver.UpdateTime
-                        };
+                        ValidFrom = string.IsNullOrWhiteSpace(line.SinceVersion)
+                                    || !GameVersionDates.TryGetValue(line.SinceVersion, out var ver)
+                                    ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                                    : ver.UpdateTime,
+                        ValidTo   = string.IsNullOrWhiteSpace(line.UntilVersion)
+                                    || !GameVersionDates.TryGetValue(line.UntilVersion, out ver)
+                                    ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+                                    : ver.UpdateTime
+                    };
 
-                        if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
-                        {
-                            BodyNameOverrides[ent.BodyName] = overrides = [];
-                        }
+                    if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
+                    {
+                        BodyNameOverrides[ent.BodyName] = overrides = [];
+                    }
 
-                        if (!bysysaddr.TryGetValue(ent.SystemAddress, out var sysov))
-                        {
-                            bysysaddr[ent.SystemAddress] = sysov = [];
-                        }
+                    if (!bysysaddr.TryGetValue(ent.SystemAddress, out var sysov))
+                    {
+                        bysysaddr[ent.SystemAddress] = sysov = [];
+                    }
 
-                        if (!overrides.Any(e => e.SystemAddress == ent.SystemAddress
-                                             && e.SystemName == ent.SystemName
-                                             && e.BodyID == ent.BodyID
-                                             && e.BodyDesignation == ent.BodyDesignation
-                                             && e.BodyType == ent.BodyType
-                                             && e.ArgOfPeriapsis == ent.ArgOfPeriapsis
-                                             && e.Inclination == ent.Inclination))
-                        {
-                            ctx.Add(ent);
-                            overrides.Add(ent);
-                            sysov.Add(ent);
-                        }
+                    if (!overrides.Any(e => e.SystemAddress == ent.SystemAddress
+                                            && e.SystemName == ent.SystemName
+                                            && e.BodyID == ent.BodyID
+                                            && e.BodyDesignation == ent.BodyDesignation
+                                            && e.BodyType == ent.BodyType
+                                            && e.ArgOfPeriapsis == ent.ArgOfPeriapsis
+                                            && e.Inclination == ent.Inclination))
+                    {
+                        ctx.Add(ent);
+                        overrides.Add(ent);
+                        sysov.Add(ent);
                     }
                 }
             }
 
-            foreach (var (name, overrides) in BodyNameOverrides)
+            foreach (var (name, sysov) in BodyNameOverrides
+                                              .Keys
+                                              .SelectMany(e =>
+                                                    SystemNameOverrides
+                                                        .GetValueOrDefault(e)
+                                                       ?.Select(o => (Name: e, Override: o))
+                                                      ?? []
+                                              )
+                                              .Where(e =>
+                                                    bysysaddr
+                                                        .GetValueOrDefault(e.Override.SystemAddress)
+                                                       ?.Any(o => o.SystemName == e.Override.Name) != true
+                                              )
+            )
             {
-                if (SystemNameOverrides.TryGetValue(name, out var sysoverrides))
+                var ent = new Models.BodyNameOverride
                 {
-                    foreach (var sysov in sysoverrides)
-                    {
-                        if (bysysaddr.GetValueOrDefault(sysov.SystemAddress)?.Any(e => e.SystemName == sysov.Name) != true)
-                        {
-                            var ent = new Models.BodyNameOverride
-                            {
-                                BodyName = name,
-                                SystemName = name,
-                                SystemAddress = sysov.SystemAddress,
-                                BodyDesignation = name,
-                                BodyID = 0,
-                                BodyType = "Star",
-                                ValidFrom = sysov.ValidFrom,
-                                ValidTo = sysov.ValidTo
-                            };
+                    BodyName = name,
+                    SystemName = name,
+                    SystemAddress = sysov.SystemAddress,
+                    BodyDesignation = name,
+                    BodyID = 0,
+                    BodyType = "Star",
+                    ValidFrom = sysov.ValidFrom,
+                    ValidTo = sysov.ValidTo
+                };
 
-                            overrides.Add(ent);
-                        }
-                    }
-                }
+                BodyNameOverrides[name].Add(ent);
             }
 
             ctx.SaveChanges();
