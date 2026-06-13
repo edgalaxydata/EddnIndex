@@ -366,6 +366,19 @@ public static class PGSectors
         return $"{p1}{s1} {p2}{s2}";
     }
 
+    private static FragmentInfo FindFragment(ReadOnlySpan<char> current)
+    {
+        foreach (var item in Fragments)
+        {
+            if (current.StartsWith(item.Value))
+            {
+                return item;
+            }
+        }
+
+        return default;
+    }
+
     private static List<FragmentInfo>? GetSectorFragments(string name)
     {
         name = name.ToLowerInvariant();
@@ -377,16 +390,7 @@ public static class PGSectors
             bool spacestart = current.StartsWith(" ");
             current = current.Trim();
 
-            FragmentInfo frag = default;
-
-            foreach (var item in Fragments)
-            {
-                if (current.StartsWith(item.Value))
-                {
-                    frag = item;
-                    break;
-                }
-            }
+            FragmentInfo frag = FindFragment(current);
 
             if (frag.Value == null)
             {

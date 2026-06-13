@@ -1357,12 +1357,11 @@ public partial class FileProcessor(
                     SignalInfoSet = null
                 };
 
-                foreach (var sig in siginfoset.SignalSetItems)
+                foreach (var signal in siginfoset.SignalSetItems
+                                                 .Select(e => SignalsById.GetValueOrDefault(e.SignalInfoId))
+                                                 .OfType<Models.SignalInfo>())
                 {
-                    if (SignalsById.TryGetValue(sig.SignalInfoId, out var signal))
-                    {
-                        AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
-                    }
+                    AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
                 }
 
                 if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
