@@ -8,7 +8,7 @@ namespace EddnIndexLookup.Filters
     /// </summary>
     public class BodyDesignationComparer(string sysname) : IComparer<BodyDesignation?>, IComparer<IBodyData>
     {
-        private readonly string SystemName = sysname;
+        private readonly string _systemName = sysname;
 
         /// <inheritdoc/>
         public int Compare(BodyDesignation? x, BodyDesignation? y)
@@ -174,14 +174,14 @@ namespace EddnIndexLookup.Filters
                 return 0;
             }
 
-            if (!x.Designation.StartsWith(SystemName))
+            if (!x.Designation.StartsWith(_systemName))
             {
-                return y.Designation.StartsWith(SystemName) ? -1 : x.Designation.CompareTo(y.Designation);
+                return y.Designation.StartsWith(_systemName) ? 1 : x.Designation.CompareTo(y.Designation);
             }
 
-            if (!y.Designation.StartsWith(SystemName))
+            if (!y.Designation.StartsWith(_systemName))
             {
-                return 1;
+                return -1;
             }
 
             if (x.BodyDesignation is null || y.BodyDesignation is null)

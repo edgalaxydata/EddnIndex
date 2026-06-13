@@ -9,7 +9,9 @@ public static class PGSectors
         public readonly sbyte Y = y;
         public readonly sbyte Z = z;
 
-        public readonly bool IsValid => X >= 0 && Y >= 0 && Y < 64 && Z >= 0;
+        public readonly bool IsValid => X >= 0  // sbyte, so upper bound is already <= 127
+                                     && Y >= 0 && Y < 64
+                                     && Z >= 0; // sbyte, so upper bound is already <= 127
 
         public readonly int Ord => IsValid ? X + Y * 128 + Z * 16384 : -1;
 
@@ -385,7 +387,7 @@ public static class PGSectors
         List<FragmentInfo> fragments = [];
         ReadOnlySpan<char> current = name;
 
-        while (current != "")
+        while (!current.IsEmpty)
         {
             bool spacestart = current.StartsWith(" ");
             current = current.Trim();
