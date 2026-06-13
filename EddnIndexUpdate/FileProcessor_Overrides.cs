@@ -196,22 +196,21 @@ public partial class FileProcessor
 
             if (File.Exists(BodyOverridesFile))
             {
-                foreach (var line in File.ReadLines(BodyOverridesFile)
+                foreach (var ent in File.ReadLines(BodyOverridesFile)
                                          .Select(e => JsonConvert.DeserializeObject<Models.BodyNameOverride>(e))
-                                         .OfType<Models.BodyNameOverride>())
+                                         .OfType<Models.BodyNameOverride>()
+                                         .Select(e => e with
+                                         {
+                                             ValidFrom = string.IsNullOrWhiteSpace(e.SinceVersion)
+                                                      || !GameVersionDates.TryGetValue(e.SinceVersion, out var ver)
+                                                       ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                                                       : ver.UpdateTime,
+                                             ValidTo   = string.IsNullOrWhiteSpace(e.UntilVersion)
+                                                      || !GameVersionDates.TryGetValue(e.UntilVersion, out ver)
+                                                       ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+                                                       : ver.UpdateTime
+                                         }))
                 {
-                    var ent = line with
-                    {
-                        ValidFrom = string.IsNullOrWhiteSpace(line.SinceVersion)
-                                    || !GameVersionDates.TryGetValue(line.SinceVersion, out var ver)
-                                    ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-                                    : ver.UpdateTime,
-                        ValidTo   = string.IsNullOrWhiteSpace(line.UntilVersion)
-                                    || !GameVersionDates.TryGetValue(line.UntilVersion, out ver)
-                                    ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
-                                    : ver.UpdateTime
-                    };
-
                     if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                     {
                         BodyNameOverrides[ent.BodyName] = overrides = [];
@@ -223,12 +222,12 @@ public partial class FileProcessor
                     }
 
                     if (!overrides.Any(e => e.SystemAddress == ent.SystemAddress
-                                            && e.SystemName == ent.SystemName
-                                            && e.BodyID == ent.BodyID
-                                            && e.BodyDesignation == ent.BodyDesignation
-                                            && e.BodyType == ent.BodyType
-                                            && e.ArgOfPeriapsis == ent.ArgOfPeriapsis
-                                            && e.Inclination == ent.Inclination))
+                                         && e.SystemName == ent.SystemName
+                                         && e.BodyID == ent.BodyID
+                                         && e.BodyDesignation == ent.BodyDesignation
+                                         && e.BodyType == ent.BodyType
+                                         && e.ArgOfPeriapsis == ent.ArgOfPeriapsis
+                                         && e.Inclination == ent.Inclination))
                     {
                         ctx.Add(ent);
                         overrides.Add(ent);
