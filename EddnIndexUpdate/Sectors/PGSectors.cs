@@ -346,22 +346,20 @@ public static class PGSectors
 
     private static string ExtractC1Prefix(int offset, out int nextOffset, out bool isVowel)
     {
-        int prefix_cnt = Math.DivRem(offset, PrefixTotalRunLength, out int rem);
-        string prefix = Prefixes.Last(p => PrefixOffsets[p] <= rem);
-        nextOffset = prefix_cnt * PrefixRunLengths[prefix] + rem - PrefixOffsets[prefix];
+        int offsetNumerator = Math.DivRem(offset, PrefixTotalRunLength, out int prefixOffset);
+        string prefix = Prefixes.Last(p => PrefixOffsets[p] <= prefixOffset);
+        nextOffset = offsetNumerator * PrefixRunLengths[prefix] + prefixOffset - PrefixOffsets[prefix];
         isVowel = C1VowelPrefixes.Contains(prefix);
         return prefix;
     }
 
     private static string ExtractC1Infix(int offset, bool isVowel, out int nextOffset)
     {
-        int infix_total_len = isVowel ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
+        int infixTotalLen = isVowel ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
+        int offsetNumerator = Math.DivRem(offset, infixTotalLen, out int infixOffset);
         string[] infixes = isVowel ? NonVowelInfixes : VowelInfixes;
-        int infix_cnt = Math.DivRem(offset, infix_total_len, out int cur_offset);
-        string infix = infixes.Last(p => InfixOffsets[p] <= cur_offset);
-        cur_offset -= InfixOffsets[infix];
-        int infix1_run_len = InfixRunLengths[infix];
-        nextOffset = infix1_run_len * infix_cnt + cur_offset;
+        string infix = infixes.Last(p => InfixOffsets[p] <= infixOffset);
+        nextOffset = offsetNumerator * InfixRunLengths[infix] + infixOffset - InfixOffsets[infix];
         return infix;
     }
 
@@ -391,14 +389,14 @@ public static class PGSectors
 
     private static string GetC2Name(int offset)
     {
-        Tuple<ushort, ushort> cur_idx = Deinterleave2((uint)offset);
-        string p1 = Prefixes.Last(p => PrefixOffsets[p] <= cur_idx.Item1);
-        string p2 = Prefixes.Last(p => PrefixOffsets[p] <= cur_idx.Item2);
-        string[] s1s = C2VowelPrefixes.Contains(p1) ? NonVowelSuffixes : VowelSuffixes;
-        string[] s2s = C2VowelPrefixes.Contains(p2) ? NonVowelSuffixes : VowelSuffixes;
-        string s1 = s1s[cur_idx.Item1 - PrefixOffsets[p1]];
-        string s2 = s2s[cur_idx.Item2 - PrefixOffsets[p2]];
-        return $"{p1}{s1} {p2}{s2}";
+        var (offset1, offset2) = Deinterleave2((uint)offset);
+        string prefix1 = Prefixes.Last(p => PrefixOffsets[p] <= offset1);
+        string prefix2 = Prefixes.Last(p => PrefixOffsets[p] <= offset1);
+        string[] suffixes1 = C2VowelPrefixes.Contains(prefix1) ? NonVowelSuffixes : VowelSuffixes;
+        string[] suffixes2 = C2VowelPrefixes.Contains(prefix2) ? NonVowelSuffixes : VowelSuffixes;
+        string suffix1 = suffixes1[offset1 - PrefixOffsets[prefix1]];
+        string suffix2 = suffixes2[offset2 - PrefixOffsets[prefix2]];
+        return $"{prefix1}{suffix1} {prefix2}{suffix2}";
     }
 
     private static FragmentInfo FindFragment(ReadOnlySpan<char> current)
@@ -505,15 +503,15 @@ public static class PGSectors
         => frag.IsVowelInfix ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
 
     private static int C1ProcessInfixFragment(FragmentInfo frag, int offset)
-        => Math.DivRem(offset, InfixRunLengths[frag.Value], out int offset_mod)
+        => Math.DivRem(offset, InfixRunLengths[frag.Value], out int infixOffset)
          * InfixTotalRunLength(frag)
-         + offset_mod
+         + infixOffset
          + InfixOffsets[frag.Value];
 
     private static int C1ProcessPrefixFragment(FragmentInfo frag, int offset)
-        => Math.DivRem(offset, PrefixRunLengths[frag.Value], out int offset_mod)
+        => Math.DivRem(offset, PrefixRunLengths[frag.Value], out int prefixOffset)
          * PrefixTotalRunLength
-         + offset_mod
+         + prefixOffset
          + PrefixOffsets[frag.Value];
 
     private static int C1ProcessSuffix4Fragment(FragmentInfo suffix, FragmentInfo infix2)
@@ -579,7 +577,7 @@ public static class PGSectors
         }
     }
 
-    private static Tuple<ushort, ushort> Deinterleave2(uint val)
+    private static (ushort v1, ushort v2) Deinterleave2(uint val)
     {
         unchecked
         {
@@ -600,7 +598,7 @@ public static class PGSectors
             // Extract original 16-bit values:
             // - low 16 bits  => first input (v1)
             // - bits 32..47 => second input (v2)
-            return new Tuple<ushort, ushort>((ushort)(x & 0xFFFF), (ushort)(x >> 32 & 0xFFFF));
+            return ((ushort)(x & 0xFFFF), (ushort)(x >> 32 & 0xFFFF));
         }
     }
 
