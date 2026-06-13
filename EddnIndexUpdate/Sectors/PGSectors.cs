@@ -2,6 +2,23 @@
 
 public static class PGSectors
 {
+    private const int OrdBits = 7;
+    private const int XBits = 7;
+    private const int YBits = 6;
+    private const int ZBits = 7;
+    private const int XMask = (1 << XBits) - 1;
+    private const int YMask = (1 << YBits) - 1;
+    private const int ZMask = (1 << ZBits) - 1;
+    private const int XShift = 0;
+    private const int YShift = XShift + XBits;
+    private const int ZShift = YShift + YBits;
+    private const int OrdXStride = 1;
+    private const int OrdYStride = OrdXStride << OrdBits;
+    private const int OrdZStride = OrdYStride << OrdBits;
+    private const int XStride = 1;
+    private const int YStride = XStride << XBits;
+    private const int ZStride = YStride << YBits;
+
     [System.Diagnostics.DebuggerDisplay("({X},{Y},{Z})")]
     public readonly struct ByteXYZ(sbyte x, sbyte y, sbyte z) : IComparable<ByteXYZ>
     {
@@ -9,13 +26,17 @@ public static class PGSectors
         public readonly sbyte Y = y;
         public readonly sbyte Z = z;
 
-        public readonly bool IsValid => X >= 0  // sbyte, so upper bound is already <= 127
-                                     && Y >= 0 && Y < 64
-                                     && Z >= 0; // sbyte, so upper bound is already <= 127
+        public readonly bool IsValid => X >= 0 && X <= XMask
+                                     && Y >= 0 && Y <= YMask
+                                     && Z >= 0 && Z <= ZMask;
 
-        public readonly int Ord => IsValid ? X + Y * 128 + Z * 16384 : -1;
+        public readonly int Ord => IsValid
+                                 ? X * OrdXStride + Y * OrdYStride + Z * OrdZStride
+                                 : -1;
 
-        public readonly int SectorId => IsValid ? X + Y * 128 + Z * 8192 : -1;
+        public readonly int SectorId => IsValid
+                                      ? X * XStride + Y * YStride + Z * ZStride
+                                      : -1;
 
         public override readonly string ToString() => $"({X},{Y},{Z})";
 
@@ -44,23 +65,29 @@ public static class PGSectors
             return !left.Equals(right);
         }
 
-        public static readonly ByteXYZ Invalid = new(-128, -128, -128);
+        public static readonly ByteXYZ Invalid = new(sbyte.MinValue, sbyte.MinValue, sbyte.MinValue);
+
+        public static ByteXYZ FromSectorId(int sectorid)
+            => new(
+                (sbyte)(sectorid >> XShift & XMask),
+                (sbyte)(sectorid >> YShift & YMask),
+                (sbyte)(sectorid >> ZShift & ZMask)
+            );
     }
 
-    private struct FragmentInfo
-    {
-        public string Value;
-        public bool IsPrefix;
-        public bool IsC1VowelPrefix;
-        public bool IsC2VowelPrefix;
-        public int PrefixIndex;
-        public bool IsInfix;
-        public bool IsVowelInfix;
-        public int InfixIndex;
-        public bool IsSuffix;
-        public bool IsVowelSuffix;
-        public int SuffixIndex;
-    }
+    private readonly record struct FragmentInfo(
+            string Value,
+            bool IsPrefix = false,
+            bool IsC1VowelPrefix = false,
+            bool IsC2VowelPrefix = false,
+            int PrefixIndex = 0,
+            bool IsInfix = false,
+            bool IsVowelInfix = false,
+            int InfixIndex = 0,
+            bool IsSuffix = false,
+            bool IsVowelSuffix = false,
+            int SuffixIndex = 0
+    );
 
     // Tables of prefixes, infixes and suffixes from https://bitbucket.org/Esvandiary/edts/src/master/pgdata.py
     // Prefixes
@@ -138,7 +165,7 @@ public static class PGSectors
     private static readonly HashSet<string> C2PrefixSuffix2 = new(
     [
         "Eo", "Oo", "Eu", "Ou", "Ae", "Ai", "Eae", "Ao", "Au", "Aae"
-    ], StringComparer.InvariantCultureIgnoreCase);
+    ], StringComparer.OrdinalIgnoreCase);
 
     // Vowelish C1 prefixes
     private static readonly HashSet<string> C1PrefixInfix2 = new(
@@ -146,10 +173,10 @@ public static class PGSectors
         "Eo", "Oo", "Eu", "Ou", "Ae", "Ai", "Eae", "Ao",
         "Au", "Aae", "A", "Io", "E", "I", "O", "Ea",
         "U", "Ee", "Ei", "Oe"
-    ], StringComparer.InvariantCultureIgnoreCase);
+    ], StringComparer.OrdinalIgnoreCase);
 
     // Prefixes using short run lengths
-    private static readonly Dictionary<string, int> PrefixRunLengths = new(StringComparer.InvariantCultureIgnoreCase)
+    private static readonly Dictionary<string, int> PrefixRunLengths = new(StringComparer.OrdinalIgnoreCase)
     {
         { "Eu",   31 }, { "Sly",   4 }, { "Tz",    1 }, { "Phl",  13 },
         { "Ae",   12 }, { "Hyp",  25 }, { "Kyl",  30 }, { "Phr",  10 },
@@ -164,7 +191,7 @@ public static class PGSectors
     };
 
     // Infixes using short run lengths
-    private static readonly Dictionary<string, int> InfixRunLengths = new(StringComparer.InvariantCultureIgnoreCase)
+    private static readonly Dictionary<string, int> InfixRunLengths = new(StringComparer.OrdinalIgnoreCase)
     {
         // Sequence 1
         { "oi",   88 }, { "ue",  147 }, { "oa",   57 },
@@ -175,15 +202,15 @@ public static class PGSectors
 
     private static readonly FragmentInfo[] Fragments = FillFragments(Prefixes, Infixes1, Infixes2, Suffixes1, Suffixes2);
 
-    private static readonly Dictionary<string, int> PrefixOffsets = new(StringComparer.InvariantCultureIgnoreCase);
+    private static readonly Dictionary<string, int> PrefixOffsets = new(StringComparer.OrdinalIgnoreCase);
     private static readonly int PrefixTotalRunLength = FillOffsets(Prefixes, PrefixRunLengths, PrefixOffsets, 35);
 
-    private static readonly Dictionary<string, int> InfixOffsets = new(StringComparer.InvariantCultureIgnoreCase);
+    private static readonly Dictionary<string, int> InfixOffsets = new(StringComparer.OrdinalIgnoreCase);
     private static readonly int Infix1TotalRunLength = FillOffsets(Infixes1, InfixRunLengths, InfixOffsets, Suffixes2.Length);
     private static readonly int Infix2TotalRunLength = FillOffsets(Infixes2, InfixRunLengths, InfixOffsets, Suffixes1.Length);
 
     private static readonly Dictionary<ByteXYZ, string> CachedSectorsByCoords = [];
-    private static readonly Dictionary<string, ByteXYZ> CachedSectorsByName = new(StringComparer.InvariantCultureIgnoreCase);
+    private static readonly Dictionary<string, ByteXYZ> CachedSectorsByName = new(StringComparer.OrdinalIgnoreCase);
 
     private static int FillOffsets(string[] prefixes, Dictionary<string, int> runlengths, Dictionary<string, int> offsets, int defaultlen)
     {
@@ -203,60 +230,70 @@ public static class PGSectors
         return cnt;
     }
 
+    private static void AddOrUpdateFragment(Dictionary<string, FragmentInfo> frags, string value, Func<FragmentInfo, string, FragmentInfo> modifyAction)
+    {
+        string p = value.ToLowerInvariant();
+
+        var frag = frags.TryGetValue(p, out FragmentInfo v)
+                 ? v
+                 : new FragmentInfo { Value = p };
+
+        frags[p] = modifyAction(frag, p);
+    }
+
     private static FragmentInfo[] FillFragments(string[] prefixes, string[] infixes1, string[] infixes2, string[] suffixes1, string[] suffixes2)
     {
-        Dictionary<string, FragmentInfo> frags = new(StringComparer.InvariantCultureIgnoreCase);
+        Dictionary<string, FragmentInfo> frags = new(StringComparer.OrdinalIgnoreCase);
 
         for (int i = 0; i < prefixes.Length; i++)
         {
-            string prefix = prefixes[i];
-            string p = prefix.ToLowerInvariant();
-            FragmentInfo frag = frags.TryGetValue(p, out FragmentInfo value) ? value : new FragmentInfo { Value = p };
-            frag.IsPrefix = true;
-            frag.IsC1VowelPrefix = C1PrefixInfix2.Contains(prefix);
-            frag.IsC2VowelPrefix = C2PrefixSuffix2.Contains(prefix);
-            frag.PrefixIndex = i;
-            frags[p] = frag;
+            AddOrUpdateFragment(frags, prefixes[i], (e, p) => e with
+            {
+                IsPrefix = true,
+                IsC1VowelPrefix = C1PrefixInfix2.Contains(p),
+                IsC2VowelPrefix = C2PrefixSuffix2.Contains(p),
+                PrefixIndex = i
+            });
         }
 
         for (int i = 0; i < infixes1.Length; i++)
         {
-            string p = infixes1[i].ToLowerInvariant();
-            FragmentInfo frag = frags.TryGetValue(p, out FragmentInfo value) ? value : new FragmentInfo { Value = p };
-            frag.IsInfix = true;
-            frag.IsVowelInfix = true;
-            frag.InfixIndex = i;
-            frags[p] = frag;
+            AddOrUpdateFragment(frags, infixes1[i], (e, _) => e with
+            {
+                IsInfix = true,
+                IsVowelInfix = true,
+                InfixIndex = i
+            });
         }
 
         for (int i = 0; i < infixes2.Length; i++)
         {
-            string p = infixes2[i].ToLowerInvariant();
-            FragmentInfo frag = frags.TryGetValue(p, out FragmentInfo value) ? value : new FragmentInfo { Value = p };
-            frag.IsInfix = true;
-            frag.IsVowelInfix = false;
-            frag.InfixIndex = i;
-            frags[p] = frag;
+            AddOrUpdateFragment(frags, infixes2[i], (e, _) => e with
+            {
+                IsInfix = true,
+                IsVowelInfix = false,
+                InfixIndex = i
+            });
         }
 
         for (int i = 0; i < suffixes1.Length; i++)
         {
-            string p = suffixes1[i].ToLowerInvariant();
-            FragmentInfo frag = frags.TryGetValue(p, out FragmentInfo value) ? value : new FragmentInfo { Value = p };
-            frag.IsSuffix = true;
-            frag.IsVowelSuffix = true;
-            frag.SuffixIndex = i;
-            frags[p] = frag;
+            AddOrUpdateFragment(frags, suffixes1[i], (e, _) => e with
+            {
+                IsSuffix = true,
+                IsVowelSuffix = true,
+                SuffixIndex = i
+            });
         }
 
         for (int i = 0; i < suffixes2.Length; i++)
         {
-            string p = suffixes2[i].ToLowerInvariant();
-            FragmentInfo frag = frags.TryGetValue(p, out FragmentInfo value) ? value : new FragmentInfo { Value = p };
-            frag.IsSuffix = true;
-            frag.IsVowelSuffix = false;
-            frag.SuffixIndex = i;
-            frags[p] = frag;
+            AddOrUpdateFragment(frags, suffixes2[i], (e, _) => e with
+            {
+                IsSuffix = true,
+                IsVowelSuffix = false,
+                SuffixIndex = i
+            });
         }
 
         return [.. frags.Values.OrderByDescending(f => f.Value.Length).ThenBy(f => f.Value)];
@@ -270,28 +307,24 @@ public static class PGSectors
             return value;
         }
 
-        int offset = (pos.Z << 14) + (pos.Y << 7) + pos.X;
+        int offset = pos.Ord;
         return CachedSectorsByCoords[pos] = IsC1Sector(offset) ? GetC1Name(offset) : GetC2Name(offset);
     }
 
     public static string GetSectorName(int sectorid)
     {
-        var pos = new ByteXYZ(
-            (sbyte)(sectorid & 0x7F),
-            (sbyte)(sectorid >> 7 & 0x3F),
-            (sbyte)(sectorid >> 13 & 0x7F)
-        );
+        var pos = ByteXYZ.FromSectorId(sectorid);
         return GetSectorName(pos);
     }
 
     public static string GetC1SectorName(ByteXYZ pos)
     {
-        return GetC1Name((pos.Z << 14) + (pos.Y << 7) + pos.X);
+        return GetC1Name(pos.Ord);
     }
 
     public static string GetC2SectorName(ByteXYZ pos)
     {
-        return GetC2Name((pos.Z << 14) + (pos.Y << 7) + pos.X);
+        return GetC2Name(pos.Ord);
     }
 
     private static bool IsC1Sector(int offset)
@@ -401,12 +434,15 @@ public static class PGSectors
 
             if (spacestart)
             {
-                frag.IsSuffix = false;
-                frag.IsInfix = false;
+                frag = frag with
+                {
+                    IsSuffix = false,
+                    IsInfix = false
+                };
             }
             else if (fragments.Count != 0 && frag.IsInfix && frag.IsVowelInfix != fragments.Last().IsVowelInfix)
             {
-                frag.IsPrefix = false;
+                frag = frag with { IsPrefix = false };
             }
 
             fragments.Add(frag);
