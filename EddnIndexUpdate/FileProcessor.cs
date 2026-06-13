@@ -569,17 +569,8 @@ public partial class FileProcessor(
         File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
     }
 
-    public async Task ProcessFileAsync(string filepath)
+    internal async Task ProcessFileAsync(string filepath, long filelen, Func<string, Stream> openFunc)
     {
-        await InitAsync();
-
-        if (!File.Exists(filepath))
-        {
-            return;
-        }
-
-        var fileinfo = new FileInfo(filepath);
-
         var filename = Path.GetFileName(filepath);
 
         if (!filename.EndsWith(".bz2"))
@@ -668,7 +659,7 @@ public partial class FileProcessor(
             indexFilename = $"{file.Date:yyyy-MM}/" + indexFilename;
         }
 
-        if (file.CompressedSize == fileinfo.Length
+        if (file.CompressedSize == filelen
             && file.UncompressedSize != null
             && file.LineCount != null
             && file.ErrorCount == 0
@@ -680,7 +671,7 @@ public partial class FileProcessor(
 
         if (Settings.IndexedDir != null)
         {
-            WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), file.LineCount, fileinfo.Length > file.UncompressedSize);
+            WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), file.LineCount, filelen > file.UncompressedSize);
         }
 
         Logger.LogInformation("Processing {Filename}", filename);
@@ -691,7 +682,7 @@ public partial class FileProcessor(
             file.LineCount,
             file.ErrorCount,
             file.ProcessedVersion,
-            fileinfo.Length,
+            filelen,
             Version
         );
 
@@ -713,7 +704,7 @@ public partial class FileProcessor(
         int bodySignalCount = 0;
         int errorCount = 0;
 
-        Stream stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        var stream = openFunc(filepath);
 
         if (filepath.EndsWith(".bz2"))
         {
@@ -957,7 +948,7 @@ public partial class FileProcessor(
         {
             var fileEntry = ctx.Attach(file);
             fileEntry.Property(e => e.LineCount).CurrentValue = lineCount;
-            fileEntry.Property(e => e.CompressedSize).CurrentValue = fileinfo.Length;
+            fileEntry.Property(e => e.CompressedSize).CurrentValue = filelen;
             fileEntry.Property(e => e.UncompressedSize).CurrentValue = reader.Position;
             fileEntry.Property(e => e.SystemLineCount).CurrentValue = systemLineCount;
             fileEntry.Property(e => e.StationLineCount).CurrentValue = stationLineCount;
@@ -972,7 +963,7 @@ public partial class FileProcessor(
             ctx.SaveChanges();
         }
 
-        if (Settings.IndexedDir != null && !filepath.EndsWith(".bz2") && reader.Position > fileinfo.Length)
+        if (Settings.IndexedDir != null && !filepath.EndsWith(".bz2") && reader.Position > filelen)
         {
             WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), null, true);
         }
@@ -995,6 +986,21 @@ public partial class FileProcessor(
         SignalInfoCounts.Clear();
         BodySignalInfoCache.Clear();
         BodySignalInfoCounts.Clear();
+    }
+
+    public async Task ProcessFileAsync(string filepath)
+    {
+        await InitAsync();
+
+        if (!File.Exists(filepath))
+        {
+            return;
+        }
+
+        var fileinfo = new FileInfo(filepath);
+        var filelen = fileinfo.Length;
+
+        await ProcessFileAsync(filepath, filelen, p => File.Open(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
     }
 
     private void HandleBadData(string filepath, int lineCount, Exception ex)
