@@ -25,8 +25,8 @@ public static class PGSectors
     private const int XStride = 1;
     private const int YStride = XStride << XBits;
     private const int ZStride = YStride << YBits;
-    private const int MaxOrd = 1 << (OrdBits * 3) - 1;
-    private const int MaxSectorId = 1 << (XBits + YBits + ZBits) - 1;
+    private const int MaxOrd = (1 << (OrdBits * 3)) - 1;
+    private const int MaxSectorId = (1 << (XBits + YBits + ZBits)) - 1;
 
     public readonly record struct ByteXYZ(sbyte X, sbyte Y, sbyte Z) : IComparable<ByteXYZ>
     {
@@ -377,7 +377,7 @@ public static class PGSectors
 
         var suffixes = prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
 
-        while (offset >= suffixes.Length)
+        if (offset >= suffixes.Length)
         {
             frags.Add(ExtractC1Infix(offset, prefixIsVowel, out offset));
             suffixes = !prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
