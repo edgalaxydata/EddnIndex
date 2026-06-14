@@ -1,6 +1,5 @@
 ﻿using EddnIndexUpdate.Sectors;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 
@@ -23,7 +22,7 @@ public partial class FileProcessor
 
         if (Sectors.Count == 0 || SectorsById.Count == 0)
         {
-            Logger.LogInformation("Loading sectors");
+            Logger.LogLoadingSectors();
 
             foreach (var sector in ctx.Set<Models.Sector>().AsNoTracking())
             {

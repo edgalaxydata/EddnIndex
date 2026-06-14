@@ -57,7 +57,7 @@ public partial class FileProcessor(
     [DoesNotReturn]
     public void Fail(string? message, object? extraData = null)
     {
-        Logger.LogError("Assert failure:\n{message}\nExtraData={ExtraData}", message, JsonConvert.SerializeObject(extraData));
+        Logger.LogAssertFailure(message, JsonConvert.SerializeObject(extraData));
 
         if (Debugger.IsAttached)
         {
@@ -89,7 +89,7 @@ public partial class FileProcessor(
 
         if (Files.Count == 0)
         {
-            Logger.LogInformation("Loading file info");
+            Logger.LogLoadingFileInfo();
 
             foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking())
             {
@@ -99,7 +99,7 @@ public partial class FileProcessor(
 
         if (Software.Count == 0)
         {
-            Logger.LogInformation("Loading software versions");
+            Logger.LogLoadingSoftwareVersions();
 
             foreach (var sw in ctx.Set<Models.SoftwareInfo>().AsNoTracking())
             {
@@ -109,7 +109,7 @@ public partial class FileProcessor(
 
         if (GameVersions.Count == 0)
         {
-            Logger.LogInformation("Loading game versions");
+            Logger.LogLoadingGameVersions();
 
             foreach (var gv in ctx.Set<Models.GameVersionInfo>().AsNoTracking())
             {
@@ -119,7 +119,7 @@ public partial class FileProcessor(
 
         if (Signals.Count == 0)
         {
-            Logger.LogInformation("Loading signals");
+            Logger.LogLoadingSignals();
             foreach (var s in ctx.Set<Models.SignalInfo>().AsNoTracking())
             {
                 Signals[(s.SignalName, s.SignalType, s.IsStation)] = s;
@@ -129,7 +129,7 @@ public partial class FileProcessor(
 
         if (SchemaEvents.Count == 0)
         {
-            Logger.LogInformation("Loading schema events");
+            Logger.LogLoadingSchemaEvents();
             foreach (var s in ctx.Set<Models.SchemaEventInfo>().AsNoTracking())
             {
                 SchemaEvents[(s.Schema, s.EventType)] = s;
@@ -138,7 +138,7 @@ public partial class FileProcessor(
 
         if (BodySignals.Count == 0)
         {
-            Logger.LogInformation("Loading body signals");
+            Logger.LogLoadingBodySignals();
 
             foreach (var s in ctx.Set<Models.BodySignalInfo>().AsNoTracking())
             {
@@ -148,7 +148,7 @@ public partial class FileProcessor(
 
         if (Stations.Count == 0)
         {
-            Logger.LogInformation("Loading stations");
+            Logger.LogLoadingStations();
 
             foreach (var s in ctx.Set<Models.StationInfo>().AsNoTracking())
             {
@@ -163,7 +163,7 @@ public partial class FileProcessor(
 
         if (SignalInfoSetCounts.Count == 0)
         {
-            Logger.LogInformation("Loading signal counts");
+            Logger.LogLoadingSignalCounts();
 
             foreach (var s in ctx.Set<Models.SignalInfoSet>().Select(e => new { e.Id, e.SignalCount }))
             {
@@ -442,7 +442,7 @@ public partial class FileProcessor(
 
     private void WriteIndexedFile(string filepath, string indexFilename, int? lineCount, bool force)
     {
-        Logger.LogInformation("Writing indexed file {Filename}", indexFilename);
+        Logger.LogWritingIndexedFile(indexFilename);
 
         if (File.Exists(indexFilename)
             && File.Exists(indexFilename + ".index")
@@ -697,9 +697,8 @@ public partial class FileProcessor(
             );
         }
 
-        Logger.LogInformation("Processing {Filename}", context.File.FileName);
-        Logger.LogInformation(
-            "Current: S:{CurLength} U:{CurUncLen} L:{CurLineCount} E:{CurErrorCount} V:{CurVersion} -> S:{UpdLength} V:{UpdVersion}",
+        Logger.LogProcessingFile(context.File.FileName);
+        Logger.LogProcessingFileState(
             context.File.CompressedSize,
             context.File.UncompressedSize,
             context.File.LineCount,
@@ -844,7 +843,7 @@ public partial class FileProcessor(
             {
                 if (!TryProcessLine(line, ref data))
                 {
-                    Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", context.FilePath, context.LineCount);
+                    Logger.LogIncompleteMessage(context.FilePath, context.LineCount);
 
                     if (Settings.BreakOnBadData != false && Debugger.IsAttached)
                     {
@@ -883,7 +882,7 @@ public partial class FileProcessor(
                 && data.NavRouteSystems.Count == 0
                 && data.EventType != "NavRoute")
             {
-                Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", context.FilePath, context.LineCount);
+                Logger.LogNoDataAvailable(context.FilePath, context.LineCount);
 
                 if (Settings.BreakOnBadData != false && Debugger.IsAttached)
                 {
@@ -1019,7 +1018,7 @@ public partial class FileProcessor(
 
     private void HandleBadData(string filepath, int lineCount, Exception ex)
     {
-        Logger.LogError(ex, "Error in file {FileName} line number {LineNo}: {Message}", filepath, lineCount, ex.Message);
+        Logger.LogBadData(ex, filepath, lineCount, ex.Message);
 
         if (Settings.BreakOnBadData != false && Debugger.IsAttached)
         {

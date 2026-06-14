@@ -1,6 +1,5 @@
 ﻿using Csv;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text;
@@ -36,7 +35,7 @@ public partial class FileProcessor
 
         if (SchemasByFilePrefix.Count == 0)
         {
-            Logger.LogInformation("Loading message types");
+            Logger.LogLoadingMessageTypes();
 
             foreach (var schema in ctx.Set<Models.FilePrefixSchema>().AsNoTracking())
             {
@@ -45,7 +44,7 @@ public partial class FileProcessor
 
             if (File.Exists(MessageTypesFile))
             {
-                Logger.LogInformation("Process message types file");
+                Logger.LogProcessingMessageTypesFile();
 
                 await foreach (var line in File.ReadLinesAsync(MessageTypesFile))
                 {
@@ -79,7 +78,7 @@ public partial class FileProcessor
 
         if (GameVersionDates.Count == 0)
         {
-            Logger.LogInformation("Loading game version dates");
+            Logger.LogLoadingGameVersionDates();
 
             foreach (var ent in ctx.Set<Models.GameVersionDate>())
             {
@@ -88,7 +87,7 @@ public partial class FileProcessor
 
             if (!File.Exists(GameVersionDatesFile))
             {
-                Logger.LogInformation("Retrieving game version dates");
+                Logger.LogRetrievingGameVersionDates();
 
                 await DownloadGameVersionsAsync(GameVersionDatesFile);
             }
@@ -119,7 +118,7 @@ public partial class FileProcessor
 
         if (SystemNameOverrides.Count == 0)
         {
-            Logger.LogInformation("Loading system name overrides");
+            Logger.LogLoadingSystemNameOverrides();
 
             foreach (var ent in ctx.Set<Models.SystemNameOverride>().AsNoTracking())
             {
@@ -133,7 +132,7 @@ public partial class FileProcessor
 
             if (!File.Exists(SystemOverridesFile))
             {
-                Logger.LogInformation("Retrieving system name overrides");
+                Logger.LogRetrievingSystemNameOverrides();
 
                 await DownloadSystemNameOverridesAsync(SystemOverridesFile);
             }
@@ -168,7 +167,7 @@ public partial class FileProcessor
 
         if (BodyNameOverrides.Count == 0)
         {
-            Logger.LogInformation("Loading body name overrides");
+            Logger.LogLoadingBodyNameOverrides();
 
             var bysysaddr = new Dictionary<long, List<Models.BodyNameOverride>>();
 
@@ -190,7 +189,7 @@ public partial class FileProcessor
 
             if (!File.Exists(BodyOverridesFile))
             {
-                Logger.LogInformation("Retrieving body overrides");
+                Logger.LogRetrievingBodyOverrides();
                 await DownloadBodyNameOverridesAsync(BodyOverridesFile);
             }
 

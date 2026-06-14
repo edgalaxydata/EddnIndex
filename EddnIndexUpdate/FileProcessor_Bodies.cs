@@ -1,5 +1,4 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -21,7 +20,7 @@ public partial class FileProcessor
 
         if (BodyNames.Count == 0)
         {
-            Logger.LogInformation("Loading body names");
+            Logger.LogLoadingBodyNames();
 
             foreach (var bodyname in ctx.Set<Models.BodyName>().AsNoTracking())
             {
@@ -31,7 +30,7 @@ public partial class FileProcessor
 
         if (BodyDesignations.Count == 0)
         {
-            Logger.LogInformation("Loading body designations");
+            Logger.LogLoadingBodyDesignations();
 
             foreach (var desig in ctx.Set<Models.BodyDesignation>().AsNoTracking())
             {
@@ -41,7 +40,7 @@ public partial class FileProcessor
 
         if (ParentSets.Count == 0)
         {
-            Logger.LogInformation("Loading parent sets");
+            Logger.LogLoadingParentSets();
 
             foreach (var ps in ctx.Set<Models.ParentSet>().AsNoTracking())
             {
@@ -350,7 +349,7 @@ public partial class FileProcessor
                 Debugger.Break();
             }
 
-            Logger.LogWarning("Encountered potential anomalous body name parsing case. Name: {BodyName}, SystemName: {SystemName}", name, systemName);
+            Logger.LogPotentialAnomalousBodyNameParsingCase(name, systemName);
         }
 
         if (BodyNames.TryGetValue(name, out var bodyName))
@@ -644,10 +643,7 @@ public partial class FileProcessor
                     Debugger.Break();
                 }
 
-                Logger.LogWarning(
-                    "Multiple body designation overrides matched. SystemName={SystemName}, BodyId={BodyId}, BodyType={BodyType}, Timestamp={Timestamp}, MatchCount={MatchCount}",
-                    systemName, bodyId, bodyType, timestamp, overrides.Count
-                );
+                Logger.LogMultipleBodyDesignationOverridesMatched(systemName, bodyId, bodyType, timestamp, overrides.Count);
             }
 
             if (overrides is [{ } ovr] && TryGetBodyDesignation(ovr.BodyDesignation, systemName, bodyId, bodyType, argOfPeriapsis, inclination, out var desig))
