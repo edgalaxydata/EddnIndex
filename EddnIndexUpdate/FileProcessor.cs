@@ -10,6 +10,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace EddnIndexUpdate;
 
@@ -569,7 +570,22 @@ public partial class FileProcessor(
         File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
     }
 
-    internal async Task ProcessFileAsync(string filepath, long filelen, Func<string, Stream> openFunc)
+    public async Task ProcessFileAsync(string filepath)
+    {
+        await InitAsync();
+
+        if (!File.Exists(filepath))
+        {
+            return;
+        }
+
+        var fileinfo = new FileInfo(filepath);
+        var filelen = fileinfo.Length;
+
+        await ProcessFileAsync(filepath, filelen, p => File.Open(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
+    }
+
+    private async Task<Models.FileInfo> GetOrAddFileAsync(string filepath)
     {
         var filename = Path.GetFileName(filepath);
 
@@ -652,12 +668,12 @@ public partial class FileProcessor(
             Files[filename] = file;
         }
 
-        var indexFilename = filename;
+        return file;
+    }
 
-        if (!indexFilename.Contains('/'))
-        {
-            indexFilename = $"{file.Date:yyyy-MM}/" + indexFilename;
-        }
+    internal async Task ProcessFileAsync(string filepath, long filelen, Func<string, Stream> openFunc)
+    {
+        var file = await GetOrAddFileAsync(filepath);
 
         if (file.CompressedSize == filelen
             && file.UncompressedSize != null
@@ -669,44 +685,35 @@ public partial class FileProcessor(
             return;
         }
 
+        var context = new FileProcessingContext(filepath, filelen, file);
+
         if (Settings.IndexedDir != null)
         {
-            WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), file.LineCount, filelen > file.UncompressedSize);
+            WriteIndexedFile(
+                context.FilePath,
+                Path.Join(Settings.IndexedDir, context.IndexedFilename),
+                context.File.LineCount,
+                context.FileLength > context.File.UncompressedSize
+            );
         }
 
-        Logger.LogInformation("Processing {Filename}", filename);
+        Logger.LogInformation("Processing {Filename}", context.File.FileName);
         Logger.LogInformation(
             "Current: S:{CurLength} U:{CurUncLen} L:{CurLineCount} E:{CurErrorCount} V:{CurVersion} -> S:{UpdLength} V:{UpdVersion}",
-            file.CompressedSize,
-            file.UncompressedSize,
-            file.LineCount,
-            file.ErrorCount,
-            file.ProcessedVersion,
-            filelen,
+            context.File.CompressedSize,
+            context.File.UncompressedSize,
+            context.File.LineCount,
+            context.File.ErrorCount,
+            context.File.ProcessedVersion,
+            context.FileLength,
             Version
         );
 
-        FillCacheForFile(file.Id);
+        FillCacheForFile(context.File.Id);
 
-        var newLines = new Dictionary<int, Models.FileLineInfo>();
-        var newBodyLines = new Dictionary<(int LineNo, int EntryNum), Models.FileLineBody>();
-        var newStationLines = new Dictionary<int, Models.FileLineStation>();
-        var newNavRouteEntries = new Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute>();
-        var newSignalEntries = new Dictionary<int, Models.FileLineSignal>();
-        var newBodySignalEntries = new Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal>();
+        var stream = openFunc(context.FilePath);
 
-        int lineCount = 0;
-        int systemLineCount = 0;
-        int stationLineCount = 0;
-        int navRouteSystemCount = 0;
-        int bodyLineCount = 0;
-        int signalCount = 0;
-        int bodySignalCount = 0;
-        int errorCount = 0;
-
-        var stream = openFunc(filepath);
-
-        if (filepath.EndsWith(".bz2"))
+        if (context.FilePath.EndsWith(".bz2"))
         {
             stream = new BZip2InputStream(stream);
         }
@@ -717,255 +724,62 @@ public partial class FileProcessor(
 
         while (reader.TryReadLine(out var line))
         {
-            lineCount++;
+            context.LineCount++;
 
-            if ((lineCount % 1000) == 0)
+            if ((context.LineCount % 1000) == 0)
             {
                 Console.Error.Write(".");
                 Console.Error.Flush();
 
-                SaveUpdates(newLines, newBodyLines, newStationLines, newNavRouteEntries, newSignalEntries, newBodySignalEntries);
+                await SaveUpdatesAsync(context);
 
-                if ((lineCount % 64000) == 0)
+                if ((context.LineCount % 64000) == 0)
                 {
-                    Console.Error.WriteLine($" {lineCount}");
+                    Console.Error.WriteLine($" {context.LineCount}");
                 }
             }
 
-            if (LineInfoCache.TryGetValue((file.Id, lineCount), out var lineInfo)
-                && lineInfo.ProcessedVersion == Version
-                && lineInfo.SchemaEventId != null
-                && lineInfo.HasStation is bool hasStation
-                && lineInfo.HasBody is bool hasBody
-                && lineInfo.NavRouteSystemCount is int lineNavRouteSystemCount
-                && lineInfo.BodySignalCount is int lineBodySignalCount
-                && lineInfo.SignalCount is int lineSignalCount
-                && BodyInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo, 0)) == hasBody
-                && StationInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo)) == hasStation
-                && BodySignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineBodySignalCount
-                && SignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineSignalCount
-                && NavRouteCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineNavRouteSystemCount)
-            {
-                systemLineCount += lineInfo.SystemId != null ? 1 : 0;
-                bodyLineCount += hasBody ? 1 : 0;
-                stationLineCount += hasStation ? 1 : 0;
-                navRouteSystemCount += lineNavRouteSystemCount;
-                signalCount += lineSignalCount;
-                bodySignalCount += lineBodySignalCount;
-
-                continue;
-            }
-
-            data.Clear(file, lineCount, int.CreateSaturating(line.Length));
-
-            if (line.Length < 2 || line.Length >= MaxLength)
-            {
-                data.IsBad = true;
-            }
-            else
-            {
-                try
-                {
-                    if (!TryProcessLine(line, ref data))
-                    {
-                        Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", filepath, lineCount);
-
-                        if (Settings.BreakOnBadData != false && Debugger.IsAttached)
-                        {
-                            Debugger.Break();
-                        }
-
-                        if (Settings.ExitOnBadData != false)
-                        {
-                            Environment.Exit(1);
-                        }
-
-                        data.IsBad = true;
-                        errorCount++;
-                    }
-                }
-                catch (System.Text.Json.JsonException ex)
-                {
-                    HandleBadData(filepath, lineCount, ex);
-
-                    data.IsBad = true;
-                    errorCount++;
-                }
-                catch (BadDataException ex)
-                {
-                    HandleBadData(filepath, lineCount, ex);
-
-                    data.IsBad = true;
-                    errorCount++;
-                }
-
-                if (data.System == null
-                    && data.Body == null
-                    && data.Station == null
-                    && data.Signals.Count == 0
-                    && data.BodySignals.Count == 0
-                    && data.NavRouteSystems.Count == 0
-                    && data.EventType != "NavRoute")
-                {
-                    Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", filepath, lineCount);
-
-                    if (Settings.BreakOnBadData != false && Debugger.IsAttached)
-                    {
-                        Debugger.Break();
-                    }
-
-                    if (Settings.ExitOnBadData != false)
-                    {
-                        Environment.Exit(1);
-                    }
-                }
-            }
-
-            newLines[data.LineNo] = new Models.FileLineInfo
-            {
-                FileId = file.Id,
-                LineNo = data.LineNo,
-                LineLength = data.LineLength,
-                GatewayTimestamp = data.GatewayTimestamp,
-                Timestamp = data.Timestamp,
-                ProcessedVersion = Version,
-                GameVersion = data.GameVersionInfo,
-                Software = data.Software,
-                System = data.System,
-                SchemaEvent = data.SchemaEvent,
-                IsBad = data.IsBad,
-                HasBody = data.Body != null,
-                HasStation = data.Station != null,
-                NavRouteSystemCount = data.NavRouteSystems.Count,
-                BodySignalCount = data.BodySignals.Count,
-                SignalCount = data.Signals.Count,
-            };
-
-            if (data.Body != null)
-            {
-                newBodyLines[(data.LineNo, 0)] = new Models.FileLineBody
-                {
-                    FileId = file.Id,
-                    LineNo = data.LineNo,
-                    EntryNum = 0,
-                    GatewayTimestamp = data.GatewayTimestamp,
-                    Body = data.Body,
-                    SemiMajorAxisError = data.SemiMajorAxisError == 0 ? null : data.SemiMajorAxisError,
-                    InclinationError = data.InclinationError == 0 ? null : data.InclinationError,
-                    ArgOfPeriapsisError = data.ArgOfPeriapsisError == 0 ? null : data.ArgOfPeriapsisError
-                };
-            }
-
-            foreach (var (entrynum, (body, smaerror, incerror, aoperror)) in data.SubBodies)
-            {
-                newBodyLines[(data.LineNo, entrynum)] = new Models.FileLineBody
-                {
-                    FileId = file.Id,
-                    LineNo = data.LineNo,
-                    EntryNum = entrynum,
-                    GatewayTimestamp = data.GatewayTimestamp,
-                    Body = body,
-                    SemiMajorAxisError = smaerror == 0 ? null : smaerror,
-                    InclinationError = incerror == 0 ? null : incerror,
-                    ArgOfPeriapsisError = aoperror == 0 ? null : aoperror
-                };
-            }
-
-            if (data.Station != null)
-            {
-                newStationLines[data.LineNo] = new Models.FileLineStation
-                {
-                    FileId = file.Id,
-                    LineNo = data.LineNo,
-                    GatewayTimestamp = data.GatewayTimestamp,
-                    Station = data.Station,
-                    LatitudeError = data.Latitude == data.Station.Latitude ? null : (short)Math.Round((data.Latitude - data.Station.Latitude) * 1000000 ?? 0),
-                    LongitudeError = data.Longitude == data.Station.Longitude ? null : (short)Math.Round((data.Longitude - data.Station.Longitude) * 1000000 ?? 0)
-                };
-            }
-
-            if (data.Signals.Count != 0)
-            {
-                var signalSet = GetOrAddSignalInfoSet(data.Signals.Values);
-
-                newSignalEntries[data.LineNo] = new Models.FileLineSignal
-                {
-                    FileId = file.Id,
-                    LineNo = data.LineNo,
-                    GatewayTimestamp = data.GatewayTimestamp,
-                    System = data.System,
-                    SignalInfoSet = signalSet
-                };
-            }
-
-            foreach (var (entnum, system) in data.NavRouteSystems)
-            {
-                newNavRouteEntries[(data.LineNo, entnum)] = new Models.FileLineNavRoute
-                {
-                    FileId = file.Id,
-                    LineNo = data.LineNo,
-                    EntryNum = entnum,
-                    GatewayTimestamp = data.GatewayTimestamp,
-                    System = system
-                };
-            }
-
-            foreach (var (entnum, signal) in data.BodySignals)
-            {
-                newBodySignalEntries[(data.LineNo, entnum)] = new Models.FileLineBodySignal
-                {
-                    FileId = file.Id,
-                    LineNo = data.LineNo,
-                    EntryNum = entnum,
-                    GatewayTimestamp = data.GatewayTimestamp,
-                    Latitude = data.Latitude,
-                    Longitude = data.Longitude,
-                    Signal = signal,
-                    Body = data.Body
-                };
-            }
-
-            systemLineCount += data.System != null ? 1 : 0;
-            bodyLineCount += data.Body != null ? 1 : 0;
-            stationLineCount += data.Station != null ? 1 : 0;
-            navRouteSystemCount += data.NavRouteSystems.Count;
-            signalCount += data.Signals.Count;
-            bodySignalCount += data.BodySignals.Count;
+            ProcessLine(line, context, ref data);
         }
 
-        Console.Error.WriteLine($" {lineCount}");
+        Console.Error.WriteLine($" {context.LineCount}");
 
-        SaveUpdates(newLines, newBodyLines, newStationLines, newNavRouteEntries, newSignalEntries, newBodySignalEntries);
+        await SaveUpdatesAsync(context);
 
         Models.SchemaEventInfo? fileSchemaEvent = null;
 
-        if (file.PrimarySchema != null)
+        if (context.File.PrimarySchema != null)
         {
-            fileSchemaEvent = GetOrAddSchemaEvent(file.PrimarySchema, file.EventType);
+            fileSchemaEvent = GetOrAddSchemaEvent(context.File.PrimarySchema, context.File.EventType);
         }
 
         using (var ctx = ContextFactory.CreateDbContext())
         {
-            var fileEntry = ctx.Attach(file);
-            fileEntry.Property(e => e.LineCount).CurrentValue = lineCount;
-            fileEntry.Property(e => e.CompressedSize).CurrentValue = filelen;
+            var fileEntry = ctx.Attach(context.File);
+            fileEntry.Property(e => e.LineCount).CurrentValue = context.LineCount;
+            fileEntry.Property(e => e.CompressedSize).CurrentValue = context.FileLength;
             fileEntry.Property(e => e.UncompressedSize).CurrentValue = reader.Position;
-            fileEntry.Property(e => e.SystemLineCount).CurrentValue = systemLineCount;
-            fileEntry.Property(e => e.StationLineCount).CurrentValue = stationLineCount;
-            fileEntry.Property(e => e.BodyLineCount).CurrentValue = bodyLineCount;
-            fileEntry.Property(e => e.NavRouteSystemCount).CurrentValue = navRouteSystemCount;
-            fileEntry.Property(e => e.SignalCount).CurrentValue = signalCount;
-            fileEntry.Property(e => e.BodySignalCount).CurrentValue = bodySignalCount;
-            fileEntry.Property(e => e.ErrorCount).CurrentValue = errorCount;
+            fileEntry.Property(e => e.SystemLineCount).CurrentValue = context.SystemLineCount;
+            fileEntry.Property(e => e.StationLineCount).CurrentValue = context.StationLineCount;
+            fileEntry.Property(e => e.BodyLineCount).CurrentValue = context.BodyLineCount;
+            fileEntry.Property(e => e.NavRouteSystemCount).CurrentValue = context.NavRouteSystemCount;
+            fileEntry.Property(e => e.SignalCount).CurrentValue = context.SignalCount;
+            fileEntry.Property(e => e.BodySignalCount).CurrentValue = context.BodySignalCount;
+            fileEntry.Property(e => e.ErrorCount).CurrentValue = context.ErrorCount;
             fileEntry.Property(e => e.ProcessedVersion).CurrentValue = Version;
             fileEntry.Property(e => e.PrimarySchemaEventId).CurrentValue = fileSchemaEvent?.Id;
 
             ctx.SaveChanges();
         }
 
-        if (Settings.IndexedDir != null && !filepath.EndsWith(".bz2") && reader.Position > filelen)
+        if (Settings.IndexedDir != null && !context.FilePath.EndsWith(".bz2") && reader.Position > context.FileLength)
         {
-            WriteIndexedFile(filepath, Path.Join(Settings.IndexedDir, indexFilename), null, true);
+            WriteIndexedFile(
+                context.FilePath,
+                Path.Join(Settings.IndexedDir, context.IndexedFilename),
+                null,
+                true
+            );
         }
 
         SystemCache.Clear();
@@ -988,19 +802,219 @@ public partial class FileProcessor(
         BodySignalInfoCounts.Clear();
     }
 
-    public async Task ProcessFileAsync(string filepath)
+    private void ProcessLine(
+            ReadOnlySequence<byte> line,
+            FileProcessingContext context,
+            ref FileLineData data
+        )
     {
-        await InitAsync();
-
-        if (!File.Exists(filepath))
+        if (LineInfoCache.TryGetValue((context.File.Id, context.LineCount), out var lineInfo)
+            && lineInfo.ProcessedVersion == Version
+            && lineInfo.SchemaEventId != null
+            && lineInfo.HasStation is bool hasStation
+            && lineInfo.HasBody is bool hasBody
+            && lineInfo.NavRouteSystemCount is int lineNavRouteSystemCount
+            && lineInfo.BodySignalCount is int lineBodySignalCount
+            && lineInfo.SignalCount is int lineSignalCount
+            && BodyInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo, 0)) == hasBody
+            && StationInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo)) == hasStation
+            && BodySignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineBodySignalCount
+            && SignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineSignalCount
+            && NavRouteCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineNavRouteSystemCount)
         {
+            context.SystemLineCount += lineInfo.SystemId != null ? 1 : 0;
+            context.BodyLineCount += hasBody ? 1 : 0;
+            context.StationLineCount += hasStation ? 1 : 0;
+            context.NavRouteSystemCount += lineNavRouteSystemCount;
+            context.SignalCount += lineSignalCount;
+            context.BodySignalCount += lineBodySignalCount;
+
             return;
         }
 
-        var fileinfo = new FileInfo(filepath);
-        var filelen = fileinfo.Length;
+        data.Clear(context.File, context.LineCount, int.CreateSaturating(line.Length));
 
-        await ProcessFileAsync(filepath, filelen, p => File.Open(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
+        if (line.Length < 2 || line.Length >= MaxLength)
+        {
+            data.IsBad = true;
+        }
+        else
+        {
+            try
+            {
+                if (!TryProcessLine(line, ref data))
+                {
+                    Logger.LogError("Error in file {FileName} line number {LineNo}: incomplete message", context.FilePath, context.LineCount);
+
+                    if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+                    {
+                        Debugger.Break();
+                    }
+
+                    if (Settings.ExitOnBadData != false)
+                    {
+                        Environment.Exit(1);
+                    }
+
+                    data.IsBad = true;
+                    context.ErrorCount++;
+                }
+            }
+            catch (System.Text.Json.JsonException ex)
+            {
+                HandleBadData(context.FilePath, context.LineCount, ex);
+
+                data.IsBad = true;
+                context.ErrorCount++;
+            }
+            catch (BadDataException ex)
+            {
+                HandleBadData(context.FilePath, context.LineCount, ex);
+
+                data.IsBad = true;
+                context.ErrorCount++;
+            }
+
+            if (data.System == null
+                && data.Body == null
+                && data.Station == null
+                && data.Signals.Count == 0
+                && data.BodySignals.Count == 0
+                && data.NavRouteSystems.Count == 0
+                && data.EventType != "NavRoute")
+            {
+                Logger.LogError("Error in file {FileName} line number {LineNo}: no data available", context.FilePath, context.LineCount);
+
+                if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+                {
+                    Debugger.Break();
+                }
+
+                if (Settings.ExitOnBadData != false)
+                {
+                    Environment.Exit(1);
+                }
+            }
+        }
+
+        FillLines(data, context);
+
+        context.SystemLineCount += data.System != null ? 1 : 0;
+        context.BodyLineCount += data.Body != null ? 1 : 0;
+        context.StationLineCount += data.Station != null ? 1 : 0;
+        context.NavRouteSystemCount += data.NavRouteSystems.Count;
+        context.SignalCount += data.Signals.Count;
+        context.BodySignalCount += data.BodySignals.Count;
+    }
+
+    private void FillLines(
+            FileLineData data,
+            FileProcessingContext context
+        )
+    {
+        context.NewLines[data.LineNo] = new Models.FileLineInfo
+        {
+            FileId = context.File.Id,
+            LineNo = data.LineNo,
+            LineLength = data.LineLength,
+            GatewayTimestamp = data.GatewayTimestamp,
+            Timestamp = data.Timestamp,
+            ProcessedVersion = Version,
+            GameVersion = data.GameVersionInfo,
+            Software = data.Software,
+            System = data.System,
+            SchemaEvent = data.SchemaEvent,
+            IsBad = data.IsBad,
+            HasBody = data.Body != null,
+            HasStation = data.Station != null,
+            NavRouteSystemCount = data.NavRouteSystems.Count,
+            BodySignalCount = data.BodySignals.Count,
+            SignalCount = data.Signals.Count,
+        };
+
+        if (data.Body != null)
+        {
+            context.NewBodyLines[(data.LineNo, 0)] = new Models.FileLineBody
+            {
+                FileId = context.File.Id,
+                LineNo = data.LineNo,
+                EntryNum = 0,
+                GatewayTimestamp = data.GatewayTimestamp,
+                Body = data.Body,
+                SemiMajorAxisError = data.SemiMajorAxisError == 0 ? null : data.SemiMajorAxisError,
+                InclinationError = data.InclinationError == 0 ? null : data.InclinationError,
+                ArgOfPeriapsisError = data.ArgOfPeriapsisError == 0 ? null : data.ArgOfPeriapsisError
+            };
+        }
+
+        foreach (var (entrynum, (body, smaerror, incerror, aoperror)) in data.SubBodies)
+        {
+            context.NewBodyLines[(data.LineNo, entrynum)] = new Models.FileLineBody
+            {
+                FileId = context.File.Id,
+                LineNo = data.LineNo,
+                EntryNum = entrynum,
+                GatewayTimestamp = data.GatewayTimestamp,
+                Body = body,
+                SemiMajorAxisError = smaerror == 0 ? null : smaerror,
+                InclinationError = incerror == 0 ? null : incerror,
+                ArgOfPeriapsisError = aoperror == 0 ? null : aoperror
+            };
+        }
+
+        if (data.Station != null)
+        {
+            context.NewStationLines[data.LineNo] = new Models.FileLineStation
+            {
+                FileId = context.File.Id,
+                LineNo = data.LineNo,
+                GatewayTimestamp = data.GatewayTimestamp,
+                Station = data.Station,
+                LatitudeError = data.Latitude == data.Station.Latitude ? null : (short)Math.Round((data.Latitude - data.Station.Latitude) * 1000000 ?? 0),
+                LongitudeError = data.Longitude == data.Station.Longitude ? null : (short)Math.Round((data.Longitude - data.Station.Longitude) * 1000000 ?? 0)
+            };
+        }
+
+        if (data.Signals.Count != 0)
+        {
+            var signalSet = GetOrAddSignalInfoSet(data.Signals.Values);
+
+            context.NewSignalEntries[data.LineNo] = new Models.FileLineSignal
+            {
+                FileId = context.File.Id,
+                LineNo = data.LineNo,
+                GatewayTimestamp = data.GatewayTimestamp,
+                System = data.System,
+                SignalInfoSet = signalSet
+            };
+        }
+
+        foreach (var (entnum, system) in data.NavRouteSystems)
+        {
+            context.NewNavRouteEntries[(data.LineNo, entnum)] = new Models.FileLineNavRoute
+            {
+                FileId = context.File.Id,
+                LineNo = data.LineNo,
+                EntryNum = entnum,
+                GatewayTimestamp = data.GatewayTimestamp,
+                System = system
+            };
+        }
+
+        foreach (var (entnum, signal) in data.BodySignals)
+        {
+            context.NewBodySignalEntries[(data.LineNo, entnum)] = new Models.FileLineBodySignal
+            {
+                FileId = context.File.Id,
+                LineNo = data.LineNo,
+                EntryNum = entnum,
+                GatewayTimestamp = data.GatewayTimestamp,
+                Latitude = data.Latitude,
+                Longitude = data.Longitude,
+                Signal = signal,
+                Body = data.Body
+            };
+        }
     }
 
     private void HandleBadData(string filepath, int lineCount, Exception ex)
@@ -1041,409 +1055,433 @@ public partial class FileProcessor(
         }
     }
 
-    private void SaveUpdates(
-            Dictionary<int, Models.FileLineInfo> newLines,
-            Dictionary<(int LineNo, int EntryNum), Models.FileLineBody> newBodyLines,
-            Dictionary<int, Models.FileLineStation> newStationLines,
-            Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> newNavRouteEntries,
-            Dictionary<int, Models.FileLineSignal> newSignalEntries,
-            Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> newBodySignalEntries
-        )
+    private async Task SaveUpdatesAsync(FileProcessingContext context)
     {
-        using (var ctx = ContextFactory.CreateDbContext())
+        await using (var ctx = await ContextFactory.CreateDbContextAsync())
         {
             ctx.AddRange(SystemCache.Values.Where(e => e.Id <= 0));
-            ctx.SaveChanges();
+            await ctx.SaveChangesAsync();
         }
 
-        using (var ctx = ContextFactory.CreateDbContext())
+        await SaveBodiesAsync();
+        await SaveSignalsAsync();
+
+        await SaveLinesAsync(context.NewLines);
+
+        context.NewLines.Clear();
+
+        await SaveBodyLinesAsync(context.NewBodyLines);
+
+        context.NewBodyLines.Clear();
+
+        await SaveStationLinesAsync(context.NewStationLines);
+
+        context.NewStationLines.Clear();
+
+        await SaveNavRouteEntriesAsync(context.NewNavRouteEntries);
+
+        context.NewNavRouteEntries.Clear();
+
+        await SaveSignalEntriesAsync(context.NewSignalEntries);
+
+        context.NewSignalEntries.Clear();
+
+        await SaveBodySignalEntriesAsync(context.NewBodySignalEntries);
+
+        context.NewBodySignalEntries.Clear();
+    }
+
+    private async Task SaveBodiesAsync()
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        foreach (var set in BodyCache.Values)
         {
-            foreach (var set in BodyCache.Values)
+            foreach (var ent in set)
             {
-                foreach (var ent in set)
+                if (ent.System != null)
                 {
-                    if (ent.System != null)
-                    {
-                        Assert(ent.System.Id > 0);
-                        ent.SystemId = ent.System.Id;
-                        ent.System = null;
-                    }
-
-                    if (ent.ParentSet != null)
-                    {
-                        Assert(ent.ParentSet.Id > 0);
-                        ent.ParentSetId = ent.ParentSet.Id;
-                        ent.ParentSet = null;
-                    }
-
-                    if (ent.Id <= 0)
-                    {
-                        ctx.Add(ent);
-                    }
-                }
-            }
-
-            ctx.SaveChanges();
-        }
-
-        using (var ctx = ContextFactory.CreateDbContext())
-        {
-            foreach (var ent in SignalInfoSetCache.Values)
-            {
-                foreach (var sig in ent.SignalSetItems)
-                {
-                    if (sig.Signal != null)
-                    {
-                        sig.SignalInfoId = sig.Signal.Id;
-                        sig.Signal = null;
-                    }
+                    Assert(ent.System.Id > 0);
+                    ent.SystemId = ent.System.Id;
+                    ent.System = null;
                 }
 
-                if (ent.Id == 0)
+                if (ent.ParentSet != null)
+                {
+                    Assert(ent.ParentSet.Id > 0);
+                    ent.ParentSetId = ent.ParentSet.Id;
+                    ent.ParentSet = null;
+                }
+
+                if (ent.Id <= 0)
                 {
                     ctx.Add(ent);
                 }
             }
-
-            ctx.SaveChanges();
         }
 
-        using (var ctx = ContextFactory.CreateDbContext())
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveSignalsAsync()
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        foreach (var ent in SignalInfoSetCache.Values)
         {
-            var softwareUpdates = new Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-            var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-            var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-            var schemaEventUpdates = new Dictionary<int, (Models.SchemaEventInfo, DateTime? FirstSeen, DateTime? LastSeen)>();
-            var sectorUpdates = new Dictionary<int, (Models.Sector Sector, DateTime? FirstSeen, DateTime? LastSeen)>();
-
-            foreach (var _ent in newLines.Values)
+            foreach (var sig in ent.SignalSetItems)
             {
-                Assert(_ent.Software?.Id != 0);
-                Assert(_ent.GameVersion?.Id != 0);
-                Assert(_ent.System?.Id != 0);
-                Assert(_ent.SchemaEvent?.Id != 0);
-
-                var software = _ent.Software;
-                var gameVersion = _ent.GameVersion;
-                var system = _ent.System;
-                var gatewayTimestamp = _ent.GatewayTimestamp;
-                var schemaEvent = _ent.SchemaEvent;
-                var sector = _ent.System?.SectorId is int sectorId
-                           ? SectorsById.GetValueOrDefault(sectorId)
-                           : _ent.System?.SectorAddress is int sectorAddr
-                           ? SectorsByAddr.GetValueOrDefault(sectorAddr)
-                           : null;
-
-                var ent = _ent with
+                if (sig.Signal != null)
                 {
-                    SoftwareId = software?.Id,
-                    GameVersionId = gameVersion?.Id,
-                    SystemId = system?.Id,
-                    SchemaEventId = schemaEvent?.Id,
-                    GameVersion = null,
-                    Software = null,
-                    System = null,
-                    SchemaEvent = null
-                };
-
-                AddOrUpdateInfo(softwareUpdates, software, gatewayTimestamp);
-                AddOrUpdateInfo(gameVersionUpdates, gameVersion, gatewayTimestamp);
-                AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
-                AddOrUpdateInfo(schemaEventUpdates, schemaEvent, gatewayTimestamp);
-                AddOrUpdateInfo(sectorUpdates, sector, gatewayTimestamp);
-
-                if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-                {
-                    var entry = ctx.Attach(lineInfo);
-                    entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                    entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
-                    entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
-                    entry.Property(e => e.SchemaEventId).CurrentValue = ent.SchemaEventId;
-                    entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
-                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                    entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
-                    entry.Property(e => e.HasBody).CurrentValue = ent.HasBody;
-                    entry.Property(e => e.HasStation).CurrentValue = ent.HasStation;
-                    entry.Property(e => e.SignalCount).CurrentValue = ent.SignalCount;
-                    entry.Property(e => e.BodySignalCount).CurrentValue = ent.BodySignalCount;
-                    entry.Property(e => e.NavRouteSystemCount).CurrentValue = ent.NavRouteSystemCount;
-                }
-                else
-                {
-                    ctx.Add(ent);
-                    LineInfoCache[(ent.FileId, ent.LineNo)] = ent;
+                    sig.SignalInfoId = sig.Signal.Id;
+                    sig.Signal = null;
                 }
             }
 
-            foreach (var (info, firstSeen, lastSeen) in gameVersionUpdates.Values)
+            if (ent.Id == 0)
             {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+                ctx.Add(ent);
             }
-
-            foreach (var (info, firstSeen, lastSeen) in softwareUpdates.Values)
-            {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
-            }
-
-            foreach (var (info, firstSeen, lastSeen) in systemUpdates.Values)
-            {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
-            }
-
-            foreach (var (info, firstSeen, lastSeen) in sectorUpdates.Values)
-            {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
-            }
-
-            ctx.SaveChanges();
         }
 
-        newLines.Clear();
+        await ctx.SaveChangesAsync();
+    }
 
-        using (var ctx = ContextFactory.CreateDbContext())
+    private async Task SaveLinesAsync(Dictionary<int, Models.FileLineInfo> newLines)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        var softwareUpdates = new Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+        var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+        var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+        var schemaEventUpdates = new Dictionary<int, (Models.SchemaEventInfo, DateTime? FirstSeen, DateTime? LastSeen)>();
+        var sectorUpdates = new Dictionary<int, (Models.Sector Sector, DateTime? FirstSeen, DateTime? LastSeen)>();
+
+        foreach (var _ent in newLines.Values)
         {
-            var bodyUpdates = new Dictionary<long, (Models.BodyInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+            Assert(_ent.Software?.Id != 0);
+            Assert(_ent.GameVersion?.Id != 0);
+            Assert(_ent.System?.Id != 0);
+            Assert(_ent.SchemaEvent?.Id != 0);
 
-            foreach (var _ent in newBodyLines.Values)
+            var software = _ent.Software;
+            var gameVersion = _ent.GameVersion;
+            var system = _ent.System;
+            var gatewayTimestamp = _ent.GatewayTimestamp;
+            var schemaEvent = _ent.SchemaEvent;
+            var sector = _ent.System?.SectorId is int sectorId
+                       ? SectorsById.GetValueOrDefault(sectorId)
+                       : _ent.System?.SectorAddress is int sectorAddr
+                       ? SectorsByAddr.GetValueOrDefault(sectorAddr)
+                       : null;
+
+            var ent = _ent with
             {
-                Assert(_ent.Body != null);
-                Assert(_ent.Body.Id != 0);
+                SoftwareId = software?.Id,
+                GameVersionId = gameVersion?.Id,
+                SystemId = system?.Id,
+                SchemaEventId = schemaEvent?.Id,
+                GameVersion = null,
+                Software = null,
+                System = null,
+                SchemaEvent = null
+            };
 
-                var body = _ent.Body;
-                var gatewayTimestamp = _ent.GatewayTimestamp;
+            AddOrUpdateInfo(softwareUpdates, software, gatewayTimestamp);
+            AddOrUpdateInfo(gameVersionUpdates, gameVersion, gatewayTimestamp);
+            AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
+            AddOrUpdateInfo(schemaEventUpdates, schemaEvent, gatewayTimestamp);
+            AddOrUpdateInfo(sectorUpdates, sector, gatewayTimestamp);
 
-                var ent = _ent with
-                {
-                    BodyId = _ent.Body.Id,
-                    Body = null
-                };
-
-                AddOrUpdateInfo(bodyUpdates, body, gatewayTimestamp);
-
-                if (BodyInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-                {
-                    var entry = ctx.Attach(lineInfo);
-                    entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
-                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                }
-                else
-                {
-                    ctx.Add(ent);
-                    BodyInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-                }
-            }
-
-            foreach (var (info, firstSeen, lastSeen) in bodyUpdates.Values)
+            if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
             {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+                var entry = ctx.Attach(lineInfo);
+                entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+                entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
+                entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
+                entry.Property(e => e.SchemaEventId).CurrentValue = ent.SchemaEventId;
+                entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
+                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
+                entry.Property(e => e.HasBody).CurrentValue = ent.HasBody;
+                entry.Property(e => e.HasStation).CurrentValue = ent.HasStation;
+                entry.Property(e => e.SignalCount).CurrentValue = ent.SignalCount;
+                entry.Property(e => e.BodySignalCount).CurrentValue = ent.BodySignalCount;
+                entry.Property(e => e.NavRouteSystemCount).CurrentValue = ent.NavRouteSystemCount;
             }
-
-            ctx.SaveChanges();
+            else
+            {
+                ctx.Add(ent);
+                LineInfoCache[(ent.FileId, ent.LineNo)] = ent;
+            }
         }
 
-        newBodyLines.Clear();
-
-        using (var ctx = ContextFactory.CreateDbContext())
+        foreach (var (info, firstSeen, lastSeen) in gameVersionUpdates.Values)
         {
-            var stationUpdates = new Dictionary<int, (Models.StationInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-
-            foreach (var _ent in newStationLines.Values)
-            {
-                Assert(_ent.Station != null);
-                Assert(_ent.Station.Id != 0);
-
-                var station = _ent.Station;
-                var gatewayTimestamp = _ent.GatewayTimestamp;
-
-                var ent = _ent with
-                {
-                    StationId = _ent.Station.Id,
-                    Station = null
-                };
-
-                AddOrUpdateInfo(stationUpdates, station, gatewayTimestamp);
-
-                if (StationInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-                {
-                    var entry = ctx.Attach(lineInfo);
-                    entry.Property(e => e.StationId).CurrentValue = ent.StationId;
-                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                }
-                else
-                {
-                    ctx.Add(ent);
-                    StationInfoCache[(ent.FileId, ent.LineNo)] = ent;
-                }
-            }
-
-            foreach (var (info, firstSeen, lastSeen) in stationUpdates.Values)
-            {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
-            }
-
-            ctx.SaveChanges();
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        newStationLines.Clear();
-
-        using (var ctx = ContextFactory.CreateDbContext())
+        foreach (var (info, firstSeen, lastSeen) in softwareUpdates.Values)
         {
-            var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-
-            foreach (var _ent in newNavRouteEntries.Values)
-            {
-                Assert(_ent.System != null);
-                Assert(_ent.System.Id != 0);
-
-                var system = _ent.System;
-                var gatewayTimestamp = _ent.GatewayTimestamp;
-
-                var ent = _ent with
-                {
-                    SystemId = _ent.System.Id,
-                    System = null
-                };
-
-                AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
-
-                if (NavRouteCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-                {
-                    var entry = ctx.Attach(lineInfo);
-                    entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                }
-                else
-                {
-                    ctx.Add(ent);
-                    NavRouteCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-                }
-            }
-
-            foreach (var (info, firstSeen, lastSeen) in systemUpdates.Values)
-            {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
-            }
-
-            ctx.SaveChanges();
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        newNavRouteEntries.Clear();
-
-        using (var ctx = ContextFactory.CreateDbContext())
+        foreach (var (info, firstSeen, lastSeen) in systemUpdates.Values)
         {
-            var signalUpdates = new Dictionary<int, (Models.SignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
-
-            foreach (var _ent in newSignalEntries.Values)
-            {
-                Assert(_ent.SignalInfoSet != null);
-                Assert(_ent.SignalInfoSet.Id != 0);
-
-                var siginfoset = _ent.SignalInfoSet;
-                var gatewayTimestamp = _ent.GatewayTimestamp;
-
-                var ent = _ent with
-                {
-                    SignalSetId = _ent.SignalInfoSet.Id,
-                    SystemId = _ent.System?.Id,
-                    System = null,
-                    SignalInfoSet = null
-                };
-
-                foreach (var signal in siginfoset.SignalSetItems
-                                                 .Select(e => SignalsById.GetValueOrDefault(e.SignalInfoId))
-                                                 .OfType<Models.SignalInfo>())
-                {
-                    AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
-                }
-
-                if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-                {
-                    var entry = ctx.Attach(lineInfo);
-                    entry.Property(e => e.SignalSetId).CurrentValue = ent.SignalSetId;
-                    entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                }
-                else
-                {
-                    ctx.Add(ent);
-                    SignalInfoCache[(ent.FileId, ent.LineNo)] = ent;
-                }
-            }
-
-            foreach (var (info, firstSeen, lastSeen) in signalUpdates.Values)
-            {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
-            }
-
-            ctx.SaveChanges();
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        newSignalEntries.Clear();
-
-        using (var ctx = ContextFactory.CreateDbContext())
+        foreach (var (info, firstSeen, lastSeen) in sectorUpdates.Values)
         {
-            var signalUpdates = new Dictionary<int, (Models.BodySignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
 
-            foreach (var _ent in newBodySignalEntries.Values)
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveBodyLinesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBody> newBodyLines)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        var bodyUpdates = new Dictionary<long, (Models.BodyInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+
+        foreach (var _ent in newBodyLines.Values)
+        {
+            Assert(_ent.Body != null);
+            Assert(_ent.Body.Id != 0);
+
+            var body = _ent.Body;
+            var gatewayTimestamp = _ent.GatewayTimestamp;
+
+            var ent = _ent with
             {
-                Assert(_ent.Signal != null);
-                Assert(_ent.Signal.Id != 0);
+                BodyId = _ent.Body.Id,
+                Body = null
+            };
 
-                var signal = _ent.Signal;
-                var gatewayTimestamp = _ent.GatewayTimestamp;
+            AddOrUpdateInfo(bodyUpdates, body, gatewayTimestamp);
 
-                var ent = _ent with
-                {
-                    BodySignalId = _ent.Signal.Id,
-                    BodyId = _ent.Body?.Id,
-                    Signal = null,
-                    Body = null
-                };
+            if (BodyInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+            {
+                var entry = ctx.Attach(lineInfo);
+                entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
+                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+            }
+            else
+            {
+                ctx.Add(ent);
+                BodyInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+            }
+        }
 
+        foreach (var (info, firstSeen, lastSeen) in bodyUpdates.Values)
+        {
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveStationLinesAsync(Dictionary<int, Models.FileLineStation> newStationLines)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        var stationUpdates = new Dictionary<int, (Models.StationInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+
+        foreach (var _ent in newStationLines.Values)
+        {
+            Assert(_ent.Station != null);
+            Assert(_ent.Station.Id != 0);
+
+            var station = _ent.Station;
+            var gatewayTimestamp = _ent.GatewayTimestamp;
+
+            var ent = _ent with
+            {
+                StationId = _ent.Station.Id,
+                Station = null
+            };
+
+            AddOrUpdateInfo(stationUpdates, station, gatewayTimestamp);
+
+            if (StationInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+            {
+                var entry = ctx.Attach(lineInfo);
+                entry.Property(e => e.StationId).CurrentValue = ent.StationId;
+                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+            }
+            else
+            {
+                ctx.Add(ent);
+                StationInfoCache[(ent.FileId, ent.LineNo)] = ent;
+            }
+        }
+
+        foreach (var (info, firstSeen, lastSeen) in stationUpdates.Values)
+        {
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveNavRouteEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> newNavRouteEntries)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+
+        foreach (var _ent in newNavRouteEntries.Values)
+        {
+            Assert(_ent.System != null);
+            Assert(_ent.System.Id != 0);
+
+            var system = _ent.System;
+            var gatewayTimestamp = _ent.GatewayTimestamp;
+
+            var ent = _ent with
+            {
+                SystemId = _ent.System.Id,
+                System = null
+            };
+
+            AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
+
+            if (NavRouteCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+            {
+                var entry = ctx.Attach(lineInfo);
+                entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+            }
+            else
+            {
+                ctx.Add(ent);
+                NavRouteCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+            }
+        }
+
+        foreach (var (info, firstSeen, lastSeen) in systemUpdates.Values)
+        {
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveSignalEntriesAsync(Dictionary<int, Models.FileLineSignal> newSignalEntries)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        var signalUpdates = new Dictionary<int, (Models.SignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+
+        foreach (var _ent in newSignalEntries.Values)
+        {
+            Assert(_ent.SignalInfoSet != null);
+            Assert(_ent.SignalInfoSet.Id != 0);
+
+            var siginfoset = _ent.SignalInfoSet;
+            var gatewayTimestamp = _ent.GatewayTimestamp;
+
+            var ent = _ent with
+            {
+                SignalSetId = _ent.SignalInfoSet.Id,
+                SystemId = _ent.System?.Id,
+                System = null,
+                SignalInfoSet = null
+            };
+
+            foreach (var signal in siginfoset.SignalSetItems
+                                             .Select(e => SignalsById.GetValueOrDefault(e.SignalInfoId))
+                                             .OfType<Models.SignalInfo>())
+            {
                 AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
-
-                if (BodySignalInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-                {
-                    var entry = ctx.Attach(lineInfo);
-                    entry.Property(e => e.BodySignalId).CurrentValue = ent.BodySignalId;
-                    entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
-                    entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                    entry.Property(e => e.Latitude).CurrentValue = ent.Latitude;
-                    entry.Property(e => e.Longitude).CurrentValue = ent.Longitude;
-                }
-                else
-                {
-                    ctx.Add(ent);
-                    BodySignalInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-                }
             }
 
-            foreach (var (info, firstSeen, lastSeen) in signalUpdates.Values)
+            if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
             {
-                var entry = ctx.Attach(info);
-                entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
-                entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+                var entry = ctx.Attach(lineInfo);
+                entry.Property(e => e.SignalSetId).CurrentValue = ent.SignalSetId;
+                entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
             }
-
-            ctx.SaveChanges();
+            else
+            {
+                ctx.Add(ent);
+                SignalInfoCache[(ent.FileId, ent.LineNo)] = ent;
+            }
         }
 
-        newBodySignalEntries.Clear();
+        foreach (var (info, firstSeen, lastSeen) in signalUpdates.Values)
+        {
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveBodySignalEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> newBodySignalEntries)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        var signalUpdates = new Dictionary<int, (Models.BodySignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+
+        foreach (var _ent in newBodySignalEntries.Values)
+        {
+            Assert(_ent.Signal != null);
+            Assert(_ent.Signal.Id != 0);
+
+            var signal = _ent.Signal;
+            var gatewayTimestamp = _ent.GatewayTimestamp;
+
+            var ent = _ent with
+            {
+                BodySignalId = _ent.Signal.Id,
+                BodyId = _ent.Body?.Id,
+                Signal = null,
+                Body = null
+            };
+
+            AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
+
+            if (BodySignalInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+            {
+                var entry = ctx.Attach(lineInfo);
+                entry.Property(e => e.BodySignalId).CurrentValue = ent.BodySignalId;
+                entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
+                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+                entry.Property(e => e.Latitude).CurrentValue = ent.Latitude;
+                entry.Property(e => e.Longitude).CurrentValue = ent.Longitude;
+            }
+            else
+            {
+                ctx.Add(ent);
+                BodySignalInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+            }
+        }
+
+        foreach (var (info, firstSeen, lastSeen) in signalUpdates.Values)
+        {
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
+        await ctx.SaveChangesAsync();
     }
 }

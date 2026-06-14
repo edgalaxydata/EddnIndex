@@ -4,13 +4,6 @@ namespace EddnIndexUpdate;
 
 public struct FileLineData
 {
-    private Dictionary<int, Models.SystemInfo> _navRouteSystems;
-    private Dictionary<int, Models.SignalInfo> _signals;
-    private Dictionary<int, Models.BodySignalInfo> _bodySignals;
-    private Dictionary<int, (string Name, decimal? innerRadius, decimal? outerRadius)> _ringData;
-    private Dictionary<int, (Models.BodyInfo body, short? smadiff, short? aopdiff, short? incdiff)> _subBodies;
-    private Dictionary<(string Name, JsonTokenType TokenType), int> _messageKeyCounts;
-
     public Models.FileInfo File { get; set; }
     public string? Schema { get; set; }
     public string? EventType { get; set; }
@@ -34,12 +27,12 @@ public struct FileLineData
     public Models.SoftwareInfo? Software { get; set; }
     public Models.GameVersionInfo? GameVersionInfo { get; set; }
     public Models.SchemaEventInfo? SchemaEvent { get; set; }
-    public Dictionary<int, (string Name, decimal? innerRadius, decimal? outerRadius)> RingData => _ringData ??= [];
-    public Dictionary<int, (Models.BodyInfo body, short? smaerror, short? aoperror, short? incerror)> SubBodies => _subBodies ??= [];
-    public Dictionary<int, Models.SystemInfo> NavRouteSystems => _navRouteSystems ??= [];
-    public Dictionary<int, Models.SignalInfo> Signals => _signals ??= [];
-    public Dictionary<int, Models.BodySignalInfo> BodySignals => _bodySignals ??= [];
-    public Dictionary<(string Name, JsonTokenType TokenType), int> MessageKeyCounts => _messageKeyCounts ??= [];
+    public Dictionary<int, (string Name, decimal? innerRadius, decimal? outerRadius)> RingData => field ??= [];
+    public Dictionary<int, (Models.BodyInfo body, short? smaerror, short? aoperror, short? incerror)> SubBodies => field ??= [];
+    public Dictionary<int, Models.SystemInfo> NavRouteSystems => field ??= [];
+    public Dictionary<int, Models.SignalInfo> Signals => field ??= [];
+    public Dictionary<int, Models.BodySignalInfo> BodySignals => field ??= [];
+    public Dictionary<(string Name, JsonTokenType TokenType), int> MessageKeyCounts => field ??= [];
 
     public void Clear(Models.FileInfo file, int lineNo, int lineLength)
     {
