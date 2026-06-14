@@ -383,6 +383,7 @@ public static class PGSectors
             suffixes = !prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
         }
 
+        // This is theoretical as there are no systems where there would be a third infix
         if (offset >= suffixes.Length)
         {
             frags.Add(ExtractC1Infix(offset, !prefixIsVowel, out offset));
@@ -535,6 +536,7 @@ public static class PGSectors
                 => CachedSectorsByName[name] = GetC1SectorPos3(p, i, s),
             [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsSuffix: true } s]
                 => CachedSectorsByName[name] = GetC1SectorPos4(p, i1, i2, s),
+            // This is theoretical, as there are no systems where there would be a third infix
             [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsInfix: true } i3, { IsSuffix: true } s]
                 => CachedSectorsByName[name] = GetC1SectorPos5(p, i1, i2, i3, s),
             _ => ByteXYZ.Invalid
@@ -607,6 +609,7 @@ public static class PGSectors
         return ByteXYZ.FromOrdinal(offset);
     }
 
+    // This is theoretical, as there are no systems where there would be a third infix
     private static ByteXYZ GetC1SectorPos5(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo infix3, FragmentInfo suffix)
     {
         if (prefix.IsVowelPrefix == infix1.IsVowelInfix
