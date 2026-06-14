@@ -614,7 +614,7 @@ public static class PGSectors
     {
         if (prefix.IsVowelPrefix == infix1.IsVowelInfix
             || infix1.IsVowelInfix == infix2.IsVowelInfix
-            || infix2.IsVowelInfix == infix3.IsVowelSuffix
+            || infix2.IsVowelInfix == infix3.IsVowelInfix
             || infix3.IsVowelInfix == suffix.IsVowelSuffix)
         {
             return ByteXYZ.Invalid;
