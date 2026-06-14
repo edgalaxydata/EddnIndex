@@ -78,9 +78,13 @@ public static class PGSectors
             bool IsPrefix = false,
             bool IsVowelPrefix = false,
             int PrefixIndex = 0,
+            int PrefixOffset = 0,
+            int PrefixRunLength = 0,
             bool IsInfix = false,
             bool IsVowelInfix = false,
             int InfixIndex = 0,
+            int InfixOffset = 0,
+            int InfixRunLength = 0,
             bool IsSuffix = false,
             bool IsVowelSuffix = false,
             int SuffixIndex = 0
@@ -191,37 +195,47 @@ public static class PGSectors
         { "dg",   31 }, { "tch",  20 }, { "wr",   31 },
     };
 
-    private static readonly FragmentInfo[] Fragments = FillFragments(Prefixes, VowelInfixes, NonVowelInfixes, VowelSuffixes, NonVowelSuffixes);
+    private static readonly FragmentInfo[] Fragments;
 
-    private static readonly Dictionary<string, int> PrefixOffsets = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly int PrefixTotalRunLength = FillOffsets(Prefixes, PrefixRunLengths, PrefixOffsets, 35);
+    private static readonly List<(string Value, int Offset, int RunLength)> PrefixesByOffset = [];
 
-    private static readonly Dictionary<string, int> InfixOffsets = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly int VowelInfixesTotalRunLength = FillOffsets(VowelInfixes, InfixRunLengths, InfixOffsets, NonVowelSuffixes.Length);
-    private static readonly int NonVowelInfixesTotalRunLength = FillOffsets(NonVowelInfixes, InfixRunLengths, InfixOffsets, VowelSuffixes.Length);
+    private static readonly List<(string Value, int Offset, int RunLength)> VowelInfixesByOffset = [];
+    private static readonly List<(string Value, int Offset, int RunLength)> NonVowelInfixesByOffset = [];
 
     private static readonly Dictionary<ByteXYZ, string> CachedSectorsByCoords = [];
     private static readonly Dictionary<string, ByteXYZ> CachedSectorsByName = new(StringComparer.OrdinalIgnoreCase);
 
-    private static int FillOffsets(string[] prefixes, Dictionary<string, int> runlengths, Dictionary<string, int> offsets, int defaultlen)
+    private static void AddOrUpdateFragment(
+            Dictionary<string, FragmentInfo> frags,
+            List<(string Value, int Offset, int RunLength)> byOffset,
+            string value,
+            Dictionary<string, int> runlengths,
+            int defaultlen,
+            Func<FragmentInfo, string, int, int, FragmentInfo> modifyAction
+        )
     {
-        int cnt = 0;
-        foreach (string p in prefixes)
-        {
-            if (!runlengths.TryGetValue(p, out int plen))
-            {
-                plen = defaultlen;
-                runlengths[p] = plen;
-            }
+        var valueLower = value.ToLowerInvariant();
 
-            offsets[p] = cnt;
-            cnt += plen;
+        var frag = frags.TryGetValue(value, out FragmentInfo v)
+                 ? v
+                 : new FragmentInfo { Value = value };
+
+        if (!runlengths.TryGetValue(value, out int plen))
+        {
+            plen = defaultlen;
+            runlengths[value] = plen;
         }
 
-        return cnt;
+        frags[valueLower] = modifyAction(frag, valueLower, byOffset.Count, plen);
+
+        byOffset.AddRange(Enumerable.Repeat((value, byOffset.Count, plen), plen));
     }
 
-    private static void AddOrUpdateFragment(Dictionary<string, FragmentInfo> frags, string value, Func<FragmentInfo, string, FragmentInfo> modifyAction)
+    private static void AddOrUpdateFragment(
+            Dictionary<string, FragmentInfo> frags,
+            string value,
+            Func<FragmentInfo, string, FragmentInfo> modifyAction
+        )
     {
         value = value.ToLowerInvariant();
 
@@ -232,43 +246,49 @@ public static class PGSectors
         frags[value] = modifyAction(frag, value);
     }
 
-    private static FragmentInfo[] FillFragments(string[] prefixes, string[] vowelInfixes, string[] nonVowelInfixes, string[] vowelSuffixes, string[] nonVowelSuffixes)
+    static PGSectors()
     {
         Dictionary<string, FragmentInfo> frags = new(StringComparer.OrdinalIgnoreCase);
 
-        for (int i = 0; i < prefixes.Length; i++)
+        for (int i = 0; i < Prefixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, prefixes[i], (e, p) => e with
+            AddOrUpdateFragment(frags, PrefixesByOffset, Prefixes[i], PrefixRunLengths, 35, (e, p, o, r) => e with
             {
                 IsPrefix = true,
                 IsVowelPrefix = VowelPrefixes.Contains(p),
-                PrefixIndex = i
+                PrefixIndex = i,
+                PrefixOffset = o,
+                PrefixRunLength = r
             });
         }
 
-        for (int i = 0; i < vowelInfixes.Length; i++)
+        for (int i = 0; i < VowelInfixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, vowelInfixes[i], (e, _) => e with
+            AddOrUpdateFragment(frags, VowelInfixesByOffset, VowelInfixes[i], InfixRunLengths, NonVowelSuffixes.Length, (e, p, o, r) => e with
             {
                 IsInfix = true,
                 IsVowelInfix = true,
-                InfixIndex = i
+                InfixIndex = i,
+                InfixOffset = o,
+                InfixRunLength = r
             });
         }
 
-        for (int i = 0; i < nonVowelInfixes.Length; i++)
+        for (int i = 0; i < NonVowelInfixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, nonVowelInfixes[i], (e, _) => e with
+            AddOrUpdateFragment(frags, NonVowelInfixesByOffset, NonVowelInfixes[i], InfixRunLengths, VowelSuffixes.Length, (e, p, o, r) => e with
             {
                 IsInfix = true,
                 IsVowelInfix = false,
-                InfixIndex = i
+                InfixIndex = i,
+                InfixOffset = o,
+                InfixRunLength = r
             });
         }
 
-        for (int i = 0; i < vowelSuffixes.Length; i++)
+        for (int i = 0; i < VowelSuffixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, vowelSuffixes[i], (e, _) => e with
+            AddOrUpdateFragment(frags, VowelSuffixes[i], (e, p) => e with
             {
                 IsSuffix = true,
                 IsVowelSuffix = true,
@@ -276,9 +296,9 @@ public static class PGSectors
             });
         }
 
-        for (int i = 0; i < nonVowelSuffixes.Length; i++)
+        for (int i = 0; i < NonVowelSuffixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, nonVowelSuffixes[i], (e, _) => e with
+            AddOrUpdateFragment(frags, NonVowelSuffixes[i], (e, p) => e with
             {
                 IsSuffix = true,
                 IsVowelSuffix = false,
@@ -286,7 +306,7 @@ public static class PGSectors
             });
         }
 
-        return [.. frags.Values.OrderByDescending(f => f.Value.Length).ThenBy(f => f.Value)];
+        Fragments = [.. frags.Values.OrderByDescending(f => f.Value.Length).ThenBy(f => f.Value)];
     }
 
     // Sector coords to sector name - based on https://bitbucket.org/Esvandiary/edts/src/develop/pgnames.py
@@ -348,20 +368,19 @@ public static class PGSectors
 
     private static string ExtractC1Prefix(int offset, out int nextOffset, out bool isVowel)
     {
-        int offsetNumerator = Math.DivRem(offset, PrefixTotalRunLength, out int prefixOffset);
-        string prefix = Prefixes.Last(p => PrefixOffsets[p] <= prefixOffset);
-        nextOffset = offsetNumerator * PrefixRunLengths[prefix] + prefixOffset - PrefixOffsets[prefix];
+        int offsetNumerator = Math.DivRem(offset, PrefixesByOffset.Count, out int prefixOffset);
+        var (prefix, ofs, runlen) = PrefixesByOffset[prefixOffset];
+        nextOffset = offsetNumerator * runlen + prefixOffset - ofs;
         isVowel = VowelPrefixes.Contains(prefix);
         return prefix;
     }
 
     private static string ExtractC1Infix(int offset, bool isVowel, out int nextOffset)
     {
-        int infixTotalLen = isVowel ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
-        int offsetNumerator = Math.DivRem(offset, infixTotalLen, out int infixOffset);
-        string[] infixes = isVowel ? VowelInfixes : NonVowelInfixes;
-        string infix = infixes.Last(p => InfixOffsets[p] <= infixOffset);
-        nextOffset = offsetNumerator * InfixRunLengths[infix] + infixOffset - InfixOffsets[infix];
+        var infixes = isVowel ? VowelInfixesByOffset : NonVowelInfixesByOffset;
+        int offsetNumerator = Math.DivRem(offset, infixes.Count, out int infixOffset);
+        var (infix, start, runlen) = infixes[infixOffset];
+        nextOffset = offsetNumerator * runlen + infixOffset - start;
         return infix;
     }
 
@@ -405,13 +424,13 @@ public static class PGSectors
         ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MaxOrd);
 
         var (offset1, offset2) = Deinterleave2((uint)offset);
-        string prefix1 = Prefixes.Last(p => PrefixOffsets[p] <= offset1);
-        string prefix2 = Prefixes.Last(p => PrefixOffsets[p] <= offset2);
+        var (prefix1, start1, _) = PrefixesByOffset[offset1];
+        var (prefix2, start2, _) = PrefixesByOffset[offset2];
 
         string[] suffixes1 = VowelPrefixes.Contains(prefix1) ? NonVowelSuffixes : VowelSuffixes;
         string[] suffixes2 = VowelPrefixes.Contains(prefix2) ? NonVowelSuffixes : VowelSuffixes;
-        var suffix1Offset = offset1 - PrefixOffsets[prefix1];
-        var suffix2Offset = offset2 - PrefixOffsets[prefix2];
+        var suffix1Offset = offset1 - start1;
+        var suffix2Offset = offset2 - start2;
 
         if (suffix1Offset < 0 || suffix1Offset >= suffixes1.Length)
         {
@@ -566,26 +585,23 @@ public static class PGSectors
             return ByteXYZ.Invalid;
         }
 
-        int idx0 = PrefixOffsets[prefix1.Value] + suffix1.SuffixIndex;
-        int idx1 = PrefixOffsets[prefix2.Value] + suffix2.SuffixIndex;
+        int idx0 = prefix1.PrefixOffset + suffix1.SuffixIndex;
+        int idx1 = prefix2.PrefixOffset + suffix2.SuffixIndex;
         uint offset = Interleave2((ushort)idx0, (ushort)idx1);
         return ByteXYZ.FromOrdinal(offset);
     }
 
-    private static int InfixTotalRunLength(FragmentInfo frag)
-        => frag.IsVowelInfix ? VowelInfixesTotalRunLength : NonVowelInfixesTotalRunLength;
-
     private static int C1ProcessInfixFragment(FragmentInfo frag, int offset)
         => Math.DivRem(offset, InfixRunLengths[frag.Value], out int infixOffset)
-         * InfixTotalRunLength(frag)
+         * (frag.IsVowelInfix ? VowelInfixesByOffset.Count : NonVowelInfixesByOffset.Count)
          + infixOffset
-         + InfixOffsets[frag.Value];
+         + frag.InfixOffset;
 
     private static int C1ProcessPrefixFragment(FragmentInfo frag, int offset)
         => Math.DivRem(offset, PrefixRunLengths[frag.Value], out int prefixOffset)
-         * PrefixTotalRunLength
+         * PrefixesByOffset.Count
          + prefixOffset
-         + PrefixOffsets[frag.Value];
+         + frag.PrefixOffset;
 
     private static ByteXYZ GetC1SectorPos4(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo suffix)
     {

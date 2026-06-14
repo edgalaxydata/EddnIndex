@@ -1,5 +1,6 @@
 ﻿using EddnIndexUpdate;
 using EddnIndexUpdate.Options;
+using EddnIndexUpdate.Sectors;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
