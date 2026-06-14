@@ -1,7 +1,4 @@
 ﻿using EddnIndexUpdate.Sectors;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace EddnIndex.Tests;
 
@@ -24,7 +21,7 @@ public class PGSectorsTest
         for (int sectorId = 0; sectorId < 128 * 64 * 128; sectorId++)
         {
             var pos = PGSectors.ByteXYZ.FromSectorId(sectorId);
-            var name = PGSectors.GetC2SectorName(pos);
+            var name = PGSectors.GetC2SectorName(pos, true);
             Assert.That(PGSectors.GetSectorPos(name), Is.EqualTo(pos), $"C2 sector name did not round-trip for SectorId {sectorId} => Name {name}");
         }
     }

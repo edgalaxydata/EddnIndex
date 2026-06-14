@@ -25,6 +25,8 @@ public static class PGSectors
     private const int XStride = 1;
     private const int YStride = XStride << XBits;
     private const int ZStride = YStride << YBits;
+    private const int MaxOrd = 1 << (OrdBits * 3) - 1;
+    private const int MaxSectorId = 1 << (XBits + YBits + ZBits) - 1;
 
     public readonly record struct ByteXYZ(sbyte X, sbyte Y, sbyte Z) : IComparable<ByteXYZ>
     {
@@ -290,6 +292,11 @@ public static class PGSectors
     // Sector coords to sector name - based on https://bitbucket.org/Esvandiary/edts/src/develop/pgnames.py
     public static string GetSectorName(ByteXYZ pos)
     {
+        if (!pos.IsValid)
+        {
+            throw new ArgumentException("Invalid sector position", nameof(pos));
+        }
+
         if (CachedSectorsByCoords.TryGetValue(pos, out string? value))
         {
             return value;
@@ -301,6 +308,9 @@ public static class PGSectors
 
     public static string GetSectorName(int sectorid)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(sectorid, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(sectorid, MaxSectorId);
+
         var pos = ByteXYZ.FromSectorId(sectorid);
         return GetSectorName(pos);
     }
@@ -310,9 +320,9 @@ public static class PGSectors
         return GetC1Name(pos.Ord);
     }
 
-    public static string GetC2SectorName(ByteXYZ pos)
+    public static string GetC2SectorName(ByteXYZ pos, bool test = false)
     {
-        return GetC2Name(pos.Ord);
+        return GetC2Name(pos.Ord, test);
     }
 
     private static bool IsC1Sector(int offset)
@@ -357,6 +367,9 @@ public static class PGSectors
 
     private static string GetC1Name(int offset)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MaxOrd);
+
         List<string> frags = [];
 
         frags.Add(ExtractC1Prefix(offset, out offset, out bool prefixIsVowel));
@@ -364,7 +377,7 @@ public static class PGSectors
 
         var suffixes = prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
 
-        if (offset >= suffixes.Length)
+        while (offset >= suffixes.Length)
         {
             frags.Add(ExtractC1Infix(offset, prefixIsVowel, out offset));
             suffixes = !prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
@@ -385,23 +398,14 @@ public static class PGSectors
         return string.Concat(frags);
     }
 
-    private static string GetC2Name(int offset)
+    private static string GetC2Name(int offset, bool test = false)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MaxOrd);
+
         var (offset1, offset2) = Deinterleave2((uint)offset);
         string prefix1 = Prefixes.Last(p => PrefixOffsets[p] <= offset1);
         string prefix2 = Prefixes.Last(p => PrefixOffsets[p] <= offset2);
-        var prefix1Frag = FindFragment(prefix1, true);
-        var prefix2Frag = FindFragment(prefix2, true);
-
-        if (!string.Equals(prefix1Frag.Value, prefix1, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new NotSupportedException("Bad C2 name prefix 1 offset");
-        }
-
-        if (!string.Equals(prefix2Frag.Value, prefix2, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new NotSupportedException("Bad C2 name prefix 2 offset");
-        }
 
         string[] suffixes1 = VowelPrefixes.Contains(prefix1) ? NonVowelSuffixes : VowelSuffixes;
         string[] suffixes2 = VowelPrefixes.Contains(prefix2) ? NonVowelSuffixes : VowelSuffixes;
@@ -421,27 +425,42 @@ public static class PGSectors
         string suffix1 = suffixes1[suffix1Offset];
         string suffix2 = suffixes2[suffix2Offset];
 
-        var suffix1Frag = FindFragment(suffix1);
-        var suffix2Frag = FindFragment(suffix2);
-
-        if (!string.Equals(suffix1Frag.Value, suffix1, StringComparison.OrdinalIgnoreCase))
+        if (test)
         {
-            throw new NotSupportedException("Bad C2 name suffix 1 offset");
-        }
+            var prefix1Frag = FindFragment(prefix1, true);
+            var prefix2Frag = FindFragment(prefix2, true);
+            var suffix1Frag = FindFragment(suffix1);
+            var suffix2Frag = FindFragment(suffix2);
 
-        if (!string.Equals(suffix2Frag.Value, suffix2, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new NotSupportedException("Bad C2 name suffix 2 offset");
-        }
+            if (!string.Equals(prefix1Frag.Value, prefix1, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NotSupportedException("Bad C2 name prefix 1 offset");
+            }
 
-        if (suffix1Frag.IsVowelSuffix == prefix1Frag.IsVowelPrefix)
-        {
-            throw new NotSupportedException("Bad C2 name 1");
-        }
+            if (!string.Equals(prefix2Frag.Value, prefix2, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NotSupportedException("Bad C2 name prefix 2 offset");
+            }
 
-        if (suffix2Frag.IsVowelSuffix == prefix2Frag.IsVowelPrefix)
-        {
-            throw new NotSupportedException("Bad C2 name 2");
+            if (!string.Equals(suffix1Frag.Value, suffix1, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NotSupportedException("Bad C2 name suffix 1 offset");
+            }
+
+            if (!string.Equals(suffix2Frag.Value, suffix2, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new NotSupportedException("Bad C2 name suffix 2 offset");
+            }
+
+            if (suffix1Frag.IsVowelSuffix == prefix1Frag.IsVowelPrefix)
+            {
+                throw new NotSupportedException("Bad C2 name 1");
+            }
+
+            if (suffix2Frag.IsVowelSuffix == prefix2Frag.IsVowelPrefix)
+            {
+                throw new NotSupportedException("Bad C2 name 2");
+            }
         }
 
         return $"{prefix1}{suffix1} {prefix2}{suffix2}";
@@ -580,9 +599,9 @@ public static class PGSectors
         offset = C1ProcessInfixFragment(infix1, offset);
         offset = C1ProcessPrefixFragment(prefix, offset);
 
-        if (offset >= 1 << (OrdBits * 3))
+        if (offset > MaxOrd)
         {
-            throw new NotSupportedException("C1 offset out of range");
+            return ByteXYZ.Invalid;
         }
 
         return ByteXYZ.FromOrdinal(offset);
