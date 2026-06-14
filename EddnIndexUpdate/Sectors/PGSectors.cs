@@ -90,7 +90,7 @@ public static class PGSectors
             int SuffixIndex = 0
     );
 
-    // Tables of prefixes, infixes and suffixes from https://bitbucket.org/Esvandiary/edts/src/master/pgdata.py
+    // Tables of prefixes, infixes and suffixes from https://bitbucket.org/Esvandiary/edts/src/develop/pgdata.py
     // Prefixes
     private static readonly string[] Prefixes =
     [
