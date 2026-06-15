@@ -349,7 +349,7 @@ public static class PGSectors
 
         var frag = frags.TryGetValue(value, out FragmentInfo v)
                  ? v
-                 : new FragmentInfo { Value = value };
+                 : new FragmentInfo(value);
 
         if (!runlengths.TryGetValue(value, out int plen))
         {
@@ -372,7 +372,7 @@ public static class PGSectors
 
         var frag = frags.TryGetValue(value, out FragmentInfo v)
                  ? v
-                 : new FragmentInfo { Value = value };
+                 : new FragmentInfo(value);
 
         frags[value] = modifyAction(frag, value);
     }
@@ -698,16 +698,14 @@ public static class PGSectors
     {
         var pos = GetSectorPos(name);
 
-        if (!pos.IsValid)
-        {
-            sectorid = default;
-            return false;
-        }
-        else
+        if (pos.IsValid)
         {
             sectorid = pos.SectorId;
             return true;
         }
+
+        sectorid = default;
+        return false;
     }
 
     private static SectorCoord GetC2SectorPos(FragmentInfo prefix1, FragmentInfo suffix1, FragmentInfo prefix2, FragmentInfo suffix2)
