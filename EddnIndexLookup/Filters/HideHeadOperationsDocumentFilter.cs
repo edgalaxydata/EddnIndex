@@ -13,6 +13,7 @@ public sealed class HideHeadOperationsDocumentFilter : IDocumentFilter
     {
         foreach (var pathItem in swaggerDoc.Paths.Values)
         {
+            // OpenAPI 2+ uses HttpMethod rather than OperationType
             pathItem.Operations?.Remove(HttpMethod.Head);
         }
     }
