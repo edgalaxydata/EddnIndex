@@ -40,7 +40,7 @@ public static class PGSectors
     private const uint _mask2x2u16  = 0b0011_0011_0011_0011_0011_0011_0011_0011U;
     private const uint _mask1x2u16  = 0b0101_0101_0101_0101_0101_0101_0101_0101U;
 
-    public readonly record struct ByteXYZ(sbyte X, sbyte Y, sbyte Z) : IComparable<ByteXYZ>
+    public readonly record struct SectorCoord(sbyte X, sbyte Y, sbyte Z) : IComparable<SectorCoord>
     {
         public readonly bool IsValid => X >= 0 && X <= XMask
                                      && Y >= 0 && Y <= YMask
@@ -56,28 +56,28 @@ public static class PGSectors
 
         public override readonly string ToString() => $"({X},{Y},{Z})";
 
-        public readonly int CompareTo(ByteXYZ other)
+        public readonly int CompareTo(SectorCoord other)
         {
             return (X, Y, Z).CompareTo((other.X, other.Y, other.Z));
         }
 
-        public static readonly ByteXYZ Invalid = new(sbyte.MinValue, sbyte.MinValue, sbyte.MinValue);
+        public static readonly SectorCoord Invalid = new(sbyte.MinValue, sbyte.MinValue, sbyte.MinValue);
 
-        public static ByteXYZ FromSectorId(int sectorid)
+        public static SectorCoord FromSectorId(int sectorid)
             => new(
                 (sbyte)(sectorid >> XShift & XMask),
                 (sbyte)(sectorid >> YShift & YMask),
                 (sbyte)(sectorid >> ZShift & ZMask)
             );
 
-        public static ByteXYZ FromOrdinal(int ordinal)
+        public static SectorCoord FromOrdinal(int ordinal)
             => new(
                 (sbyte)(ordinal >> OrdXShift & OrdMask),
                 (sbyte)(ordinal >> OrdYShift & OrdMask),
                 (sbyte)(ordinal >> OrdZShift & OrdMask)
             );
 
-        public static ByteXYZ FromOrdinal(uint ordinal)
+        public static SectorCoord FromOrdinal(uint ordinal)
             => new(
                 (sbyte)(ordinal >> OrdXShift & OrdMask),
                 (sbyte)(ordinal >> OrdYShift & OrdMask),
@@ -332,8 +332,8 @@ public static class PGSectors
     private static readonly List<(string Value, int Offset, int RunLength)> VowelInfixesByOffset = [];
     private static readonly List<(string Value, int Offset, int RunLength)> NonVowelInfixesByOffset = [];
 
-    private static readonly Dictionary<ByteXYZ, string> CachedSectorsByCoords = [];
-    private static readonly Dictionary<string, ByteXYZ> CachedSectorsByName = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<SectorCoord, string> CachedSectorsByCoords = [];
+    private static readonly Dictionary<string, SectorCoord> CachedSectorsByName = new(StringComparer.OrdinalIgnoreCase);
 
     private static void AddOrUpdateFragment(
             Dictionary<string, FragmentInfo> frags,
@@ -442,7 +442,7 @@ public static class PGSectors
     }
 
     // Sector coords to sector name - based on https://bitbucket.org/Esvandiary/edts/src/develop/pgnames.py
-    public static string GetSectorName(ByteXYZ pos)
+    public static string GetSectorName(SectorCoord pos)
     {
         if (!pos.IsValid)
         {
@@ -463,16 +463,16 @@ public static class PGSectors
         ArgumentOutOfRangeException.ThrowIfLessThan(sectorid, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(sectorid, MaxSectorId);
 
-        var pos = ByteXYZ.FromSectorId(sectorid);
+        var pos = SectorCoord.FromSectorId(sectorid);
         return GetSectorName(pos);
     }
 
-    public static string GetC1SectorName(ByteXYZ pos)
+    public static string GetC1SectorName(SectorCoord pos)
     {
         return GetC1Name(pos.Ord);
     }
 
-    public static string GetC2SectorName(ByteXYZ pos, bool test = false)
+    public static string GetC2SectorName(SectorCoord pos, bool test = false)
     {
         return GetC2Name(pos.Ord, test);
     }
@@ -681,16 +681,16 @@ public static class PGSectors
         return fragments;
     }
 
-    public static ByteXYZ GetSectorPos(string name)
+    public static SectorCoord GetSectorPos(string name)
     {
-        if (CachedSectorsByName.TryGetValue(name, out ByteXYZ value))
+        if (CachedSectorsByName.TryGetValue(name, out SectorCoord value))
         {
             return value;
         }
 
         return GetSectorFragments(name) switch
         {
-            null => ByteXYZ.Invalid,
+            null => SectorCoord.Invalid,
             [{ IsPrefix: true } p1, { IsSuffix: true } s1, { IsPrefix: true } p2, { IsSuffix: true } s2]
                 => CachedSectorsByName[name] = GetC2SectorPos(p1, s1, p2, s2),
             [{ IsPrefix: true } p, { IsInfix: true } i, { IsSuffix: true } s]
@@ -700,7 +700,7 @@ public static class PGSectors
             // This is theoretical, as there are no systems where there would be a third infix
             [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsInfix: true } i3, { IsSuffix: true } s]
                 => CachedSectorsByName[name] = GetC1SectorPos5(p, i1, i2, i3, s),
-            _ => ByteXYZ.Invalid
+            _ => SectorCoord.Invalid
         };
     }
 
@@ -720,17 +720,17 @@ public static class PGSectors
         }
     }
 
-    private static ByteXYZ GetC2SectorPos(FragmentInfo prefix1, FragmentInfo suffix1, FragmentInfo prefix2, FragmentInfo suffix2)
+    private static SectorCoord GetC2SectorPos(FragmentInfo prefix1, FragmentInfo suffix1, FragmentInfo prefix2, FragmentInfo suffix2)
     {
         if (prefix1.IsVowelish == suffix1.IsVowelish || prefix2.IsVowelish == suffix2.IsVowelish)
         {
-            return ByteXYZ.Invalid;
+            return SectorCoord.Invalid;
         }
 
         int idx0 = prefix1.PrefixOffset + suffix1.SuffixIndex;
         int idx1 = prefix2.PrefixOffset + suffix2.SuffixIndex;
         uint offset = Interleave2((ushort)idx0, (ushort)idx1);
-        return ByteXYZ.FromOrdinal(offset);
+        return SectorCoord.FromOrdinal(offset);
     }
 
     private static int C1ProcessInfixFragment(FragmentInfo frag, int offset)
@@ -745,13 +745,13 @@ public static class PGSectors
          + prefixOffset
          + frag.PrefixOffset;
 
-    private static ByteXYZ GetC1SectorPos4(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo suffix)
+    private static SectorCoord GetC1SectorPos4(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo suffix)
     {
         if (prefix.IsVowelish == infix1.IsVowelish
             || infix1.IsVowelish == infix2.IsVowelish
             || infix2.IsVowelish == suffix.IsVowelish)
         {
-            return ByteXYZ.Invalid;
+            return SectorCoord.Invalid;
         }
 
         int offset = suffix.SuffixIndex;
@@ -761,21 +761,21 @@ public static class PGSectors
 
         if (offset > MaxOrd)
         {
-            return ByteXYZ.Invalid;
+            return SectorCoord.Invalid;
         }
 
-        return ByteXYZ.FromOrdinal(offset);
+        return SectorCoord.FromOrdinal(offset);
     }
 
     // This is theoretical, as there are no systems where there would be a third infix
-    private static ByteXYZ GetC1SectorPos5(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo infix3, FragmentInfo suffix)
+    private static SectorCoord GetC1SectorPos5(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo infix3, FragmentInfo suffix)
     {
         if (prefix.IsVowelish == infix1.IsVowelish
             || infix1.IsVowelish == infix2.IsVowelish
             || infix2.IsVowelish == infix3.IsVowelish
             || infix3.IsVowelish == suffix.IsVowelish)
         {
-            return ByteXYZ.Invalid;
+            return SectorCoord.Invalid;
         }
 
         int offset = suffix.SuffixIndex;
@@ -783,20 +783,20 @@ public static class PGSectors
         offset = C1ProcessInfixFragment(infix2, offset);
         offset = C1ProcessInfixFragment(infix1, offset);
         offset = C1ProcessPrefixFragment(prefix, offset);
-        return ByteXYZ.FromOrdinal(offset);
+        return SectorCoord.FromOrdinal(offset);
     }
 
-    private static ByteXYZ GetC1SectorPos3(FragmentInfo prefix, FragmentInfo infix, FragmentInfo suffix)
+    private static SectorCoord GetC1SectorPos3(FragmentInfo prefix, FragmentInfo infix, FragmentInfo suffix)
     {
         if (prefix.IsVowelish == infix.IsVowelish || infix.IsVowelish == suffix.IsVowelish)
         {
-            return ByteXYZ.Invalid;
+            return SectorCoord.Invalid;
         }
 
         int offset = suffix.SuffixIndex;
         offset = C1ProcessInfixFragment(infix, offset);
         offset = C1ProcessPrefixFragment(prefix, offset);
-        return ByteXYZ.FromOrdinal(offset);
+        return SectorCoord.FromOrdinal(offset);
     }
 
     private static uint Interleave2(ushort v1, ushort v2)
@@ -872,7 +872,7 @@ public static class PGSectors
         }
     }
 
-    private static uint Interleave3(ByteXYZ val)
+    private static uint Interleave3(SectorCoord val)
     {
         unchecked
         {
@@ -909,7 +909,7 @@ public static class PGSectors
         }
     }
 
-    private static ByteXYZ Deinterleave3(uint val)
+    private static SectorCoord Deinterleave3(uint val)
     {
         unchecked
         {
@@ -933,7 +933,7 @@ public static class PGSectors
             }
             else
             {
-                var (x, y, z) = (val, val >> 1, val >> 2);
+                var (x, y, z) = (val & _mask1x3u8, (val >> 1) & _mask1x3u8, (val >> 2) & _mask1x3u8);
 
                 (x, y, z) = ((x | (x >> 2)) & _mask2x3u8, (y | (y >> 2)) & _mask2x3u8, (z | (z >> 2)) & _mask2x3u8);
                 (x, y, z) = ((x | (x >> 4)) & _mask4x3u8, (y | (y >> 4)) & _mask4x3u8, (z | (z >> 4)) & _mask4x3u8);
