@@ -1,5 +1,5 @@
-﻿using EddnIndexUpdate.Models;
-using System.Diagnostics;
+﻿using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 
 namespace EddnIndexUpdate.Sectors;
 
@@ -27,6 +27,17 @@ public static class PGSectors
     private const int ZStride = YStride << YBits;
     private const int MaxOrd = (1 << (OrdBits * 3)) - 1;
     private const int MaxSectorId = (1 << (XBits + YBits + ZBits)) - 1;
+
+    private const uint _mask8x3u8 = 0b000_000_000_000_000_011_111_111U;
+    private const uint _mask4x3u8 = 0b000_000_001_111_000_000_001_111U;
+    private const uint _mask2x3u8 = 0b000_011_000_011_000_011_000_011U;
+    private const uint _mask1x3u8 = 0b001_001_001_001_001_001_001_001U;
+
+    private const uint _mask16x2u16 = 0b0000_0000_0000_0000_1111_1111_1111_1111U;
+    private const uint _mask8x2u16  = 0b0000_0000_1111_1111_0000_0000_1111_1111U;
+    private const uint _mask4x2u16  = 0b0000_1111_0000_1111_0000_1111_0000_1111U;
+    private const uint _mask2x2u16  = 0b0011_0011_0011_0011_0011_0011_0011_0011U;
+    private const uint _mask1x2u16  = 0b0101_0101_0101_0101_0101_0101_0101_0101U;
 
     public readonly record struct ByteXYZ(sbyte X, sbyte Y, sbyte Z) : IComparable<ByteXYZ>
     {
@@ -662,28 +673,34 @@ public static class PGSectors
         unchecked
         {
             // Interleave two 16-bit values into a 32-bit Morton code (Z-order curve).
-            // Layout strategy:
-            // - place v1 in low 16 bits
-            // - place v2 in bits 32..47
-            // Then progressively "spread" bits so each original bit is separated by one zero bit.
-            ulong x = v1 | (ulong)v2 << 32;
 
-            // Spread to byte granularity: keep only alternating 8-bit groups.
-            x = (x | x << 8) & 0x00FF00FF00FF00FFUL;
+            if (Bmi2.IsSupported)
+            {
+                return Bmi2.ParallelBitDeposit(v1, _mask1x2u16)
+                     | Bmi2.ParallelBitDeposit(v2, _mask1x2u16 << 1);
+            }
+            else if (Vector64<uint>.IsSupported)
+            {
+                var x = Vector64.Create((uint)v1, (uint)v2);
 
-            // Spread to nibble granularity (4-bit groups).
-            x = (x | x << 4) & 0x0F0F0F0F0F0F0F0FUL;
+                x = (x | x << 8) & Vector64.Create(_mask8x2u16);
+                x = (x | x << 4) & Vector64.Create(_mask4x2u16);
+                x = (x | x << 2) & Vector64.Create(_mask2x2u16);
+                x = (x | x << 1) & Vector64.Create(_mask1x2u16);
 
-            // Spread to 2-bit groups.
-            x = (x | x << 2) & 0x3333333333333333UL;
+                return x[0] | (x[1] << 1);
+            }
+            else
+            {
+                var (x1, x2) = ((uint)v1, (uint)v2);
 
-            // Spread to single-bit spacing: retain bits in even positions only.
-            x = (x | x << 1) & 0x5555555555555555UL;
+                (x1, x2) = ((x1 | (x1 << 8)) & _mask8x2u16, (x2 | (x2 << 8)) & _mask8x2u16);
+                (x1, x2) = ((x1 | (x1 << 4)) & _mask4x2u16, (x2 | (x2 << 4)) & _mask4x2u16);
+                (x1, x2) = ((x1 | (x1 << 2)) & _mask2x2u16, (x2 | (x2 << 2)) & _mask2x2u16);
+                (x1, x2) = ((x1 | (x1 << 1)) & _mask1x2u16, (x2 | (x2 << 1)) & _mask1x2u16);
 
-            // Merge the two spread lanes:
-            // - low lane (from v1) already occupies even bit positions
-            // - high lane (from v2) is shifted down by 31 so it occupies odd positions.
-            return (uint)((x | x >> 31) & 0xFFFFFFFF);
+                return x1 | (x2 << 1);
+            }
         }
     }
 
@@ -691,24 +708,36 @@ public static class PGSectors
     {
         unchecked
         {
-            // Reverse of Interleave2 (Morton-style 2-way bit interleave):
-            // - even-position bits in val belong to v1
-            // - odd-position bits in val belong to v2
-            // Place even bits in the low 32-bit lane and odd bits in the high lane.
-            // 0x55555555 = 0101... selects even bits, 0xAAAAAAAA = 1010... selects odd bits.
-            ulong x = val & 0x55555555UL | (val & 0xAAAAAAAAUL) << 31;
+            // Reverse of Interleave2 (Morton-style 2-way bit interleave)
 
-            // Progressively "compact" separated bits in each lane back into contiguous values.
-            // Each stage merges neighboring groups and masks away interleaving gaps.
-            x = (x | x >> 1) & 0x3333333333333333UL;
-            x = (x | x >> 2) & 0x0F0F0F0F0F0F0F0FUL;
-            x = (x | x >> 4) & 0x00FF00FF00FF00FFUL;
-            x = (x | x >> 8) & 0x0000FFFF0000FFFFUL;
+            if (Bmi2.IsSupported)
+            {
+                return (
+                    (ushort)Bmi2.ParallelBitExtract(val, _mask1x2u16),
+                    (ushort)Bmi2.ParallelBitExtract(val, _mask1x2u16 << 1)
+                );
+            }
+            else if (Vector64<uint>.IsSupported)
+            {
+                var x = Vector64.Create(val, val >> 1) & Vector64.Create(_mask1x2u16);
 
-            // Extract original 16-bit values:
-            // - low 16 bits  => first input (v1)
-            // - bits 32..47 => second input (v2)
-            return ((ushort)(x & 0xFFFF), (ushort)(x >> 32 & 0xFFFF));
+                x = (x | (x >> 1)) & Vector64.Create(_mask2x2u16);
+                x = (x | (x >> 2)) & Vector64.Create(_mask4x2u16);
+                x = (x | (x >> 4)) & Vector64.Create(_mask8x2u16);
+                x = (x | (x >> 8)) & Vector64.Create(_mask16x2u16);
+
+                return ((ushort)x[0], (ushort)x[1]);
+            }
+            else
+            {
+                var (x1, x2) = (val & _mask1x2u16, (val >> 1) & _mask1x2u16);
+
+                (x1, x2) = ((x1 | (x1 >> 1)) & _mask2x2u16, (x2 | (x2 >> 1)) & _mask2x2u16);
+                (x1, x2) = ((x1 | (x1 >> 1)) & _mask4x2u16, (x2 | (x2 >> 1)) & _mask4x2u16);
+                (x1, x2) = ((x1 | (x1 >> 1)) & _mask8x2u16, (x2 | (x2 >> 1)) & _mask8x2u16);
+
+                return ((ushort)((x1 | (x1 >> 1)) & _mask16x2u16), (ushort)((x2 | (x2 >> 1)) & _mask16x2u16));
+            }
         }
     }
 
@@ -716,21 +745,36 @@ public static class PGSectors
     {
         unchecked
         {
-            // Interleave 3 coordinates (Morton/Z-order), using 7 bits from each axis.
-            // Initial packing layout in x: [Z6..Z0][Y6..Y0][X6..X0] (21 bits total).
-            ulong x = (ulong)val.Ord;
+            // Interleave 3 coordinates (Morton/Z-order)
 
-            // Spread the packed bits apart in stages; each mask keeps only lanes that
-            // can still contribute to the final every-3rd-bit pattern.
-            x = (x | x << 32) & 0x001F00000000FFFFUL;
-            x = (x | x << 16) & 0x001F0000FF0000FFUL;
-            x = (x | x << 8) & 0x100F00F00F00F00FUL;
-            x = (x | x << 4) & 0x10C30C30C30C30C3UL;
-            x = (x | x << 2) & 0x1249249249249249UL;
+            if (Bmi2.IsSupported)
+            {
+                return Bmi2.ParallelBitDeposit((uint)val.X, _mask1x3u8)
+                     | Bmi2.ParallelBitDeposit((uint)val.Y, _mask1x3u8 << 1)
+                     | Bmi2.ParallelBitDeposit((uint)val.Z, _mask1x3u8 << 2);
+            }
+            else if (Vector128<uint>.IsSupported)
+            {
+                var x = Vector128.Create((uint)val.X, (uint)val.Y, (uint)val.Z, 0);
 
-            // Fold the three separated 21-bit lanes together to produce the final
-            // 21-bit Morton code (bits ordered x0,y0,z0,x1,y1,z1,...).
-            return (uint)((x | x >> 20 | x >> 40) & 0x1FFFFF);
+                x = (x | (x << 8)) & Vector128.Create(_mask4x3u8);
+                x = (x | (x << 4)) & Vector128.Create(_mask2x3u8);
+                x = (x | (x << 2)) & Vector128.Create(_mask1x3u8);
+
+                // Fold the three separated 21-bit lanes together to produce the final
+                // 21-bit Morton code (bits ordered x0,y0,z0,x1,y1,z1,...).
+                return x[0] | (x[1] << 1) | (x[2] << 2);
+            }
+            else
+            {
+                var (x, y, z) = ((uint)val.X, (uint)val.Y, (uint)val.Z);
+
+                (x, y, z) = ((x | (x << 8)) & _mask4x3u8, (y | (y << 8)) & _mask4x3u8, (z | (z << 8)) & _mask4x3u8);
+                (x, y, z) = ((x | (x << 4)) & _mask4x3u8, (y | (y << 4)) & _mask4x3u8, (z | (z << 4)) & _mask4x3u8);
+                (x, y, z) = ((x | (x << 2)) & _mask4x3u8, (y | (y << 2)) & _mask4x3u8, (z | (z << 2)) & _mask4x3u8);
+
+                return x | (y << 1) | (z << 2);
+            }
         }
     }
 
@@ -738,16 +782,34 @@ public static class PGSectors
     {
         unchecked
         {
-            ulong x =  (ulong)val & 0b001001001001001001001
-                    | ((ulong)val & 0b010010010010010010010) << 20
-                    | ((ulong)val & 0b100100100100100100100) << 40;
+            if (Bmi2.IsSupported)
+            {
+                return new(
+                    (sbyte)Bmi2.ParallelBitExtract(val, _mask1x3u8),
+                    (sbyte)Bmi2.ParallelBitExtract(val, _mask1x3u8 << 1),
+                    (sbyte)Bmi2.ParallelBitExtract(val, _mask1x3u8 << 2)
+                );
+            }
+            else if (Vector128<uint>.IsSupported)
+            {
+                var x = Vector128.Create(val, val >> 1, val >> 2, 0) & Vector128.Create(_mask1x3u8);
 
-            x = (x | x >> 2) & 0x10C30C30C30C30C3UL;
-            x = (x | x >> 4) & 0x100F00F00F00F00FUL;
-            x = (x | x >> 8) & 0x001F0000FF0000FFUL;
-            x = (x | x >> 16) & 0x001F00000000FFFFUL;
-            x = (x | x >> 32) & 0x00000000001FFFFFUL;
-            return ByteXYZ.FromOrdinal((uint)x);
+                x = (x | (x >> 2)) & Vector128.Create(_mask2x3u8);
+                x = (x | (x >> 4)) & Vector128.Create(_mask4x3u8);
+                x = (x | (x >> 8)) & Vector128.Create(_mask8x3u8);
+
+                return new((sbyte)x[0], (sbyte)x[1], (sbyte)x[2]);
+            }
+            else
+            {
+                var (x, y, z) = (val, val >> 1, val >> 2);
+
+                (x, y, z) = ((x | (x >> 2)) & _mask2x3u8, (y | (y >> 2)) & _mask2x3u8, (z | (z >> 2)) & _mask2x3u8);
+                (x, y, z) = ((x | (x >> 4)) & _mask4x3u8, (y | (y >> 4)) & _mask4x3u8, (z | (z >> 4)) & _mask4x3u8);
+                (x, y, z) = ((x | (x >> 8)) & _mask8x3u8, (y | (y >> 8)) & _mask8x3u8, (z | (z >> 8)) & _mask8x3u8);
+
+                return new((sbyte)x, (sbyte)y, (sbyte)z);
+            }
         }
     }
 }
