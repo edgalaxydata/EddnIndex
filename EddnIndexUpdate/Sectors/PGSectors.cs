@@ -87,18 +87,14 @@ public static class PGSectors
 
     private readonly record struct FragmentInfo(
             string Value,
+            bool IsVowelish = false,
             bool IsPrefix = false,
-            bool IsVowelPrefix = false,
-            int PrefixIndex = 0,
             int PrefixOffset = 0,
             int PrefixRunLength = 0,
             bool IsInfix = false,
-            bool IsVowelInfix = false,
-            int InfixIndex = 0,
             int InfixOffset = 0,
             int InfixRunLength = 0,
             bool IsSuffix = false,
-            bool IsVowelSuffix = false,
             int SuffixIndex = 0
     );
 
@@ -389,8 +385,7 @@ public static class PGSectors
             AddOrUpdateFragment(frags, PrefixesByOffset, Prefixes[i], PrefixRunLengths, 35, (e, p, o, r) => e with
             {
                 IsPrefix = true,
-                IsVowelPrefix = VowelPrefixes.Contains(p),
-                PrefixIndex = i,
+                IsVowelish = VowelPrefixes.Contains(p),
                 PrefixOffset = o,
                 PrefixRunLength = r
             });
@@ -401,8 +396,7 @@ public static class PGSectors
             AddOrUpdateFragment(frags, VowelInfixesByOffset, VowelInfixes[i], InfixRunLengths, NonVowelSuffixes.Length, (e, p, o, r) => e with
             {
                 IsInfix = true,
-                IsVowelInfix = true,
-                InfixIndex = i,
+                IsVowelish = true,
                 InfixOffset = o,
                 InfixRunLength = r
             });
@@ -413,8 +407,7 @@ public static class PGSectors
             AddOrUpdateFragment(frags, NonVowelInfixesByOffset, NonVowelInfixes[i], InfixRunLengths, VowelSuffixes.Length, (e, p, o, r) => e with
             {
                 IsInfix = true,
-                IsVowelInfix = false,
-                InfixIndex = i,
+                IsVowelish = false,
                 InfixOffset = o,
                 InfixRunLength = r
             });
@@ -425,7 +418,7 @@ public static class PGSectors
             AddOrUpdateFragment(frags, VowelSuffixes[i], (e, p) => e with
             {
                 IsSuffix = true,
-                IsVowelSuffix = true,
+                IsVowelish = true,
                 SuffixIndex = i
             });
         }
@@ -435,7 +428,7 @@ public static class PGSectors
             AddOrUpdateFragment(frags, NonVowelSuffixes[i], (e, p) => e with
             {
                 IsSuffix = true,
-                IsVowelSuffix = false,
+                IsVowelish = false,
                 SuffixIndex = i
             });
         }
@@ -565,6 +558,17 @@ public static class PGSectors
         ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MaxOrd);
 
         var (offset1, offset2) = Deinterleave2((uint)offset);
+
+        if (offset1 >= PrefixesByOffset.Count)
+        {
+            throw new NotSupportedException("Bad C2 name 1 offset");
+        }
+
+        if (offset2 >= PrefixesByOffset.Count)
+        {
+            throw new NotSupportedException("Bad C2 name 2 offset");
+        }
+
         var (prefix1, start1, _) = PrefixesByOffset[offset1];
         var (prefix2, start2, _) = PrefixesByOffset[offset2];
 
@@ -613,12 +617,12 @@ public static class PGSectors
                 throw new NotSupportedException("Bad C2 name suffix 2 offset");
             }
 
-            if (suffix1Frag.IsVowelSuffix == prefix1Frag.IsVowelPrefix)
+            if (suffix1Frag.IsVowelish == prefix1Frag.IsVowelish)
             {
                 throw new NotSupportedException("Bad C2 name 1");
             }
 
-            if (suffix2Frag.IsVowelSuffix == prefix2Frag.IsVowelPrefix)
+            if (suffix2Frag.IsVowelish == prefix2Frag.IsVowelish)
             {
                 throw new NotSupportedException("Bad C2 name 2");
             }
@@ -664,7 +668,7 @@ public static class PGSectors
                     IsInfix = false
                 };
             }
-            else if (frag.IsInfix && fragments.Count > 0 && frag.IsVowelInfix == !fragments[^1].IsVowelInfix)
+            else if (frag.IsInfix && fragments.Count > 0 && frag.IsVowelish == !fragments[^1].IsVowelish)
             {
                 frag = frag with { IsPrefix = false };
             }
@@ -718,7 +722,7 @@ public static class PGSectors
 
     private static ByteXYZ GetC2SectorPos(FragmentInfo prefix1, FragmentInfo suffix1, FragmentInfo prefix2, FragmentInfo suffix2)
     {
-        if (prefix1.IsVowelPrefix == suffix1.IsVowelSuffix || prefix2.IsVowelPrefix == suffix2.IsVowelSuffix)
+        if (prefix1.IsVowelish == suffix1.IsVowelish || prefix2.IsVowelish == suffix2.IsVowelish)
         {
             return ByteXYZ.Invalid;
         }
@@ -730,22 +734,22 @@ public static class PGSectors
     }
 
     private static int C1ProcessInfixFragment(FragmentInfo frag, int offset)
-        => Math.DivRem(offset, InfixRunLengths[frag.Value], out int infixOffset)
-         * (frag.IsVowelInfix ? VowelInfixesByOffset.Count : NonVowelInfixesByOffset.Count)
+        => Math.DivRem(offset, frag.InfixRunLength, out int infixOffset)
+         * (frag.IsVowelish ? VowelInfixesByOffset.Count : NonVowelInfixesByOffset.Count)
          + infixOffset
          + frag.InfixOffset;
 
     private static int C1ProcessPrefixFragment(FragmentInfo frag, int offset)
-        => Math.DivRem(offset, PrefixRunLengths[frag.Value], out int prefixOffset)
+        => Math.DivRem(offset, frag.PrefixRunLength, out int prefixOffset)
          * PrefixesByOffset.Count
          + prefixOffset
          + frag.PrefixOffset;
 
     private static ByteXYZ GetC1SectorPos4(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo suffix)
     {
-        if (prefix.IsVowelPrefix == infix1.IsVowelInfix
-            || infix1.IsVowelInfix == infix2.IsVowelInfix
-            || infix2.IsVowelInfix == suffix.IsVowelSuffix)
+        if (prefix.IsVowelish == infix1.IsVowelish
+            || infix1.IsVowelish == infix2.IsVowelish
+            || infix2.IsVowelish == suffix.IsVowelish)
         {
             return ByteXYZ.Invalid;
         }
@@ -766,10 +770,10 @@ public static class PGSectors
     // This is theoretical, as there are no systems where there would be a third infix
     private static ByteXYZ GetC1SectorPos5(FragmentInfo prefix, FragmentInfo infix1, FragmentInfo infix2, FragmentInfo infix3, FragmentInfo suffix)
     {
-        if (prefix.IsVowelPrefix == infix1.IsVowelInfix
-            || infix1.IsVowelInfix == infix2.IsVowelInfix
-            || infix2.IsVowelInfix == infix3.IsVowelInfix
-            || infix3.IsVowelInfix == suffix.IsVowelSuffix)
+        if (prefix.IsVowelish == infix1.IsVowelish
+            || infix1.IsVowelish == infix2.IsVowelish
+            || infix2.IsVowelish == infix3.IsVowelish
+            || infix3.IsVowelish == suffix.IsVowelish)
         {
             return ByteXYZ.Invalid;
         }
@@ -784,7 +788,7 @@ public static class PGSectors
 
     private static ByteXYZ GetC1SectorPos3(FragmentInfo prefix, FragmentInfo infix, FragmentInfo suffix)
     {
-        if (prefix.IsVowelPrefix == infix.IsVowelInfix || infix.IsVowelInfix == suffix.IsVowelSuffix)
+        if (prefix.IsVowelish == infix.IsVowelish || infix.IsVowelish == suffix.IsVowelish)
         {
             return ByteXYZ.Invalid;
         }
