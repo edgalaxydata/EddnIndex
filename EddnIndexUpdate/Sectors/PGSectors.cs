@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Collections.Concurrent;
+using System.Numerics;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 
@@ -332,8 +333,8 @@ public static class PGSectors
     private static readonly List<(string Value, int Offset, int RunLength)> VowelInfixesByOffset = [];
     private static readonly List<(string Value, int Offset, int RunLength)> NonVowelInfixesByOffset = [];
 
-    private static readonly Dictionary<SectorCoord, string> CachedSectorsByCoords = [];
-    private static readonly Dictionary<string, SectorCoord> CachedSectorsByName = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<SectorCoord, string> CachedSectorsByCoords = [];
+    private static readonly ConcurrentDictionary<string, SectorCoord> CachedSectorsByName = [];
 
     private static void AddOrUpdateFragment(
             Dictionary<string, FragmentInfo> frags,
@@ -449,13 +450,7 @@ public static class PGSectors
             throw new ArgumentException("Invalid sector position", nameof(pos));
         }
 
-        if (CachedSectorsByCoords.TryGetValue(pos, out string? value))
-        {
-            return value;
-        }
-
-        int offset = pos.Ord;
-        return CachedSectorsByCoords[pos] = IsC1Sector(offset) ? GetC1Name(offset) : GetC2Name(offset);
+        return CachedSectorsByCoords.GetOrAdd(pos, p => IsC1Sector(p.Ord) ? GetC1Name(p.Ord) : GetC2Name(p.Ord));
     }
 
     public static string GetSectorName(int sectorid)
@@ -683,25 +678,20 @@ public static class PGSectors
 
     public static SectorCoord GetSectorPos(string name)
     {
-        if (CachedSectorsByName.TryGetValue(name, out SectorCoord value))
-        {
-            return value;
-        }
-
-        return GetSectorFragments(name) switch
+        return CachedSectorsByName.GetOrAdd(name.ToLowerInvariant(), n => GetSectorFragments(n) switch
         {
             null => SectorCoord.Invalid,
             [{ IsPrefix: true } p1, { IsSuffix: true } s1, { IsPrefix: true } p2, { IsSuffix: true } s2]
-                => CachedSectorsByName[name] = GetC2SectorPos(p1, s1, p2, s2),
+                => GetC2SectorPos(p1, s1, p2, s2),
             [{ IsPrefix: true } p, { IsInfix: true } i, { IsSuffix: true } s]
-                => CachedSectorsByName[name] = GetC1SectorPos3(p, i, s),
+                => GetC1SectorPos3(p, i, s),
             [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsSuffix: true } s]
-                => CachedSectorsByName[name] = GetC1SectorPos4(p, i1, i2, s),
+                => GetC1SectorPos4(p, i1, i2, s),
             // This is theoretical, as there are no systems where there would be a third infix
             [{ IsPrefix: true } p, { IsInfix: true } i1, { IsInfix: true } i2, { IsInfix: true } i3, { IsSuffix: true } s]
-                => CachedSectorsByName[name] = GetC1SectorPos5(p, i1, i2, i3, s),
+                => GetC1SectorPos5(p, i1, i2, i3, s),
             _ => SectorCoord.Invalid
-        };
+        });
     }
 
     public static bool TryGetSectorId(string name, out int sectorid)
