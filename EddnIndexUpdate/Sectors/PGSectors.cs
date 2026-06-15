@@ -860,10 +860,10 @@ public static class PGSectors
                 var (x1, x2) = (val & _mask1x2u16, (val >> 1) & _mask1x2u16);
 
                 (x1, x2) = ((x1 | (x1 >> 1)) & _mask2x2u16, (x2 | (x2 >> 1)) & _mask2x2u16);
-                (x1, x2) = ((x1 | (x1 >> 1)) & _mask4x2u16, (x2 | (x2 >> 1)) & _mask4x2u16);
-                (x1, x2) = ((x1 | (x1 >> 1)) & _mask8x2u16, (x2 | (x2 >> 1)) & _mask8x2u16);
+                (x1, x2) = ((x1 | (x1 >> 2)) & _mask4x2u16, (x2 | (x2 >> 2)) & _mask4x2u16);
+                (x1, x2) = ((x1 | (x1 >> 4)) & _mask8x2u16, (x2 | (x2 >> 4)) & _mask8x2u16);
 
-                return ((ushort)((x1 | (x1 >> 1)) & _mask16x2u16), (ushort)((x2 | (x2 >> 1)) & _mask16x2u16));
+                return ((ushort)((x1 | (x1 >> 8)) & _mask16x2u16), (ushort)((x2 | (x2 >> 8)) & _mask16x2u16));
             }
         }
     }
@@ -897,8 +897,8 @@ public static class PGSectors
                 var (x, y, z) = ((uint)val.X, (uint)val.Y, (uint)val.Z);
 
                 (x, y, z) = ((x | (x << 8)) & _mask4x3u8, (y | (y << 8)) & _mask4x3u8, (z | (z << 8)) & _mask4x3u8);
-                (x, y, z) = ((x | (x << 4)) & _mask4x3u8, (y | (y << 4)) & _mask4x3u8, (z | (z << 4)) & _mask4x3u8);
-                (x, y, z) = ((x | (x << 2)) & _mask4x3u8, (y | (y << 2)) & _mask4x3u8, (z | (z << 2)) & _mask4x3u8);
+                (x, y, z) = ((x | (x << 4)) & _mask2x3u8, (y | (y << 4)) & _mask2x3u8, (z | (z << 4)) & _mask2x3u8);
+                (x, y, z) = ((x | (x << 2)) & _mask1x3u8, (y | (y << 2)) & _mask1x3u8, (z | (z << 2)) & _mask1x3u8);
 
                 return x | (y << 1) | (z << 2);
             }
