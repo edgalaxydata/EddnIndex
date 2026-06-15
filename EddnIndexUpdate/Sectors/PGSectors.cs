@@ -362,8 +362,10 @@ public static class PGSectors
         {
             uint key = (uint)offset;
 
-            // 32-bit hashing algorithm found at http://papa.bretmulvey.com/post/124027987928/hash-functions
-            // Seemingly originally by Bob Jenkins <bob_jenkins-at-burtleburtle.net> in the 1990s
+            // Source: Thomas Wang, "Integer Hash Function", section
+            // "Robert Jenkins' 32 bit Mix Function" (Jan 1997; updated Jul 1999).
+            // Archive: https://web.archive.org/web/19990903131503/http://www.concentric.net/~ttwang/tech/inthash.htm
+
             key += key << 12;
             key ^= key >> 22;
             key += key << 4;
