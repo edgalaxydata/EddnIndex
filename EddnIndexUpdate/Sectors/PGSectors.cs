@@ -1,4 +1,5 @@
-﻿using System.Runtime.Intrinsics;
+﻿using System.Numerics;
+using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 
 namespace EddnIndexUpdate.Sectors;
@@ -100,6 +101,128 @@ public static class PGSectors
             bool IsVowelSuffix = false,
             int SuffixIndex = 0
     );
+
+    private class FragmentTrieNode
+    {
+        private const char MIN_VALUE = 'a';
+        private const char MAX_VALUE = 'z';
+
+        private FragmentInfo Value;
+        private readonly Lock _lock = new();
+        private volatile uint _usedNodeMask = 0;
+        private volatile FragmentTrieNode[] _childNodes = [];
+
+        private void Add(string fullKey, ReadOnlySpan<char> subKey, in FragmentInfo frag)
+        {
+            lock (_lock)
+            {
+                if (subKey.Length == 0)
+                {
+                    if (Value.Value != null)
+                    {
+                        throw new ArgumentException($"An item with the same key exists: {fullKey}", nameof(fullKey));
+                    }
+
+                    Value = frag;
+                    return;
+                }
+            }
+
+            var c0 = char.ToLowerInvariant(subKey[0]);
+
+            ArgumentOutOfRangeException.ThrowIfLessThan(c0, MIN_VALUE, nameof(fullKey));
+            ArgumentOutOfRangeException.ThrowIfGreaterThan(c0, MAX_VALUE, nameof(fullKey));
+
+            uint mask = 1U << (c0 - MIN_VALUE);
+            FragmentTrieNode? newNode = null;
+
+            while (true)
+            {
+                int pos;
+                uint usedNodeMask;
+                FragmentTrieNode[] childNodes;
+
+                lock (_lock)
+                {
+                    usedNodeMask = _usedNodeMask;
+                    childNodes = _childNodes;
+                    pos = BitOperations.PopCount(_usedNodeMask & (mask - 1));
+                }
+
+                if ((usedNodeMask & mask) != 0)
+                {
+                    childNodes[pos].Add(fullKey, subKey[1..], in frag);
+                    return;
+                }
+
+                newNode ??= new FragmentTrieNode();
+
+                lock (_lock)
+                {
+                    if (!ReferenceEquals(childNodes, _childNodes) || usedNodeMask != _usedNodeMask)
+                    {
+                        continue;
+                    }
+
+                    _childNodes = [.. childNodes[..pos], newNode, .. childNodes[pos..]];
+                    _usedNodeMask = usedNodeMask | mask;
+                }
+
+                newNode.Add(fullKey, subKey[1..], in frag);
+                return;
+            }
+        }
+
+        public void Add(in FragmentInfo frag)
+            => Add(frag.Value, frag.Value, in frag);
+
+        private bool TryFind(ReadOnlySpan<char> fullKey, ReadOnlySpan<char> subKey, out FragmentInfo frag)
+        {
+            lock (_lock)
+            {
+                if (subKey.Length == 0)
+                {
+                    frag = Value;
+                    return frag.Value != null;
+                }
+            }
+
+            var c0 = char.ToLowerInvariant(subKey[0]);
+
+            if (c0 < MIN_VALUE || c0 > MAX_VALUE)
+            {
+                lock (_lock)
+                {
+                    frag = Value;
+                    return frag.Value != null;
+                }
+            }
+
+            uint mask = 1U << (c0 - MIN_VALUE);
+
+            int pos;
+            uint usedNodeMask;
+            FragmentTrieNode[] childNodes;
+
+            lock (_lock)
+            {
+                usedNodeMask = _usedNodeMask;
+                childNodes = _childNodes;
+                pos = BitOperations.PopCount(_usedNodeMask & (mask - 1));
+            }
+
+            if ((usedNodeMask & mask) != 0)
+            {
+                return childNodes[pos].TryFind(fullKey, subKey[1..], out frag);
+            }
+
+            frag = Value;
+            return Value.Value != null;
+        }
+
+        public bool TryFind(ReadOnlySpan<char> key, out FragmentInfo frag)
+            => TryFind(key, key, out frag);
+    }
 
     // Tables of prefixes, infixes and suffixes from https://bitbucket.org/Esvandiary/edts/src/develop/pgdata.py
     // Prefixes
@@ -206,7 +329,7 @@ public static class PGSectors
         { "dg",   31 }, { "tch",  20 }, { "wr",   31 },
     };
 
-    private static readonly FragmentInfo[] Fragments;
+    private static readonly FragmentTrieNode FragmentTrie = new();
 
     private static readonly List<(string Value, int Offset, int RunLength)> PrefixesByOffset = [];
 
@@ -317,7 +440,12 @@ public static class PGSectors
             });
         }
 
-        Fragments = [.. frags.Values.OrderByDescending(f => f.Value.Length).ThenBy(f => f.Value)];
+        FragmentInfo[] fragments = [.. frags.Values.OrderByDescending(f => f.Value.Length).ThenBy(f => f.Value)];
+
+        foreach (var frag in fragments)
+        {
+            FragmentTrie.Add(in frag);
+        }
     }
 
     // Sector coords to sector name - based on https://bitbucket.org/Esvandiary/edts/src/develop/pgnames.py
@@ -460,8 +588,8 @@ public static class PGSectors
 
         if (test)
         {
-            var prefix1Frag = FindFragment(prefix1, true);
-            var prefix2Frag = FindFragment(prefix2, true);
+            var prefix1Frag = FindFragment(prefix1);
+            var prefix2Frag = FindFragment(prefix2);
             var suffix1Frag = FindFragment(suffix1);
             var suffix2Frag = FindFragment(suffix2);
 
@@ -499,14 +627,11 @@ public static class PGSectors
         return $"{prefix1}{suffix1} {prefix2}{suffix2}";
     }
 
-    private static FragmentInfo FindFragment(ReadOnlySpan<char> current, bool isPrefix = false)
+    private static FragmentInfo FindFragment(ReadOnlySpan<char> current)
     {
-        foreach (var item in Fragments)
+        if (FragmentTrie.TryFind(current, out var frag))
         {
-            if (current.StartsWith(item.Value, StringComparison.OrdinalIgnoreCase) && (!isPrefix || item.IsPrefix))
-            {
-                return item;
-            }
+            return frag;
         }
 
         return default;
@@ -524,7 +649,7 @@ public static class PGSectors
             isPrefix |= current.StartsWith(" ");
             current = current.Trim();
 
-            FragmentInfo frag = FindFragment(current, isPrefix);
+            FragmentInfo frag = FindFragment(current);
 
             if (frag.Value == null)
             {
