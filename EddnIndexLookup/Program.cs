@@ -5,6 +5,7 @@ using EddnIndexLookup.Options;
 using Scalar.AspNetCore;
 using EddnIndexLookup.Conventions;
 using EddnIndexLookup.Filters;
+using System.IO.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +25,9 @@ builder.Services.AddControllersWithViews(opts =>
                     opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
                     opts.JsonSerializerOptions.WriteIndented = true;
                 });
+
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IFileSystem, Testably.Abstractions.RealFileSystem>();
 
 builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(
     opts =>

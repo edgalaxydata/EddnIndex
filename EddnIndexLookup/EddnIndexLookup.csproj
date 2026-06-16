@@ -16,6 +16,7 @@
     <PackageReference Include="Scalar.AspNetCore.Swashbuckle" Version="2.16.3" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="10.2.1" />
     <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.1" />
+    <PackageReference Include="Testably.Abstractions" Version="10.2.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,12 +1,19 @@
-﻿namespace EddnIndexUpdate;
+﻿using System.IO.Abstractions;
 
-public class FileProcessingContext(string filepath, long filelen, Models.FileInfo file)
+namespace EddnIndexUpdate;
+
+public class FileProcessingContext(
+        string filepath,
+        long filelen,
+        Models.FileInfo file,
+        IPath path
+    )
 {
     public string FilePath { get; } = filepath;
     public long FileLength { get; } = filelen;
     public string IndexedFilename { get; }
-        = Path.Join(
-            file.FileName.ContainsAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar])
+        = path.Join(
+            file.FileName.ContainsAny([path.DirectorySeparatorChar, path.AltDirectorySeparatorChar])
                 ? null
                 : file.Date?.ToString("yyyy-MM"),
             file.FileName

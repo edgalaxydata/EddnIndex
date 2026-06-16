@@ -8,6 +8,7 @@ using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 
@@ -16,37 +17,40 @@ namespace EddnIndexUpdate;
 public partial class FileProcessor(
         IDbContextFactory<Models.EDDNContext> contextFactory,
         ILogger<FileProcessor> logger,
-        IOptions<FileProcessorSettings> options
+        IOptions<FileProcessorSettings> options,
+        IHttpClientFactory httpClientFactory,
+        IFileSystem fileSystem
     )
 {
     private readonly IDbContextFactory<Models.EDDNContext> ContextFactory = contextFactory;
     private readonly ILogger Logger = logger;
-    private readonly FileProcessorSettings Settings = options.Value;
+    private readonly IFileSystem _fileSystem = fileSystem;
+    protected readonly FileProcessorSettings Settings = options.Value;
 
-    private readonly Dictionary<string, Models.SignalInfoSet> SignalInfoSetCache = [];
-    private readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
-    private readonly Dictionary<int, int> SignalInfoSetCounts = [];
-    private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
-    private readonly Dictionary<(int FileId, int LineNo), int> BodyInfoCounts = [];
-    private readonly Dictionary<(int FileId, int LineNo), Models.FileLineInfo> LineInfoCache = [];
-    private readonly Dictionary<(int FileId, int LineNo), Models.FileLineStation> StationInfoCache = [];
-    private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineNavRoute> NavRouteCache = [];
-    private readonly Dictionary<(int FileId, int LineNo), int> NavRouteCounts = [];
-    private readonly Dictionary<(int FileId, int LineNo), Models.FileLineSignal> SignalInfoCache = [];
-    private readonly Dictionary<(int FileId, int LineNo), int> SignalInfoCounts = [];
-    private readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBodySignal> BodySignalInfoCache = [];
-    private readonly Dictionary<(int FileId, int LineNo), int> BodySignalInfoCounts = [];
+    protected readonly Dictionary<string, Models.SignalInfoSet> SignalInfoSetCache = [];
+    protected readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
+    protected readonly Dictionary<int, int> SignalInfoSetCounts = [];
+    protected readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo), int> BodyInfoCounts = [];
+    protected readonly Dictionary<(int FileId, int LineNo), Models.FileLineInfo> LineInfoCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo), Models.FileLineStation> StationInfoCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineNavRoute> NavRouteCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo), int> NavRouteCounts = [];
+    protected readonly Dictionary<(int FileId, int LineNo), Models.FileLineSignal> SignalInfoCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo), int> SignalInfoCounts = [];
+    protected readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBodySignal> BodySignalInfoCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo), int> BodySignalInfoCounts = [];
 
-    private readonly Dictionary<string, Models.FileInfo> Files = [];
-    private readonly Dictionary<(string Name, string Version), Models.SoftwareInfo> Software = [];
-    private readonly Dictionary<(string? Version, string? Build, bool? IsOdyssey, bool? IsHorizons), Models.GameVersionInfo> GameVersions = [];
-    private readonly Dictionary<(string SignalName, string? SignalType, bool? IsStation), Models.SignalInfo> Signals = [];
-    private readonly Dictionary<(string Schema, string? EventType), Models.SchemaEventInfo> SchemaEvents = [];
-    private readonly Dictionary<int, Models.SignalInfo> SignalsById = [];
-    private readonly Dictionary<(string Type, int? Count, string? Category, string? SubCategory, string? Region, long? EntryID), Models.BodySignalInfo> BodySignals = [];
-    private readonly Dictionary<(string? StationName, long? MarketId, string? StationType, string? SystemName, long? SystemAddress, string? BodyName), List<Models.StationInfo>> Stations = [];
+    protected readonly Dictionary<string, Models.FileInfo> Files = [];
+    protected readonly Dictionary<(string Name, string Version), Models.SoftwareInfo> Software = [];
+    protected readonly Dictionary<(string? Version, string? Build, bool? IsOdyssey, bool? IsHorizons), Models.GameVersionInfo> GameVersions = [];
+    protected readonly Dictionary<(string SignalName, string? SignalType, bool? IsStation), Models.SignalInfo> Signals = [];
+    protected readonly Dictionary<(string Schema, string? EventType), Models.SchemaEventInfo> SchemaEvents = [];
+    protected readonly Dictionary<int, Models.SignalInfo> SignalsById = [];
+    protected readonly Dictionary<(string Type, int? Count, string? Category, string? SubCategory, string? Region, long? EntryID), Models.BodySignalInfo> BodySignals = [];
+    protected readonly Dictionary<(string? StationName, long? MarketId, string? StationType, string? SystemName, long? SystemAddress, string? BodyName), List<Models.StationInfo>> Stations = [];
 
-    private readonly HttpClient HttpClient = new();
+    private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
     private static readonly int Version = 1;
     private static readonly int MaxLength = 4194304;
@@ -173,7 +177,7 @@ public partial class FileProcessor(
         InitComplete = true;
     }
 
-    private Models.SoftwareInfo GetOrAddSoftware(string softwareName, string softwareVersion)
+    protected Models.SoftwareInfo GetOrAddSoftware(string softwareName, string softwareVersion)
     {
         if (Software.TryGetValue((softwareName, softwareVersion), out var software))
         {
@@ -195,7 +199,7 @@ public partial class FileProcessor(
         return software;
     }
 
-    private Models.GameVersionInfo GetOrAddGameVersion(string? gamebuild, string? gameversion, bool? isOdyssey, bool? isHorizons)
+    protected Models.GameVersionInfo GetOrAddGameVersion(string? gamebuild, string? gameversion, bool? isOdyssey, bool? isHorizons)
     {
         if (GameVersions.TryGetValue((gameversion, gamebuild, isOdyssey, isHorizons), out var version))
         {
@@ -219,7 +223,7 @@ public partial class FileProcessor(
         return version;
     }
 
-    private Models.StationInfo GetOrAddStation(string? stationName, long? marketId, string? stationType, string? systemName, long? systemAddress, string? bodyName, decimal? latitude, decimal? longitude)
+    protected Models.StationInfo GetOrAddStation(string? stationName, long? marketId, string? stationType, string? systemName, long? systemAddress, string? bodyName, decimal? latitude, decimal? longitude)
     {
         if (stationType == "FleetCarrier" || (marketId >= 3700_000_000 && marketId < 3789_600_000))
         {
@@ -263,7 +267,7 @@ public partial class FileProcessor(
         return station;
     }
 
-    private Models.SignalInfo GetOrAddSignal(string name, string? type, bool? isStation)
+    protected Models.SignalInfo GetOrAddSignal(string name, string? type, bool? isStation)
     {
         if (Signals.TryGetValue((name, type, isStation), out var signal))
         {
@@ -285,7 +289,7 @@ public partial class FileProcessor(
         return signal;
     }
 
-    private Models.SchemaEventInfo GetOrAddSchemaEvent(string schema, string? eventType)
+    protected Models.SchemaEventInfo GetOrAddSchemaEvent(string schema, string? eventType)
     {
         if (SchemaEvents.TryGetValue((schema, eventType), out var schemaEvent))
         {
@@ -305,7 +309,7 @@ public partial class FileProcessor(
         return schemaEvent;
     }
 
-    private Models.SignalInfoSet GetOrAddSignalInfoSet(ICollection<Models.SignalInfo> signals)
+    protected Models.SignalInfoSet GetOrAddSignalInfoSet(ICollection<Models.SignalInfo> signals)
     {
         var signalIds = signals.Select(e => e.Id).Order().ToList();
         var signalIdsJson =
@@ -361,7 +365,7 @@ public partial class FileProcessor(
         return signalSet;
     }
 
-    private Models.BodySignalInfo GetOrAddBodySignal(string type, int? count, string? category = null, string? subcategory = null, string? region = null, long? entryId = null)
+    protected Models.BodySignalInfo GetOrAddBodySignal(string type, int? count, string? category = null, string? subcategory = null, string? region = null, long? entryId = null)
     {
         if (BodySignals.TryGetValue((type, count, category, subcategory, region, entryId), out var signal))
         {
@@ -443,16 +447,16 @@ public partial class FileProcessor(
     {
         Logger.LogWritingIndexedFile(indexFilename);
 
-        if (File.Exists(indexFilename)
-            && File.Exists(indexFilename + ".index")
+        if (_fileSystem.File.Exists(indexFilename)
+            && _fileSystem.File.Exists(indexFilename + ".index")
             && lineCount is int lineCountVal
             && lineCountVal > 0
             && !force
-            && new FileInfo(indexFilename + ".index") is { } ixInfo
+            && _fileSystem.FileInfo.New(indexFilename + ".index") is { } ixInfo
             && ixInfo.Length % 8 == 0
             && ((lineCountVal + 1023) / 1024) <= (ixInfo.Length / 8) - 1)
         {
-            using var indexStream = File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var indexStream = _fileSystem.File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
             indexStream.Seek(indexStream.Length - 16, SeekOrigin.Begin);
             var ixlineno = (indexStream.Position / 8) * 1024;
             long startPos = 0;
@@ -464,7 +468,7 @@ public partial class FileProcessor(
 
             if (endPos > startPos && endPos - startPos < 1048576)
             {
-                using var ixbzStream = File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var ixbzStream = _fileSystem.File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using (var ixmemStream = new MemoryStream())
                 {
                     var buf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
@@ -490,17 +494,17 @@ public partial class FileProcessor(
             }
         }
 
-        Stream stream = File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        Stream stream = _fileSystem.File.Open(filepath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
         if (filepath.EndsWith(".bz2"))
         {
             stream = new BZip2InputStream(stream);
         }
 
-        Directory.CreateDirectory(Path.GetDirectoryName(indexFilename)!);
-        using (var rawFileStream = File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
+        _fileSystem.Directory.CreateDirectory(_fileSystem.Path.GetDirectoryName(indexFilename)!);
+        using (var rawFileStream = _fileSystem.File.Open(indexFilename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
         {
-            using var rawFileIndexStream = File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
+            using var rawFileIndexStream = _fileSystem.File.Open(indexFilename + ".index.tmp", FileMode.Create, FileAccess.Write, FileShare.Read);
             using var memStream = new MemoryStream();
             var bz2stream = new BZip2OutputStream(memStream, true);
             Span<byte> idxspan = stackalloc byte[8];
@@ -565,28 +569,28 @@ public partial class FileProcessor(
             }
         }
 
-        File.Move(indexFilename + ".tmp", indexFilename, true);
-        File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
+        _fileSystem.File.Move(indexFilename + ".tmp", indexFilename, true);
+        _fileSystem.File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
     }
 
     public async Task ProcessFileAsync(string filepath)
     {
         await InitAsync();
 
-        if (!File.Exists(filepath))
+        if (!_fileSystem.File.Exists(filepath))
         {
             return;
         }
 
-        var fileinfo = new FileInfo(filepath);
+        var fileinfo = _fileSystem.FileInfo.New(filepath);
         var filelen = fileinfo.Length;
 
-        await ProcessFileAsync(filepath, filelen, p => File.Open(p, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
+        await ProcessFileAsync(filepath, filelen);
     }
 
-    private async Task<Models.FileInfo> GetOrAddFileAsync(string filepath)
+    protected async Task<Models.FileInfo> GetOrAddFileAsync(string filepath)
     {
-        var filename = Path.GetFileName(filepath);
+        var filename = _fileSystem.Path.GetFileName(filepath);
 
         if (!filename.EndsWith(".bz2"))
         {
@@ -595,7 +599,7 @@ public partial class FileProcessor(
 
         bool test = false;
 
-        if (Path.GetDirectoryName(filepath) is string filedir && Path.GetFileName(filedir) is string lastdir)
+        if (_fileSystem.Path.GetDirectoryName(filepath) is string filedir && _fileSystem.Path.GetFileName(filedir) is string lastdir)
         {
             if (lastdir == "beta" || lastdir == "beta-data")
             {
@@ -612,7 +616,7 @@ public partial class FileProcessor(
         if (!Files.TryGetValue(filename, out var file))
         {
             if (filename.Split('-') is not [.. { } parts, string yearstr, string monthstr, string dayext]
-                || dayext.Split('.', 2) is not [string daystr, string ext]
+                || dayext.Split('.', 2) is not [string daystr, _]
                 || daystr.Length != 2
                 || monthstr.Length != 2
                 || yearstr.Length != 4
@@ -670,7 +674,7 @@ public partial class FileProcessor(
         return file;
     }
 
-    internal async Task ProcessFileAsync(string filepath, long filelen, Func<string, Stream> openFunc)
+    protected async Task ProcessFileAsync(string filepath, long filelen)
     {
         var file = await GetOrAddFileAsync(filepath);
 
@@ -684,13 +688,13 @@ public partial class FileProcessor(
             return;
         }
 
-        var context = new FileProcessingContext(filepath, filelen, file);
+        var context = new FileProcessingContext(filepath, filelen, file, _fileSystem.Path);
 
         if (Settings.IndexedDir != null)
         {
             WriteIndexedFile(
                 context.FilePath,
-                Path.Join(Settings.IndexedDir, context.IndexedFilename),
+                _fileSystem.Path.Join(Settings.IndexedDir, context.IndexedFilename),
                 context.File.LineCount,
                 context.FileLength > context.File.UncompressedSize
             );
@@ -709,7 +713,7 @@ public partial class FileProcessor(
 
         FillCacheForFile(context.File.Id);
 
-        var stream = openFunc(context.FilePath);
+        Stream stream = _fileSystem.File.Open(context.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
         if (context.FilePath.EndsWith(".bz2"))
         {
@@ -774,7 +778,7 @@ public partial class FileProcessor(
         {
             WriteIndexedFile(
                 context.FilePath,
-                Path.Join(Settings.IndexedDir, context.IndexedFilename),
+                _fileSystem.Path.Join(Settings.IndexedDir, context.IndexedFilename),
                 null,
                 true
             );
@@ -800,7 +804,7 @@ public partial class FileProcessor(
         BodySignalInfoCounts.Clear();
     }
 
-    private void ProcessLine(
+    protected void ProcessLine(
             ReadOnlySequence<byte> line,
             FileProcessingContext context,
             ref FileLineData data
@@ -905,7 +909,7 @@ public partial class FileProcessor(
         context.BodySignalCount += data.BodySignals.Count;
     }
 
-    private void FillLines(
+    protected void FillLines(
             FileLineData data,
             FileProcessingContext context
         )
@@ -1053,7 +1057,7 @@ public partial class FileProcessor(
         }
     }
 
-    private async Task SaveUpdatesAsync(FileProcessingContext context)
+    protected async Task SaveUpdatesAsync(FileProcessingContext context)
     {
         await using (var ctx = await ContextFactory.CreateDbContextAsync())
         {

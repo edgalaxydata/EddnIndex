@@ -1,11 +1,11 @@
 ﻿using EddnIndexUpdate;
 using EddnIndexUpdate.Options;
-using EddnIndexUpdate.Sectors;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.IO.Abstractions;
 
 var cmdlineargs = new Dictionary<string, string?>();
 var dirnames = new List<string>();
@@ -65,11 +65,16 @@ builder.Configuration.AddJsonFile("hosting.json", optional: true);
 builder.Configuration.AddUserSecrets(System.Reflection.Assembly.GetExecutingAssembly(), optional: true);
 builder.Configuration.AddInMemoryCollection(cmdlineargs);
 
+builder.Services.AddHttpClient();
+builder.Services.AddSingleton<IFileSystem, Testably.Abstractions.RealFileSystem>();
+
 builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
+
 builder.Services.AddOptions<FileProcessorSettings>()
                 .BindConfiguration("FileProcessor")
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
+
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
@@ -77,6 +82,7 @@ using var host = builder.Build();
 var svcprov = host.Services;
 
 var processor = svcprov.GetRequiredService<FileProcessor>();
+var fileSystem = svcprov.GetRequiredService<IFileSystem>();
 
 if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
 {
@@ -91,13 +97,13 @@ if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
 foreach (var dirname in dirnames)
 {
     List<string> filenames = [
-        .. Directory.EnumerateFiles(dirname, "*.jsonl.bz2", SearchOption.AllDirectories),
-        .. Directory.EnumerateFiles(dirname, "*.jsonl", SearchOption.AllDirectories)
+        .. fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl.bz2", SearchOption.AllDirectories),
+        .. fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl", SearchOption.AllDirectories)
     ];
 
     filenames = [..
         filenames
-            .Select(e => (Parts: Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
+            .Select(e => (Parts: fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
             .OrderBy(e => e.Parts[^3])
             .ThenBy(e => e.Parts[^2])
             .ThenBy(e => e.Parts[^1])

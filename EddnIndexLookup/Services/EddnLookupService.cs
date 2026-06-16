@@ -7,9 +7,10 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Buffers;
 using System.Buffers.Binary;
-using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
+using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
+using Testably.Abstractions.Helpers;
 using Models = EddnIndexUpdate.Models;
 using Sectors = EddnIndexUpdate.Sectors;
 
@@ -18,17 +19,20 @@ namespace EddnIndexLookup.Services;
 /// <summary>
 /// Backend service for EDDN lookup API
 /// </summary>
-/// <param name="contextFactory"></param>
-/// <param name="logger"></param>
-/// <param name="options"></param>
+/// <param name="contextFactory">DbContext factory</param>
+/// <param name="logger">Logger</param>
+/// <param name="options">Service settings</param>
+/// <param name="fileSystem">Filesystem abstraction</param>
 public class EddnLookupService(
         IDbContextFactory<Models.EDDNContext> contextFactory,
         ILogger<FileProcessor> logger,
-        IOptions<EddnLookupServiceSettings> options
+        IOptions<EddnLookupServiceSettings> options,
+        IFileSystem fileSystem
     )
 {
     private readonly IDbContextFactory<Models.EDDNContext> ContextFactory = contextFactory;
     private readonly ILogger Logger = logger;
+    private readonly IFileSystem _fileSystem = fileSystem;
     private readonly EddnLookupServiceSettings Settings = options.Value;
     private readonly Dictionary<string, (DateTime LastMod, long Length, Dictionary<int, LinkedListNode<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)>> Entries)> LineCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly LinkedList<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)> LineCacheLRU = [];
@@ -988,7 +992,7 @@ public class EddnLookupService(
         var systemMatches = brief
                           ? []
                           : await GetSystemMatchEntriesAsync(systems.Keys, limitMatches, minDate, maxDate, canceltoken);
-        
+
         var bodyMatches =
             systemMatches
                 .Values
@@ -1278,7 +1282,7 @@ public class EddnLookupService(
         var matches = brief
                     ? []
                     : await GetStationMatchEntriesAsync(stations.Keys, limitMatches, minDate, maxDate, canceltoken);
-        
+
         var matchCounts = await GetStationMatchCountsAsync(stations.Keys, canceltoken);
 
         var entries = new Dictionary<int, StationData>();
@@ -1308,7 +1312,7 @@ public class EddnLookupService(
         if (Settings.IndexedDir == null
             || lineno <= 0
             || string.IsNullOrWhiteSpace(filename)
-            || filename.ContainsAny(Path.GetInvalidFileNameChars()))
+            || filename.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
         {
             return null;
         }
@@ -1326,7 +1330,7 @@ public class EddnLookupService(
         {
             file = await ctx.Set<Models.FileInfo>().FirstOrDefaultAsync(e => e.FileName == filename, cancellationToken: canceltoken);
 
-            if (file == null || string.IsNullOrWhiteSpace(file.FileName) || file.FileName.ContainsAny(Path.GetInvalidFileNameChars()))
+            if (file == null || string.IsNullOrWhiteSpace(file.FileName) || file.FileName.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
             {
                 return null;
             }
@@ -1349,23 +1353,27 @@ public class EddnLookupService(
             }
         }
 
-        var indexFilename = Path.Join(Settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
+        var indexFilename = _fileSystem.Path.Join(Settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
 
-        if (!File.Exists(indexFilename) || !File.Exists(indexFilename + ".index"))
+        if (!_fileSystem.File.Exists(indexFilename) || !_fileSystem.File.Exists(indexFilename + ".index"))
         {
             return null;
         }
 
-        var info = new FileInfo(indexFilename);
+        var info = _fileSystem.FileInfo.New(indexFilename);
         var dataLastMod = info.LastWriteTimeUtc;
         var dataSize = info.Length;
         Span<byte> ixStartEndPos = stackalloc byte[16];
 
         for (int retries = 3; ; retries--)
         {
-            using var indexStream = File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var indexStream = _fileSystem.File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
 
-            var ixLastMod = File.GetLastWriteTimeUtc(indexStream.SafeFileHandle);
+            var ixLastMod = indexStream is IFileSystemExtensibility indexFsExt
+                         && indexFsExt.TryGetWrappedInstance<FileStream>(out var indexInnerStream)
+                          ? _fileSystem.File.GetLastWriteTimeUtc(indexInnerStream.SafeFileHandle)
+                          : _fileSystem.File.GetLastWriteTimeUtc(indexStream.Name);
+
             var ixSize = indexStream.Length;
 
             if (chunkNo >= indexStream.Length / 8 - 1)
@@ -1385,12 +1393,15 @@ public class EddnLookupService(
                 return null;
             }
 
-            using var dataStream = File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var dataStream = _fileSystem.File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
 
             var newSize = dataStream.Length;
-            var newLastMod = File.GetLastWriteTimeUtc(dataStream.SafeFileHandle);
+            var newLastMod = dataStream is IFileSystemExtensibility dataFsExt
+                          && dataFsExt.TryGetWrappedInstance<FileStream>(out var dataInnerStream)
+                           ? _fileSystem.File.GetLastWriteTimeUtc(dataInnerStream.SafeFileHandle)
+                           : _fileSystem.File.GetLastWriteTimeUtc(dataStream.Name);
 
-            var ixInfo = new FileInfo(indexFilename + ".index");
+            var ixInfo = _fileSystem.FileInfo.New(indexFilename + ".index");
 
             if (newSize != dataSize
                 || newLastMod != dataLastMod
@@ -1883,9 +1894,10 @@ public class EddnLookupService(
         foreach (var (name, path) in Settings.DumpDirs)
         {
             var (size, filecount) =
-                Directory
+                _fileSystem
+                    .Directory
                     .EnumerateFiles(path, "*", SearchOption.AllDirectories)
-                    .Select(e => new FileInfo(e))
+                    .Select(e => _fileSystem.FileInfo.New(e))
                     .Aggregate((size: 0L, filecount: 0), (a, e) => (a.size + e.Length, a.filecount + 1));
 
             dirusages[name] = new DumpDirectoryUsage

@@ -13,21 +13,21 @@ public partial class FileProcessor
     private readonly Dictionary<string, Models.GameVersionDate> GameVersionDates = [];
     private readonly Dictionary<string, Models.FilePrefixSchema> SchemasByFilePrefix = [];
 
-    private string BodyOverridesFile => Path.IsPathRooted(Settings.BodyOverridesFile)
+    private string BodyOverridesFile => _fileSystem.Path.IsPathRooted(Settings.BodyOverridesFile)
                                       ? Settings.BodyOverridesFile
-                                      : Path.Join(Settings.BaseDir, Settings.BodyOverridesFile);
+                                      : _fileSystem.Path.Join(Settings.BaseDir, Settings.BodyOverridesFile);
 
-    private string SystemOverridesFile => Path.IsPathRooted(Settings.SystemOverridesFile)
+    private string SystemOverridesFile => _fileSystem.Path.IsPathRooted(Settings.SystemOverridesFile)
                                         ? Settings.SystemOverridesFile
-                                        : Path.Join(Settings.BaseDir, Settings.SystemOverridesFile);
+                                        : _fileSystem.Path.Join(Settings.BaseDir, Settings.SystemOverridesFile);
 
-    private string GameVersionDatesFile => Path.IsPathRooted(Settings.GameVersionDatesFile)
+    private string GameVersionDatesFile => _fileSystem.Path.IsPathRooted(Settings.GameVersionDatesFile)
                                          ? Settings.GameVersionDatesFile
-                                         : Path.Join(Settings.BaseDir, Settings.GameVersionDatesFile);
+                                         : _fileSystem.Path.Join(Settings.BaseDir, Settings.GameVersionDatesFile);
 
-    private string MessageTypesFile => Path.IsPathRooted(Settings.MessageTypesFile)
+    private string MessageTypesFile => _fileSystem.Path.IsPathRooted(Settings.MessageTypesFile)
                                      ? Settings.MessageTypesFile
-                                     : Path.Join(Settings.BaseDir, Settings.MessageTypesFile);
+                                     : _fileSystem.Path.Join(Settings.BaseDir, Settings.MessageTypesFile);
 
     private async Task Init_OverridesAsync()
     {
@@ -42,11 +42,11 @@ public partial class FileProcessor
                 SchemasByFilePrefix[schema.FilenamePrefix] = schema;
             }
 
-            if (File.Exists(MessageTypesFile))
+            if (_fileSystem.File.Exists(MessageTypesFile))
             {
                 Logger.LogProcessingMessageTypesFile();
 
-                await foreach (var line in File.ReadLinesAsync(MessageTypesFile))
+                await foreach (var line in _fileSystem.File.ReadLinesAsync(MessageTypesFile))
                 {
                     if (line.Trim().Split('\t') is [string schema, string prefix] && !SchemasByFilePrefix.ContainsKey(prefix))
                     {
@@ -85,16 +85,16 @@ public partial class FileProcessor
                 GameVersionDates[ent.Version] = ent;
             }
 
-            if (!File.Exists(GameVersionDatesFile))
+            if (!_fileSystem.File.Exists(GameVersionDatesFile))
             {
                 Logger.LogRetrievingGameVersionDates();
 
                 await DownloadGameVersionsAsync(GameVersionDatesFile);
             }
 
-            if (File.Exists(GameVersionDatesFile))
+            if (_fileSystem.File.Exists(GameVersionDatesFile))
             {
-                await foreach (var line in File.ReadLinesAsync(GameVersionDatesFile))
+                await foreach (var line in _fileSystem.File.ReadLinesAsync(GameVersionDatesFile))
                 {
                     if (JsonConvert.DeserializeObject<Models.GameVersionDate>(line) is { } ent)
                     {
@@ -130,16 +130,18 @@ public partial class FileProcessor
                 overrides.Add(ent);
             }
 
-            if (!File.Exists(SystemOverridesFile))
+            if (!_fileSystem.File.Exists(SystemOverridesFile))
             {
                 Logger.LogRetrievingSystemNameOverrides();
 
                 await DownloadSystemNameOverridesAsync(SystemOverridesFile);
             }
 
-            if (File.Exists(SystemOverridesFile))
+            if (_fileSystem.File.Exists(SystemOverridesFile))
             {
-                foreach (var ent in File.ReadLines(SystemOverridesFile)
+                foreach (var ent in _fileSystem
+                                        .File
+                                        .ReadLines(SystemOverridesFile)
                                         .Select(JsonConvert.DeserializeObject<Models.SystemNameOverride>)
                                         .OfType<Models.SystemNameOverride>())
                 {
@@ -187,28 +189,30 @@ public partial class FileProcessor
                 sysov.Add(ent);
             }
 
-            if (!File.Exists(BodyOverridesFile))
+            if (!_fileSystem.File.Exists(BodyOverridesFile))
             {
                 Logger.LogRetrievingBodyOverrides();
                 await DownloadBodyNameOverridesAsync(BodyOverridesFile);
             }
 
-            if (File.Exists(BodyOverridesFile))
+            if (_fileSystem.File.Exists(BodyOverridesFile))
             {
-                foreach (var ent in File.ReadLines(BodyOverridesFile)
-                                         .Select(e => JsonConvert.DeserializeObject<Models.BodyNameOverride>(e))
-                                         .OfType<Models.BodyNameOverride>()
-                                         .Select(e => e with
-                                         {
-                                             ValidFrom = string.IsNullOrWhiteSpace(e.SinceVersion)
-                                                      || !GameVersionDates.TryGetValue(e.SinceVersion, out var ver)
-                                                       ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
-                                                       : ver.UpdateTime,
-                                             ValidTo   = string.IsNullOrWhiteSpace(e.UntilVersion)
-                                                      || !GameVersionDates.TryGetValue(e.UntilVersion, out ver)
-                                                       ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
-                                                       : ver.UpdateTime
-                                         }))
+                foreach (var ent in _fileSystem
+                                        .File
+                                        .ReadLines(BodyOverridesFile)
+                                        .Select(e => JsonConvert.DeserializeObject<Models.BodyNameOverride>(e))
+                                        .OfType<Models.BodyNameOverride>()
+                                        .Select(e => e with
+                                        {
+                                            ValidFrom = string.IsNullOrWhiteSpace(e.SinceVersion)
+                                                     || !GameVersionDates.TryGetValue(e.SinceVersion, out var ver)
+                                                      ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+                                                      : ver.UpdateTime,
+                                            ValidTo   = string.IsNullOrWhiteSpace(e.UntilVersion)
+                                                     || !GameVersionDates.TryGetValue(e.UntilVersion, out ver)
+                                                      ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+                                                      : ver.UpdateTime
+                                        }))
                 {
                     if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                     {
@@ -285,19 +289,20 @@ public partial class FileProcessor
 
         if (!string.IsNullOrWhiteSpace(settings.URI))
         {
-            using var stream = await HttpClient.GetStreamAsync(settings.URI);
+            using var client = _httpClientFactory.CreateClient();
+            using var stream = await client.GetStreamAsync(settings.URI);
             await ProcessBodyNameOverridesCsvAsync(byName, stream);
         }
 
         if (!string.IsNullOrWhiteSpace(settings.Filename))
         {
-            using var stream = File.Open(settings.Filename, FileMode.Open, FileAccess.Read, FileShare.Read);
+            using var stream = _fileSystem.File.Open(settings.Filename, FileMode.Open, FileAccess.Read, FileShare.Read);
             await ProcessBodyNameOverridesCsvAsync(byName, stream);
         }
 
         if (byName.Count != 0)
         {
-            using (var outfile = File.Open(filename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
+            using (var outfile = _fileSystem.File.Open(filename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
             {
                 using var writer = new StreamWriter(outfile, new UTF8Encoding(false));
 
@@ -310,7 +315,7 @@ public partial class FileProcessor
                 }
             }
 
-            File.Move(filename + ".tmp", filename, true);
+            _fileSystem.File.Move(filename + ".tmp", filename, true);
         }
     }
 
@@ -382,43 +387,46 @@ public partial class FileProcessor
 
         if (!string.IsNullOrWhiteSpace(overridesJsonSettings.URI))
         {
-            var systemsJson = await HttpClient.GetStringAsync(overridesJsonSettings.URI);
+            using var client = _httpClientFactory.CreateClient();
+            var systemsJson = await client.GetStringAsync(overridesJsonSettings.URI);
             ProcessSystemOverridesJson(sysOverrides, systemsJson);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesJsonSettings.Filename))
         {
-            var systemsJson = await File.ReadAllTextAsync(overridesJsonSettings.Filename);
+            var systemsJson = await _fileSystem.File.ReadAllTextAsync(overridesJsonSettings.Filename);
             ProcessSystemOverridesJson(sysOverrides, systemsJson);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesCsvSettings.URI))
         {
-            var systemsCsv = await HttpClient.GetStringAsync(overridesCsvSettings.URI);
+            using var client = _httpClientFactory.CreateClient();
+            var systemsCsv = await client.GetStringAsync(overridesCsvSettings.URI);
             ProcessSystemOverridesCsv(sysOverrides, systemsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesCsvSettings.Filename))
         {
-            var systemsCsv = await File.ReadAllTextAsync(overridesCsvSettings.Filename);
+            var systemsCsv = await _fileSystem.File.ReadAllTextAsync(overridesCsvSettings.Filename);
             ProcessSystemOverridesCsv(sysOverrides, systemsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(renamesCsvSettings.URI))
         {
-            var renamesCsv = await HttpClient.GetStringAsync(renamesCsvSettings.URI);
+            using var client = _httpClientFactory.CreateClient();
+            var renamesCsv = await client.GetStringAsync(renamesCsvSettings.URI);
             ProcessSystemRenamesCsv(sysOverrides, renamesCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(renamesCsvSettings.Filename))
         {
-            var renamesCsv = await File.ReadAllTextAsync(renamesCsvSettings.Filename);
+            var renamesCsv = await _fileSystem.File.ReadAllTextAsync(renamesCsvSettings.Filename);
             ProcessSystemRenamesCsv(sysOverrides, renamesCsv);
         }
 
         if (sysOverrides.Count != 0)
         {
-            using (var outfile = File.Open(filename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
+            using (var outfile = _fileSystem.File.Open(filename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
             {
                 using var writer = new StreamWriter(outfile, new UTF8Encoding(false));
 
@@ -431,7 +439,7 @@ public partial class FileProcessor
                 }
             }
 
-            File.Move(filename + ".tmp", filename, true);
+            _fileSystem.File.Move(filename + ".tmp", filename, true);
         }
     }
 
@@ -588,19 +596,20 @@ public partial class FileProcessor
 
         if (!string.IsNullOrWhiteSpace(settings.URI))
         {
-            var versionsCsv = await HttpClient.GetStringAsync(settings.URI);
+            using var client = _httpClientFactory.CreateClient();
+            var versionsCsv = await client.GetStringAsync(settings.URI);
             ProcessGameVersionsCsv(versions, versionsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(settings.Filename))
         {
-            var versionsCsv = await File.ReadAllTextAsync(settings.Filename);
+            var versionsCsv = await _fileSystem.File.ReadAllTextAsync(settings.Filename);
             ProcessGameVersionsCsv(versions, versionsCsv);
         }
 
         if (versions.Count != 0)
         {
-            using (var file = File.Open(filename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
+            using (var file = _fileSystem.File.Open(filename + ".tmp", FileMode.Create, FileAccess.Write, FileShare.Read))
             {
                 using var writer = new StreamWriter(file, new UTF8Encoding(false));
 
@@ -610,7 +619,7 @@ public partial class FileProcessor
                 }
             }
 
-            File.Move(filename + ".tmp", filename, true);
+            _fileSystem.File.Move(filename + ".tmp", filename, true);
         }
     }
 

@@ -920,7 +920,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// Note that this will not currently search for systems that would fall inside
     /// a hand-authored sector unless `nameOnly` is `true` and the system name starts
     /// with the given sector name.
-    /// 
+    ///
     /// Warning: in sectors close to the galactic core, this can return a large number of results.
     /// </remarks>
     /// <param name="sectorName">Name of the sector</param>
@@ -976,7 +976,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// Note that this will not currently search for systems that would fall inside
     /// a hand-authored sector unless `nameOnly` is `true` and the system name starts
     /// with the given sector name.
-    /// 
+    ///
     /// Warning: in sectors close to the galactic core, this can return a large number of results.
     /// </remarks>
     /// <param name="sectorName">Name of the sector</param>
@@ -1004,9 +1004,9 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <summary>Get a list of systems in the gaps between known systems in a sector</summary>
     /// <remarks>
     /// Enumerate the systems in the boxels that have been visited.
-    /// 
+    ///
     /// Warning: in sectors close to the galactic core, this can return a large number of results.
-    /// 
+    ///
     /// Only searches the base procedural name, and not any name in a hand-authored sector.
     /// </remarks>
     /// <param name="sectorName">Sector name</param>
@@ -1028,7 +1028,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     /// <summary>Get a list of systems in the gaps between known systems in a sector boxel</summary>
     /// <remarks>
     /// Enumerate the systems in the boxels that have been visited.
-    /// 
+    ///
     /// Only searches the base procedural name, and not any name in a hand-authored sector.
     /// </remarks>
     /// <param name="sectorName">Sector name</param>

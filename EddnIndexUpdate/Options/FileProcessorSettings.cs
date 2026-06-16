@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexUpdate.Options;
 
-public class FileProcessorSettings : IValidatableObject
+public class FileProcessorSettings
 {
     public class OverridesURISettings<T>
         where T : notnull, new()
@@ -93,12 +93,4 @@ public class FileProcessorSettings : IValidatableObject
     public bool? BreakOnBadData { get; set; }
     public bool? ExitOnBadData { get; set; }
     public bool? Reprocess { get; set; }
-
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (!Directory.Exists(BaseDir))
-        {
-            yield return new ValidationResult("BaseDir points to a non-existent directory", [nameof(BaseDir)]);
-        }
-    }
 }
