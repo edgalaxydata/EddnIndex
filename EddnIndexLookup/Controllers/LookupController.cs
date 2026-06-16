@@ -862,6 +862,52 @@ public class LookupController(EddnLookupService service) : ControllerBase
         );
     }
 
+    /// <summary>Lookup signals</summary>
+    /// <param name="signalName">Name of the signal</param>
+    /// <param name="systemName">Limit to events with given system name</param>
+    /// <param name="systemAddress">Limit to events with given system address</param>
+    /// <param name="brief">Set brief to only return signal information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <returns>List of signals</returns>
+    [ApiExplorerSettings(GroupName = "v2")]
+    [HttpGet("signals/{signalName}")]
+    [HttpHead("signals/{signalName}")]
+    [ProducesResponseType<List<SignalData>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<SignalData>>> GetSignalsAsync(
+            string signalName,
+            [FromQuery] string? systemName = null,
+            [FromQuery] long? systemAddress = null,
+            [FromQuery] bool brief = false,
+            [FromQuery] int? limitMatches = 100,
+            [FromQuery] DateTimeOffset? minDate = null,
+            [FromQuery] DateTimeOffset? maxDate = null
+        )
+    {
+        if (Request.Method == "HEAD")
+        {
+            brief = true;
+        }
+
+        var signals = await Service.GetSignalsAsync(signalName, systemName, systemAddress, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+
+        return Ok(
+            signals.Select(e => e with
+            {
+                Matches = e.Matches is null
+                    ? null
+                    : [..
+                            e.Matches.Select(m => m with
+                            {
+                                Extract = GetExtractUrl(m.FileName, m.LineNo)
+                            })
+                    ]
+            })
+            .OrderByDescending(e => e.LastSeen)
+        );
+    }
+
     private string? GetExtractUrl(string filename, int lineno)
     {
         return Url.Action("ExtractLine", "Lookup", new { filename, lineno }, Request.Scheme);

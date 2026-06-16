@@ -246,12 +246,16 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.ToTable("SignalInfoSets");
             m.HasKey(e => e.Id);
             m.HasIndex(e => new { e.FirstSignalId, e.LastSignalId, e.SignalCount });
-            m.OwnsMany(e => e.SignalSetItems, o =>
-            {
-                o.HasKey(e => e.Id);
-                o.WithOwner().HasForeignKey(e => e.SignalInfoSetId).HasPrincipalKey(e => e.Id);
-                o.HasOne(e => e.Signal).WithMany().HasForeignKey(e => e.SignalInfoId).HasPrincipalKey(e => e.Id);
-            });
+            m.HasMany(e => e.SignalSetItems).WithOne().HasForeignKey(e => e.SignalInfoSetId).HasPrincipalKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<SignalInfoSetItem>(m =>
+        {
+            m.ToTable("SignalInfoSetItem");
+            m.HasKey(e => e.Id);
+            m.HasIndex(e => e.SignalInfoId);
+            m.HasIndex(e => e.SignalInfoSetId);
+            m.HasOne(e => e.Signal).WithMany().HasForeignKey(e => e.SignalInfoId).HasPrincipalKey(e => e.Id);
         });
 
         modelBuilder.Entity<SoftwareInfo>(m =>

@@ -1,6 +1,6 @@
-﻿using EddnIndexLookup.DTO;
+﻿using EddnIndex.Common;
+using EddnIndexLookup.DTO;
 using EddnIndexLookup.Options;
-using EddnIndex.Common;
 using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -911,6 +911,100 @@ public class EddnLookupService(
         );
     }
 
+    private async Task<Dictionary<int, List<MatchEntry>>> GetSignalMatchEntriesAsync(
+            ICollection<int> signalIds,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
+        )
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        var matches = new Dictionary<int, List<MatchEntry>>();
+
+        foreach (var signalId in signalIds)
+        {
+            var query =
+                ctx.Set<Models.FileLineSignal>()
+                   .Join(
+                        ctx.Set<Models.SignalInfoSetItem>(),
+                        o => o.SignalSetId,
+                        i => i.SignalInfoId,
+                        (o, i) => new { i.SignalInfoId, SignalLine = o }
+                   )
+                   .Where(e => e.SignalInfoId == signalId)
+                   .LeftJoin(
+                        ctx.Set<Models.FileInfo>(),
+                        o => o.SignalLine.FileId,
+                        i => i.Id,
+                        (o, i) => new { o.SignalInfoId, o.SignalLine, File = i }
+                    )
+                   .LeftJoin(
+                        ctx.Set<Models.FileLineInfo>()
+                           .Include(e => e.Software)
+                           .Include(e => e.SchemaEvent)
+                           .Include(e => e.GameVersion),
+                        o => new { o.SignalLine.FileId, o.SignalLine.LineNo },
+                        i => new { i.FileId, i.LineNo },
+                        (o, i) => new { o.SignalInfoId, o.SignalLine, o.File, Info = i }
+                   )
+                   .Select(e => new MatchEntry
+                   {
+                       FileName = e.File!.FileName,
+                       LineNo = e.SignalLine!.LineNo,
+                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info!.Timestamp,
+                       GatewayTimestamp = e.SignalLine.GatewayTimestamp,
+                       SystemId = e.Info!.SystemId,
+                       SignalId = e.SignalInfoId
+                   });
+
+            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp >= minTS);
+            }
+
+            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+            {
+                query = query.Where(e => e.GatewayTimestamp <= maxTS);
+            }
+
+            matches[signalId] = await
+                query
+                    .OrderByDescending(e => e.GatewayTimestamp)
+                    .Take(limitMatches ?? 1000)
+                    .Where(e => e.FileName != null)
+                    .ToListAsync(canceltoken);
+        }
+
+        var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
+
+        var systems = await GetSystemsAsync<SystemData>(systemIds, true, canceltoken);
+
+        return matches.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value
+                      .Select(e => e.SystemId is not int sysid
+                                || systems.GetValueOrDefault(sysid) is not { } sys
+                                ? e
+                                : e with
+                                {
+                                    SystemName = sys.Name,
+                                    SystemAddress = sys.SystemAddress
+                                }
+                      )
+                      .ToList()
+        );
+    }
+
     private async Task<Dictionary<int, int>> GetSystemMatchCountsAsync(ICollection<int> systemIds, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
@@ -943,8 +1037,26 @@ public class EddnLookupService(
             ctx.Set<Models.FileLineStation>()
                .Where(e => stationIds.Contains(e.StationId))
                .GroupBy(e => e.StationId)
-               .Select(g => new { BodyId = g.Key, Count = g.Count() })
-               .ToDictionaryAsync(e => e.BodyId, e => e.Count, cancellationToken: canceltoken);
+               .Select(g => new { StationId = g.Key, Count = g.Count() })
+               .ToDictionaryAsync(e => e.StationId, e => e.Count, cancellationToken: canceltoken);
+    }
+
+    private async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(ICollection<int> signalIds, CancellationToken canceltoken)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        return await
+            ctx.Set<Models.FileLineSignal>()
+               .Join(
+                    ctx.Set<Models.SignalInfoSetItem>(),
+                    o => o.SignalSetId,
+                    i => i.SignalInfoId,
+                    (o, i) => new { i.SignalInfoId }
+               )
+               .Where(e => signalIds.Contains(e.SignalInfoId))
+               .GroupBy(e => e.SignalInfoId)
+               .Select(g => new { SignalInfoId = g.Key, Count = g.Count() })
+               .ToDictionaryAsync(e => e.SignalInfoId, e => e.Count, cancellationToken: canceltoken);
     }
 
     /// <summary>Lookup systems</summary>
@@ -1290,6 +1402,98 @@ public class EddnLookupService(
         foreach (var (id, station) in stations)
         {
             entries[id] = station with
+            {
+                MatchCount = matchCounts.GetValueOrDefault(id),
+                Matches = matches.GetValueOrDefault(id)
+            };
+        }
+
+        return [.. entries.Values];
+    }
+
+    /// <summary>Lookup signals</summary>
+    /// <param name="signalName"></param>
+    /// <param name="systemName">Limit to events with given system name</param>
+    /// <param name="systemAddress">Limit to events with given system address</param>
+    /// <param name="brief">Set brief to only return signal information</param>
+    /// <param name="limitMatches">Limit number of matches returned</param>
+    /// <param name="minDate">Start of date range for matches</param>
+    /// <param name="maxDate">End of date range for matches</param>
+    /// <param name="canceltoken">Cancellation token</param>
+    /// <returns>List of signals</returns>
+    public async Task<List<SignalData>> GetSignalsAsync(
+            string signalName,
+            string? systemName,
+            long? systemAddress,
+            bool brief,
+            int? limitMatches,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            CancellationToken canceltoken
+        )
+    {
+        if (string.IsNullOrWhiteSpace(signalName))
+        {
+            return [];
+        }
+
+        signalName = signalName.Trim();
+
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        var query = ctx.Set<Models.SignalInfo>().Where(e => e.SignalName == signalName);
+
+        var signals = await
+            query
+                .Select(e => new SignalData
+                {
+                    Id = e.Id,
+                    SignalName = e.SignalName,
+                    SignalType = e.SignalType,
+                    IsStation = e.IsStation,
+                    FirstSeen = e.FirstSeen,
+                    LastSeen = e.LastSeen,
+                    ValidFrom = e.ValidFrom,
+                    ValidTo = e.ValidTo,
+                })
+                .OrderByDescending(e => e.LastSeen)
+                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
+
+        var matches = brief
+                    ? []
+                    : await GetSignalMatchEntriesAsync(signals.Keys, limitMatches, minDate, maxDate, canceltoken);
+
+        if (systemName != null)
+        {
+            matches = matches.ToDictionary(
+                e => e.Key,
+                e => e.Value.Where(s => string.Equals(s.SystemName, systemName, StringComparison.OrdinalIgnoreCase)).ToList()
+            );
+
+            signals = signals
+                .Where(e => matches.GetValueOrDefault(e.Key)?.Count > 0)
+                .ToDictionary();
+        }
+
+        if (systemAddress != null)
+        {
+            matches = matches.ToDictionary(
+                e => e.Key,
+                e => e.Value.Where(s => string.Equals(s.SystemName, systemName, StringComparison.OrdinalIgnoreCase)).ToList()
+            );
+
+            signals = signals
+                .Where(e => matches.GetValueOrDefault(e.Key)?.Count > 0)
+                .ToDictionary();
+        }
+
+        var matchCounts = await GetStationMatchCountsAsync(signals.Keys, canceltoken);
+
+        var entries = new Dictionary<int, SignalData>();
+
+        foreach (var (id, signal) in signals)
+        {
+            entries[id] = signal with
             {
                 MatchCount = matchCounts.GetValueOrDefault(id),
                 Matches = matches.GetValueOrDefault(id)
