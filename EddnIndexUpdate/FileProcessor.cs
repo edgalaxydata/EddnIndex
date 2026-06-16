@@ -58,7 +58,7 @@ public partial class FileProcessor(
     private bool InitComplete = false;
 
     [DoesNotReturn]
-    public void Fail(string? message, object? extraData = null)
+    private void Fail(string? message, object? extraData = null)
     {
         Logger.LogAssertFailure(message, JsonConvert.SerializeObject(extraData));
 
@@ -70,7 +70,7 @@ public partial class FileProcessor(
         throw new BadDataException(message, extraData);
     }
 
-    public void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] string? message = null, object? extraData = null)
+    private void Assert([DoesNotReturnIf(false)] bool condition, [CallerArgumentExpression(nameof(condition))] string? message = null, object? extraData = null)
     {
         if (!condition)
         {
@@ -78,7 +78,7 @@ public partial class FileProcessor(
         }
     }
 
-    private async Task InitAsync()
+    protected async Task InitAsync()
     {
         if (InitComplete) return;
 
@@ -388,7 +388,33 @@ public partial class FileProcessor(
         return signal;
     }
 
-    private void FillCacheForFile(int fileid)
+    public async Task ProcessDirectoriesAsync(IEnumerable<string> dirnames)
+    {
+        foreach (var dirname in dirnames)
+        {
+            List<string> filenames = [
+                .. _fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl.bz2", SearchOption.AllDirectories),
+                .. _fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl", SearchOption.AllDirectories)
+            ];
+
+            filenames = [..
+                filenames
+                    .Select(e => (Parts: fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
+                    .OrderBy(e => e.Parts[^3])
+                    .ThenBy(e => e.Parts[^2])
+                    .ThenBy(e => e.Parts[^1])
+                    .Select(e => e.Name)
+            ];
+
+
+            foreach (var filename in filenames)
+            {
+                await ProcessFileAsync(filename);
+            }
+        }
+    }
+
+    protected void FillCacheForFile(int fileid)
     {
         using var ctx = ContextFactory.CreateDbContext();
 
@@ -443,7 +469,7 @@ public partial class FileProcessor(
         }
     }
 
-    private void WriteIndexedFile(string filepath, string indexFilename, int? lineCount, bool force)
+    protected void WriteIndexedFile(string filepath, string indexFilename, int? lineCount, bool force)
     {
         Logger.LogWritingIndexedFile(indexFilename);
 

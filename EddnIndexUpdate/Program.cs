@@ -82,7 +82,6 @@ using var host = builder.Build();
 var svcprov = host.Services;
 
 var processor = svcprov.GetRequiredService<FileProcessor>();
-var fileSystem = svcprov.GetRequiredService<IFileSystem>();
 
 if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
 {
@@ -94,24 +93,4 @@ if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
     Debugger.Break();
 }
 
-foreach (var dirname in dirnames)
-{
-    List<string> filenames = [
-        .. fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl.bz2", SearchOption.AllDirectories),
-        .. fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl", SearchOption.AllDirectories)
-    ];
-
-    filenames = [..
-        filenames
-            .Select(e => (Parts: fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
-            .OrderBy(e => e.Parts[^3])
-            .ThenBy(e => e.Parts[^2])
-            .ThenBy(e => e.Parts[^1])
-            .Select(e => e.Name)];
-
-
-    foreach (var filename in filenames)
-    {
-        await processor.ProcessFileAsync(filename);
-    }
-}
+await processor.ProcessDirectoriesAsync(dirnames);
