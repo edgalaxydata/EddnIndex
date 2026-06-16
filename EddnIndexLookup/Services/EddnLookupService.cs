@@ -930,7 +930,7 @@ public class EddnLookupService(
                    .Join(
                         ctx.Set<Models.SignalInfoSetItem>(),
                         o => o.SignalSetId,
-                        i => i.SignalInfoId,
+                        i => i.SignalInfoSetId,
                         (o, i) => new { i.SignalInfoId, SignalLine = o }
                    )
                    .Where(e => e.SignalInfoId == signalId)
