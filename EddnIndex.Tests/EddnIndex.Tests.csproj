@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EddnIndexLookup\EddnIndexLookup.csproj" />
     <ProjectReference Include="..\EddnIndexUpdate\EddnIndexUpdate.csproj" />
   </ItemGroup>
 

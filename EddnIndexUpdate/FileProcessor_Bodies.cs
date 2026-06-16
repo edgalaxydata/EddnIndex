@@ -2,6 +2,8 @@
 using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using EddnIndex.Common;
+using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 

@@ -1,7 +1,5 @@
 ﻿using EddnIndexLookup.Services;
-using EddnIndexUpdate.Models;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace EddnIndexLookup.Controllers
 {

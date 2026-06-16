@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 

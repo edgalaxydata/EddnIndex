@@ -11,6 +11,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 
@@ -399,7 +400,7 @@ public partial class FileProcessor(
 
             filenames = [..
                 filenames
-                    .Select(e => (Parts: fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
+                    .Select(e => (Parts: _fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
                     .OrderBy(e => e.Parts[^3])
                     .ThenBy(e => e.Parts[^2])
                     .ThenBy(e => e.Parts[^1])

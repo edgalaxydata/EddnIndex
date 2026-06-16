@@ -1,4 +1,3 @@
-using EddnIndexUpdate;
 using EddnIndexLookup.Services;
 using System.Reflection;
 using EddnIndexLookup.Options;
@@ -6,6 +5,8 @@ using Scalar.AspNetCore;
 using EddnIndexLookup.Conventions;
 using EddnIndexLookup.Filters;
 using System.IO.Abstractions;
+using EddnIndex.Common.Models;
+using EddnIndex.Common;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -29,7 +30,7 @@ builder.Services.AddControllersWithViews(opts =>
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IFileSystem, Testably.Abstractions.RealFileSystem>();
 
-builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(
+builder.Services.AddDbContextFactory<EDDNContext>(
     opts =>
     {
         opts.ConfigureDB(builder.Configuration.GetSection("Database"));

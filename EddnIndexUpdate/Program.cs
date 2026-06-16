@@ -1,4 +1,6 @@
-﻿using EddnIndexUpdate;
+﻿using EddnIndex.Common;
+using EddnIndex.Common.Models;
+using EddnIndexUpdate;
 using EddnIndexUpdate.Options;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,7 +70,7 @@ builder.Configuration.AddInMemoryCollection(cmdlineargs);
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<IFileSystem, Testably.Abstractions.RealFileSystem>();
 
-builder.Services.AddDbContextFactory<EddnIndexUpdate.Models.EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
+builder.Services.AddDbContextFactory<EDDNContext>(opts => opts.ConfigureDB(builder.Configuration.GetSection("Database")));
 
 builder.Services.AddOptions<FileProcessorSettings>()
                 .BindConfiguration("FileProcessor")

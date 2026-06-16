@@ -1,4 +1,5 @@
 ﻿using System.IO.Abstractions;
+using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 

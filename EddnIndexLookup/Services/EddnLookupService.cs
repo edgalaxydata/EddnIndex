@@ -1,6 +1,6 @@
 ﻿using EddnIndexLookup.DTO;
 using EddnIndexLookup.Options;
-using EddnIndexUpdate;
+using EddnIndex.Common;
 using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -11,8 +11,8 @@ using System.Diagnostics;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using Testably.Abstractions.Helpers;
-using Models = EddnIndexUpdate.Models;
-using Sectors = EddnIndexUpdate.Sectors;
+using Models = EddnIndex.Common.Models;
+using Sectors = EddnIndex.Common.Sectors;
 
 namespace EddnIndexLookup.Services;
 
@@ -25,7 +25,7 @@ namespace EddnIndexLookup.Services;
 /// <param name="fileSystem">Filesystem abstraction</param>
 public class EddnLookupService(
         IDbContextFactory<Models.EDDNContext> contextFactory,
-        ILogger<FileProcessor> logger,
+        ILogger<EddnLookupService> logger,
         IOptions<EddnLookupServiceSettings> options,
         IFileSystem fileSystem
     )

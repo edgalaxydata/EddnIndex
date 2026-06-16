@@ -1,4 +1,4 @@
-﻿using EddnIndexUpdate.Sectors;
+﻿using EddnIndex.Common.Sectors;
 
 namespace EddnIndex.Tests;
 

@@ -47,6 +47,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EddnIndex.Common\EddnIndex.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="msgtypes.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>

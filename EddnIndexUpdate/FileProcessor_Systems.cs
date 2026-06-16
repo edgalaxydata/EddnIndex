@@ -1,7 +1,9 @@
-﻿using EddnIndexUpdate.Sectors;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using EddnIndex.Common;
+using Models = EddnIndex.Common.Models;
+using EddnIndex.Common.Sectors;
 
 namespace EddnIndexUpdate;
 

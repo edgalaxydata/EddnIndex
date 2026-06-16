@@ -9,17 +9,25 @@ WORKDIR /app
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
+ARG VERSION
+ARG SOURCE_REVISION
 WORKDIR /src
+COPY ["EddnIndex.Common/EddnIndex.Common.csproj", "EddnIndex.Common/"]
 COPY ["EddnIndexUpdate/EddnIndexUpdate.csproj", "EddnIndexUpdate/"]
-RUN dotnet restore "./EddnIndexUpdate/EddnIndexUpdate.csproj"
+RUN dotnet restore "./EddnIndex.Common/EddnIndex.Common.csproj" --artifacts-path=/app/build
+RUN dotnet restore "./EddnIndexUpdate/EddnIndexUpdate.csproj" --artifacts-path=/app/build
 COPY . .
+WORKDIR "/src/EddnIndex.Common"
+RUN dotnet build --no-restore "./EddnIndex.Common.csproj" -c $BUILD_CONFIGURATION --artifacts-path=/app/build -p:Version=${VERSION:-$(date "+%Y.%m%d.%H%M")} -p:SourceRevisionId=${SOURCE_REVISION}
 WORKDIR "/src/EddnIndexUpdate"
-RUN dotnet build "./EddnIndexUpdate.csproj" -c $BUILD_CONFIGURATION --artifacts-path=/app/build -p:Version=${VERSION:-$(date "+%Y.%m%d.%H%M")} -p:SourceRevisionId=${SOURCE_REVISION}
+RUN dotnet build --no-restore "./EddnIndexUpdate.csproj" -c $BUILD_CONFIGURATION --artifacts-path=/app/build -p:Version=${VERSION:-$(date "+%Y.%m%d.%H%M")} -p:SourceRevisionId=${SOURCE_REVISION}
 
 # This stage is used to publish the service project to be copied to the final stage
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./EddnIndexUpdate.csproj" -c $BUILD_CONFIGURATION --artifacts-path=/app/build -p:PublishDir=/app/publish -p:Version=${VERSION:-$(date "+%Y.%m%d.%H%M")} -p:SourceRevisionId=${SOURCE_REVISION} -p:UseAppHost=false
+ARG VERSION
+ARG SOURCE_REVISION
+RUN dotnet publish --no-restore --no-build "./EddnIndexUpdate.csproj" -c $BUILD_CONFIGURATION --artifacts-path=/app/build -p:PublishDir=/app/publish -p:Version=${VERSION:-$(date "+%Y.%m%d.%H%M")} -p:SourceRevisionId=${SOURCE_REVISION} -p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final

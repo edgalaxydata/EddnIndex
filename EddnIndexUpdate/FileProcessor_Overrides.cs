@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text;
+using EddnIndex.Common;
+using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 

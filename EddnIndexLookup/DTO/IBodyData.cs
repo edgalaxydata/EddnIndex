@@ -1,4 +1,4 @@
-﻿using EddnIndexUpdate.Models;
+﻿using EddnIndex.Common.Models;
 using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexLookup.DTO;

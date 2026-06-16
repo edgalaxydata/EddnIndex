@@ -1,5 +1,6 @@
-﻿using EddnIndexLookup.DTO;
-using EddnIndexUpdate.Models;
+﻿using EddnIndex.Common;
+using EddnIndex.Common.Models;
+using EddnIndexLookup.DTO;
 
 namespace EddnIndexLookup.Filters
 {
@@ -35,41 +36,41 @@ namespace EddnIndexLookup.Filters
 
             if ((x.StarNum == 0 && y.StarNum != 0)
                 || (x.StarNum != 0 && y.StarNum == 0)
-                || x.DesignationType == EddnIndexUpdate.DesignationType.Unknown
-                || y.DesignationType == EddnIndexUpdate.DesignationType.Unknown)
+                || x.DesignationType == DesignationType.Unknown
+                || y.DesignationType == DesignationType.Unknown)
             {
                 return x.Designation.CompareTo(y.Designation);
             }
 
-            var xhasplanet = x.DesignationType >= EddnIndexUpdate.DesignationType.PlanetaryBody;
-            var xhasmoon1 = x.DesignationType >= EddnIndexUpdate.DesignationType.Moon1Body;
-            var xhasmoon2 = x.DesignationType >= EddnIndexUpdate.DesignationType.Moon2Body;
-            var xhasmoon3 = x.DesignationType >= EddnIndexUpdate.DesignationType.Moon3Body;
+            var xhasplanet = x.DesignationType >= DesignationType.PlanetaryBody;
+            var xhasmoon1 = x.DesignationType >= DesignationType.Moon1Body;
+            var xhasmoon2 = x.DesignationType >= DesignationType.Moon2Body;
+            var xhasmoon3 = x.DesignationType >= DesignationType.Moon3Body;
 
-            var yhasplanet = y.DesignationType >= EddnIndexUpdate.DesignationType.PlanetaryBody;
-            var yhasmoon1 = y.DesignationType >= EddnIndexUpdate.DesignationType.Moon1Body;
-            var yhasmoon2 = y.DesignationType >= EddnIndexUpdate.DesignationType.Moon2Body;
-            var yhasmoon3 = y.DesignationType >= EddnIndexUpdate.DesignationType.Moon3Body;
+            var yhasplanet = y.DesignationType >= DesignationType.PlanetaryBody;
+            var yhasmoon1 = y.DesignationType >= DesignationType.Moon1Body;
+            var yhasmoon2 = y.DesignationType >= DesignationType.Moon2Body;
+            var yhasmoon3 = y.DesignationType >= DesignationType.Moon3Body;
 
             var planetcomp = Nullable.Compare(x.PlanetNum, y.PlanetNum);
             var moon1comp = Nullable.Compare(x.Moon1Num, y.Moon1Num);
             var moon2comp = Nullable.Compare(x.Moon2Num, y.Moon2Num);
             var moon3comp = Nullable.Compare(x.Moon3Num, y.Moon3Num);
 
-            if (x.DesignationType == EddnIndexUpdate.DesignationType.StellarBarycentre
-                && y.DesignationType != EddnIndexUpdate.DesignationType.StellarBarycentre)
+            if (x.DesignationType == DesignationType.StellarBarycentre
+                && y.DesignationType != DesignationType.StellarBarycentre)
             {
                 return -1;
             }
 
-            if (y.DesignationType == EddnIndexUpdate.DesignationType.StellarBarycentre
-                && x.DesignationType != EddnIndexUpdate.DesignationType.StellarBarycentre)
+            if (y.DesignationType == DesignationType.StellarBarycentre
+                && x.DesignationType != DesignationType.StellarBarycentre)
             {
                 return 1;
             }
 
-            if (x.DesignationType == EddnIndexUpdate.DesignationType.StellarBarycentre
-                && y.DesignationType == EddnIndexUpdate.DesignationType.StellarBarycentre)
+            if (x.DesignationType == DesignationType.StellarBarycentre
+                && y.DesignationType == DesignationType.StellarBarycentre)
             {
                 if (x.StarNum == y.StarNum && x.StellarBarycentreLength == y.StellarBarycentreLength)
                 {
@@ -89,30 +90,30 @@ namespace EddnIndexLookup.Filters
                 }
             }
 
-            if (x.DesignationType is EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster
-                && y.DesignationType is not (EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster))
+            if (x.DesignationType is DesignationType.Belt or DesignationType.AsteroidCluster
+                && y.DesignationType is not (DesignationType.Belt or DesignationType.AsteroidCluster))
             {
                 return -1;
             }
 
-            if (y.DesignationType is EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster
-                && x.DesignationType is not (EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster))
+            if (y.DesignationType is DesignationType.Belt or DesignationType.AsteroidCluster
+                && x.DesignationType is not (DesignationType.Belt or DesignationType.AsteroidCluster))
             {
                 return 1;
             }
 
-            if (x.DesignationType is EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster
-                && y.DesignationType is EddnIndexUpdate.DesignationType.Belt or EddnIndexUpdate.DesignationType.AsteroidCluster)
+            if (x.DesignationType is DesignationType.Belt or DesignationType.AsteroidCluster
+                && y.DesignationType is DesignationType.Belt or DesignationType.AsteroidCluster)
             {
                 return planetcomp == 0 ? moon1comp : planetcomp;
             }
 
             foreach (var (bctype, (xnum, xhas), (ynum, yhas), cmp) in new[]
             {
-                (EddnIndexUpdate.DesignationType.PlanetaryBarycentre, (x.PlanetNum, xhasplanet), (y.PlanetNum, yhasplanet), planetcomp),
-                (EddnIndexUpdate.DesignationType.Moon1Barycentre, (x.Moon1Num, xhasmoon1), (y.Moon1Num, yhasmoon1), moon1comp),
-                (EddnIndexUpdate.DesignationType.Moon2Barycentre, (x.Moon2Num, xhasmoon2), (y.Moon2Num, yhasmoon2), moon2comp),
-                (EddnIndexUpdate.DesignationType.Moon3Barycentre, (x.Moon3Num, xhasmoon3), (y.Moon3Num, yhasmoon3), moon3comp),
+                (DesignationType.PlanetaryBarycentre, (x.PlanetNum, xhasplanet), (y.PlanetNum, yhasplanet), planetcomp),
+                (DesignationType.Moon1Barycentre, (x.Moon1Num, xhasmoon1), (y.Moon1Num, yhasmoon1), moon1comp),
+                (DesignationType.Moon2Barycentre, (x.Moon2Num, xhasmoon2), (y.Moon2Num, yhasmoon2), moon2comp),
+                (DesignationType.Moon3Barycentre, (x.Moon3Num, xhasmoon3), (y.Moon3Num, yhasmoon3), moon3comp),
             })
             {
                 if (x.DesignationType == bctype || y.DesignationType == bctype)
