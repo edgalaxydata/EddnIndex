@@ -832,7 +832,7 @@ public class EddnLookupService(
         {
             var query =
                 ctx.Set<Models.FileLineStation>()
-                   .Where(e => stationIds.Contains(e.StationId))
+                   .Where(e => e.StationId == stationid)
                    .LeftJoin(
                         ctx.Set<Models.FileInfo>(),
                         o => o.FileId,
