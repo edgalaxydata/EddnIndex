@@ -53,7 +53,7 @@ public class EddnLookupService(
             yield return -entry.Id;
         }
 
-        if (Models.SystemInfo.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode, true)
+        if (SystemHelpers.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode, true)
             && n2 >= 0
             && n2 < 65536
             && mid >= 0
@@ -99,7 +99,7 @@ public class EddnLookupService(
         {
             var ids = new List<long>();
 
-            if (Models.SystemInfo.TrySplitProcgenName(sysname, out string? sectorname, out int mid, out int n2, out int masscode, true)
+            if (SystemHelpers.TrySplitProcgenName(sysname, out string? sectorname, out int mid, out int n2, out int masscode, true)
                 && n2 >= 0
                 && n2 < 65536
                 && mid >= 0
@@ -202,7 +202,7 @@ public class EddnLookupService(
         }
 
         List<long> sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
-        long? modsysaddr = Models.SystemInfo.SystemAddressToModSystemAddress(systemAddress);
+        long? modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
 
         if ((modsysaddr == null && systemAddress != null) || (sysNameIds.Count == 0 && systemName != null))
         {
@@ -1534,7 +1534,7 @@ public class EddnLookupService(
                 boxelName += "-";
             }
 
-            if (!Models.SystemInfo.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
+            if (!SystemHelpers.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
                 || n2 != 0
                 || mid < 0
                 || mid >= 0x200000
@@ -1667,7 +1667,7 @@ public class EddnLookupService(
                 boxelName += "-";
             }
 
-            if (!Models.SystemInfo.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
+            if (!SystemHelpers.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
                 || n2 != 0
                 || mid < 0
                 || mid >= 0x200000
@@ -1707,7 +1707,7 @@ public class EddnLookupService(
         await foreach (var entry in query)
         {
             if (entry.ModSystemAddress is not long modsysaddr
-                || Models.SystemInfo.GetPGSuffix(modsysaddr, false) is not string pgsuffix)
+                || SystemHelpers.GetPGSuffix(modsysaddr, false) is not string pgsuffix)
             {
                 continue;
             }
@@ -1738,7 +1738,7 @@ public class EddnLookupService(
 
             while (prevSeqnum < seqnum)
             {
-                var sysaddr = Models.SystemInfo.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
+                var sysaddr = SystemHelpers.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
 
                 yield return new SystemGapData
                 {
@@ -1750,7 +1750,7 @@ public class EddnLookupService(
                 prevSeqnum++;
             }
 
-            prevSystemAddress = Models.SystemInfo.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
+            prevSystemAddress = SystemHelpers.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
 
             if (entry.IsRejected != true && entry.HasCoords)
             {

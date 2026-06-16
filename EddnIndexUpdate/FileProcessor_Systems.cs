@@ -185,7 +185,7 @@ public partial class FileProcessor
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
 
-        if (Models.SystemInfo.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode)
+        if (SystemHelpers.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode)
             && n2 >= 0
             && n2 < 65536
             && mid >= 0
@@ -194,7 +194,7 @@ public partial class FileProcessor
             && masscode < 8)
         {
             var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
-            var checkSuffix = Models.SystemInfo.GetPGSuffix(boxelid);
+            var checkSuffix = SystemHelpers.GetPGSuffix(boxelid);
             Assert(name.EndsWith(checkSuffix), extraData: new { name, checkSuffix });
 
             var sector = GetOrAddSector(sectorName);
@@ -283,8 +283,8 @@ public partial class FileProcessor
         }
 
         var nameid = GetOrAddSystemName(name);
-        var modsysaddr = Models.SystemInfo.SystemAddressToModSystemAddress(systemAddress);
-        var revsysaddr = Models.SystemInfo.ModSystemAddressToSystemAddress(modsysaddr);
+        var modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
+        var revsysaddr = SystemHelpers.ModSystemAddressToSystemAddress(modsysaddr);
         Assert(systemAddress == revsysaddr, extraData: new { modsysaddr, systemAddress, revsysaddr });
         var namemodsysaddr = TryGetNameModSystemAddress(nameid);
 
@@ -316,7 +316,7 @@ public partial class FileProcessor
 
             if (overrides is [{ } ovr])
             {
-                namemodsysaddr ??= Models.SystemInfo.SystemAddressToModSystemAddress(ovr.SystemAddress);
+                namemodsysaddr ??= SystemHelpers.SystemAddressToModSystemAddress(ovr.SystemAddress);
 
                 if ((systemAddress == null || ovr.SystemAddress == systemAddress)
                     && (ovr.X == null || x == null || ovr.X == x)
@@ -331,8 +331,8 @@ public partial class FileProcessor
 
         modsysaddr ??= namemodsysaddr;
 
-        var namesysaddr = Models.SystemInfo.ModSystemAddressToSystemAddress(namemodsysaddr);
-        var revnamemodsysaddr = Models.SystemInfo.SystemAddressToModSystemAddress(namesysaddr);
+        var namesysaddr = SystemHelpers.ModSystemAddressToSystemAddress(namemodsysaddr);
+        var revnamemodsysaddr = SystemHelpers.SystemAddressToModSystemAddress(namesysaddr);
         Assert(namemodsysaddr == revnamemodsysaddr, extraData: new { namemodsysaddr, namesysaddr, revnamemodsysaddr });
 
         systemAddress ??= namesysaddr;

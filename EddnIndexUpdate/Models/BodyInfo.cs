@@ -26,7 +26,7 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
 
     public int? SysName_SectorAddress => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
 
-    public string? SysName_PGSuffix => SystemInfo.GetPGSuffix(SystemNameId);
+    public string? SysName_PGSuffix => SystemHelpers.GetPGSuffix(SystemNameId);
 
     public virtual bool Equals(BodyInfo? other)
     {
