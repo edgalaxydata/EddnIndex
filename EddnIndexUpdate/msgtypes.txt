@@ -33,3 +33,5 @@ https://eddn.edcd.io/schemas/fcmaterials_journal/1/test	Test-Journal.FCMaterials
 https://eddn.edcd.io/schemas/dockingdenied/1	Journal.DockingDenied
 https://eddn.edcd.io/schemas/dockingdenied/1/test	Test-Journal.DockingDenied
 https://eddn.edcd.io/schemas/dockinggranted/1	Journal.DockingGranted
+https://eddn.edcd.io/schemas/scanorganic/1      Journal.ScanOrganic
+https://eddn.edcd.io/schemas/scanorganic/1/test Test-Journal.ScanOrganic

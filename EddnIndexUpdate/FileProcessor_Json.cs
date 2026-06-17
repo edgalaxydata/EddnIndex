@@ -326,7 +326,7 @@ public partial class FileProcessor
                     case ("Body" or "BodyName", JsonTokenType.String):
                         bodyName = reader.GetString();
                         break;
-                    case ("BodyID", JsonTokenType.Number) when (reader.TryGetInt32(out int bid)):
+                    case ("Body" or "BodyID", JsonTokenType.Number) when (reader.TryGetInt32(out int bid)):
                         bodyId = bid;
                         break;
                     case ("BodyType", JsonTokenType.String):
