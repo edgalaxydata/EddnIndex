@@ -1274,7 +1274,7 @@ public class EddnLookupService(
                 .ToDictionary();
         }
 
-        var matchCounts = await GetStationMatchCountsAsync(signals.Keys, canceltoken);
+        var matchCounts = await GetSignalMatchCountsAsync(signals.Keys, canceltoken);
 
         var entries = new Dictionary<int, SignalData>();
 
@@ -1356,7 +1356,7 @@ public class EddnLookupService(
         var dataSize = info.Length;
         Span<byte> ixStartEndPos = stackalloc byte[16];
 
-        for (int retries = 3; ; retries--)
+        for (int retries = 3; retries > 0; retries--)
         {
             using var indexStream = _fileSystem.File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
 
@@ -1497,6 +1497,8 @@ public class EddnLookupService(
                 return itemNo < lines.Count ? lines[itemNo] : null;
             }
         }
+
+        return null;
     }
 
     /// <summary>Get systems in a sector</summary>
