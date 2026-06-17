@@ -9,7 +9,7 @@ string? providerName = null;
 
 for (int i = 0; i < args.Length; i++)
 {
-    if (args[i] == "--provider" && i > args.Length - 1)
+    if (args[i] == "--provider" && i < args.Length - 1)
     {
         providerName = args[i + 1];
         i++;
