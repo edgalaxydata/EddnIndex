@@ -1266,7 +1266,7 @@ public class EddnLookupService(
         {
             matches = matches.ToDictionary(
                 e => e.Key,
-                e => e.Value.Where(s => string.Equals(s.SystemName, systemName, StringComparison.OrdinalIgnoreCase)).ToList()
+                e => e.Value.Where(s => s.SystemAddress == systemAddress).ToList()
             );
 
             signals = signals
