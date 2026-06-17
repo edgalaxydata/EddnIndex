@@ -391,27 +391,19 @@ public partial class FileProcessor(
 
     public async Task ProcessDirectoriesAsync(IEnumerable<string> dirnames)
     {
-        foreach (var dirname in dirnames)
+        foreach (var filename in dirnames
+                                    .SelectMany<string, string>(f => [
+                                        .. _fileSystem.Directory.EnumerateFiles(f, "*.jsonl.bz2", SearchOption.AllDirectories),
+                                        .. _fileSystem.Directory.EnumerateFiles(f, "*.jsonl", SearchOption.AllDirectories)
+                                    ])
+                                    .Select(e => (Parts: _fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
+                                    .Where(e => e.Parts.Length > 3)
+                                    .OrderBy(e => e.Parts[^3])
+                                    .ThenBy(e => e.Parts[^2])
+                                    .ThenBy(e => e.Parts[^1])
+                                    .Select(e => e.Name))
         {
-            List<string> filenames = [
-                .. _fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl.bz2", SearchOption.AllDirectories),
-                .. _fileSystem.Directory.EnumerateFiles(dirname, "*.jsonl", SearchOption.AllDirectories)
-            ];
-
-            filenames = [..
-                filenames
-                    .Select(e => (Parts: _fileSystem.Path.GetFileNameWithoutExtension(e).Split("-"), Name: e))
-                    .OrderBy(e => e.Parts[^3])
-                    .ThenBy(e => e.Parts[^2])
-                    .ThenBy(e => e.Parts[^1])
-                    .Select(e => e.Name)
-            ];
-
-
-            foreach (var filename in filenames)
-            {
-                await ProcessFileAsync(filename);
-            }
+            await ProcessFileAsync(filename);
         }
     }
 
