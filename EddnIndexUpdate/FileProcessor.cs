@@ -1,4 +1,5 @@
-﻿using EddnIndexUpdate.Options;
+﻿using EddnIndex.Common;
+using EddnIndexUpdate.Options;
 using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -672,20 +673,28 @@ public partial class FileProcessor(
                 primarySchemaEvent = GetOrAddSchemaEvent(primarySchema.PrimarySchema, primarySchema.EventType ?? eventType);
             }
 
-            using var ctx = ContextFactory.CreateDbContext();
-
-            file = new Models.FileInfo
+            try
             {
-                FileName = filename,
-                Date = date,
-                PrimarySchema = primarySchema?.PrimarySchema,
-                EventType = primarySchema?.EventType ?? eventType,
-                IsTest = primarySchema?.IsTest == true || test,
-                PrimarySchemaEventId = primarySchemaEvent?.Id
-            };
+                using var ctx = ContextFactory.CreateDbContext();
 
-            ctx.Add(file);
-            ctx.SaveChanges();
+                file = new Models.FileInfo
+                {
+                    FileName = filename,
+                    Date = date,
+                    PrimarySchema = primarySchema?.PrimarySchema,
+                    EventType = primarySchema?.EventType ?? eventType,
+                    IsTest = primarySchema?.IsTest == true || test,
+                    PrimarySchemaEventId = primarySchemaEvent?.Id
+                };
+
+                ctx.Add(file);
+                ctx.SaveChanges();
+            }
+            catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
+            {
+                using var ctx = ContextFactory.CreateDbContext();
+                file = ctx.Set<Models.FileInfo>().First(e => e.FileName == filename);
+            }
 
             Files[filename] = file;
         }
