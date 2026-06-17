@@ -41,7 +41,7 @@ public class EddnLookupService(
     private readonly TimeSpan MaxCacheAge = TimeSpan.FromHours(1);
     private readonly int MaxCacheSize = 8192;
 
-    private async IAsyncEnumerable<long> GetSystemNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
+    private protected async IAsyncEnumerable<long> GetSystemNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -79,7 +79,7 @@ public class EddnLookupService(
         }
     }
 
-    private async Task<Dictionary<string, List<long>>> GetSystemNameIdsAsync(ICollection<string> names, CancellationToken canceltoken)
+    private protected async Task<Dictionary<string, List<long>>> GetSystemNameIdsAsync(ICollection<string> names, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
@@ -142,7 +142,7 @@ public class EddnLookupService(
         return sysNameIds;
     }
 
-    private async IAsyncEnumerable<(long? SystemNameId, int BodyNameId)> GetBodyNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
+    private protected async IAsyncEnumerable<(long? SystemNameId, int BodyNameId)> GetBodyNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -197,7 +197,7 @@ public class EddnLookupService(
         }
     }
 
-    private async Task<Dictionary<int, TSystem>?> GetSystemsAsync<TSystem>(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, TSystem>?> GetSystemsAsync<TSystem>(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
         where TSystem : class, ISystemData, new()
     {
         if (string.IsNullOrWhiteSpace(systemName) && (systemAddress == null || systemAddress <= 0))
@@ -240,7 +240,7 @@ public class EddnLookupService(
         return await FillSystemsAsync<TSystem>(ctx, systems, canceltoken);
     }
 
-    private static TSystem? FillSystem<TSystem>(
+    private protected static TSystem? FillSystem<TSystem>(
             Models.SystemInfo system,
             Dictionary<long, string> systemNames,
             Dictionary<int, string> sectorsById,
@@ -284,7 +284,7 @@ public class EddnLookupService(
             };
     }
 
-    private static async Task<Dictionary<int, TSystem>> FillSystemsAsync<TSystem>(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems, CancellationToken canceltoken)
+    private protected static async Task<Dictionary<int, TSystem>> FillSystemsAsync<TSystem>(Models.EDDNContext ctx, Dictionary<int, Models.SystemInfo> systems, CancellationToken canceltoken)
         where TSystem : class, ISystemData, new()
     {
         var systemNameIds = systems.Values.Select(e => e.SystemNameId).Distinct().ToList();
@@ -324,7 +324,7 @@ public class EddnLookupService(
         return systemDatas;
     }
 
-    private static async Task<Dictionary<long, TBodyData>> FillBodiesAsync<TBodyData>(
+    private protected static async Task<Dictionary<long, TBodyData>> FillBodiesAsync<TBodyData>(
             Models.EDDNContext ctx,
             Dictionary<long, Models.BodyInfo> bodies,
             CancellationToken canceltoken
@@ -475,7 +475,7 @@ public class EddnLookupService(
         return bodiesData;
     }
 
-    private async Task<Dictionary<long, BodyData>?> GetBodiesAsync(string? systemName, long? systemAddress, string? bodyName, int? bodyId, bool includeRejected, CancellationToken canceltoken)
+    private protected async Task<Dictionary<long, BodyData>?> GetBodiesAsync(string? systemName, long? systemAddress, string? bodyName, int? bodyId, bool includeRejected, CancellationToken canceltoken)
     {
         var systems = await GetSystemsAsync<BodySystem>(systemName, systemAddress, includeRejected, canceltoken);
 
@@ -520,7 +520,7 @@ public class EddnLookupService(
         return await FillBodiesAsync<BodyData>(ctx, bodies, canceltoken);
     }
 
-    private async Task<Dictionary<int, TSystem>> GetSystemsAsync<TSystem>(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, TSystem>> GetSystemsAsync<TSystem>(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
         where TSystem : class, ISystemData, new()
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
@@ -537,7 +537,7 @@ public class EddnLookupService(
         return await FillSystemsAsync<TSystem>(ctx, await query.ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken), canceltoken);
     }
 
-    private async Task<Dictionary<int, Dictionary<long, TBodyData>>> GetSystemBodiesAsync<TBodyData>(
+    private protected async Task<Dictionary<int, Dictionary<long, TBodyData>>> GetSystemBodiesAsync<TBodyData>(
             ICollection<int> systemIds,
             bool includeRejected,
             CancellationToken canceltoken
@@ -568,7 +568,7 @@ public class EddnLookupService(
                 .ToDictionary(g => g.Key, g => g.ToDictionary(e => e.Id));
     }
 
-    private async Task<Dictionary<int, StationData>> GetStationsAsync(ICollection<int> stationIds, bool includeRejected, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, StationData>> GetStationsAsync(ICollection<int> stationIds, bool includeRejected, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
@@ -602,7 +602,33 @@ public class EddnLookupService(
                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
     }
 
-    private async Task<Dictionary<int, List<MatchEntry>>> GetSystemMatchEntriesAsync(
+    private protected async Task<Dictionary<TKey, List<MatchEntry>>> FillMatchSystemData<TKey>(
+            Dictionary<TKey, List<MatchEntry>> matches,
+            CancellationToken canceltoken
+        )
+        where TKey : notnull
+    {
+        var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
+
+        var systems = await GetSystemsAsync<SystemData>(systemIds, true, canceltoken);
+
+        return matches.ToDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value
+                      .Select(e => e.SystemId is not int sysid
+                                || systems.GetValueOrDefault(sysid) is not { } sys
+                                ? e
+                                : e with
+                                {
+                                    SystemName = sys.Name,
+                                    SystemAddress = sys.SystemAddress
+                                }
+                      )
+                      .ToList()
+        );
+    }
+
+    private protected async Task<Dictionary<int, List<MatchEntry>>> GetSystemMatchEntriesAsync(
             ICollection<int> systemIds,
             int? limitMatches,
             DateTimeOffset? minDate,
@@ -616,70 +642,32 @@ public class EddnLookupService(
 
         foreach (var sysid in systemIds)
         {
-            var routeQuery =
-                ctx.Set<Models.FileLineNavRoute>()
-                   .Where(e => e.SystemId == sysid)
-                   .LeftJoin(
-                        ctx.Set<Models.FileInfo>(),
-                        o => o.FileId,
-                        i => i.Id,
-                        (o, i) => new { RouteEntry = o, File = i }
-                    )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineInfo>()
-                           .Include(e => e.Software)
-                           .Include(e => e.SchemaEvent)
-                           .Include(e => e.GameVersion),
-                        o => new { o.RouteEntry.FileId, o.RouteEntry.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, Info = i, o.RouteEntry }
-                   )
+            var routeQueryResults = await
+                ctx.QuerySystemRouteMatchLines(sysid, minDate, maxDate, limitMatches)
                    .Select(e => new MatchEntry
                    {
-                       FileName = e.File!.FileName,
+                       FileName = e.File.FileName,
                        LineNo = e.RouteEntry.LineNo,
                        EntryNum = e.RouteEntry.EntryNum,
-                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
-                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
-                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                       Timestamp = e.Info!.Timestamp,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
                        GatewayTimestamp = e.RouteEntry.GatewayTimestamp,
                        SystemId = e.RouteEntry.SystemId
-                   });
+                   })
+                   .ToListAsync(canceltoken);
 
-            var query =
-                ctx.Set<Models.FileLineInfo>()
-                   .Where(e => e.SystemId == sysid)
-                   .Include(e => e.Software)
-                   .Include(e => e.SchemaEvent)
-                   .Include(e => e.GameVersion)
-                   .LeftJoin(
-                        ctx.Set<Models.FileInfo>(),
-                        o => o.FileId,
-                        i => i.Id,
-                        (o, i) => new { Info = o, File = i }
-                    )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineBody>(),
-                        o => new { o.Info.FileId, o.Info.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, o.Info, Body = i }
-                   )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineStation>()
-                           .Include(e => e.Station),
-                        o => new { o.Info.FileId, o.Info.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, o.Info, o.Body, Station = i }
-                   )
+            var queryResults = await
+                ctx.QuerySystemMatchLines(sysid, minDate, maxDate, limitMatches)
                    .Select(e => new MatchEntry
                    {
-                       FileName = e.File!.FileName,
+                       FileName = e.File.FileName,
                        LineNo = e.Info.LineNo,
                        SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
                        SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
@@ -696,33 +684,8 @@ public class EddnLookupService(
                        StationId = e.Station == null ? null : e.Station.StationId,
                        StationName = e.Station == null || e.Station.Station == null ? null : e.Station.Station.StationName,
                        MarketId = e.Station == null || e.Station.Station == null ? null : e.Station.Station.MarketId
-                   });
-
-            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp >= minTS);
-                routeQuery = routeQuery.Where(e => e.GatewayTimestamp >= minTS);
-            }
-
-            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp <= maxTS);
-                routeQuery = routeQuery.Where(e => e.GatewayTimestamp <= maxTS);
-            }
-
-            var queryResults = await
-                query
-                    .OrderByDescending(e => e.GatewayTimestamp)
-                    .Take(limitMatches ?? 1000)
-                    .Where(e => e.FileName != null)
-                    .ToListAsync(canceltoken);
-
-            var routeQueryResults = await
-                routeQuery
-                    .OrderByDescending(e => e.GatewayTimestamp)
-                    .Take(limitMatches ?? 1000)
-                    .Where(e => e.FileName != null)
-                    .ToListAsync(canceltoken);
+                   })
+                   .ToListAsync(canceltoken);
 
             matches[sysid] = [..
                 queryResults
@@ -735,7 +698,7 @@ public class EddnLookupService(
         return matches;
     }
 
-    private async Task<Dictionary<long, List<MatchEntry>>> GetBodyMatchEntriesAsync(
+    private protected async Task<Dictionary<long, List<MatchEntry>>> GetBodyMatchEntriesAsync(
             ICollection<long> bodyIds,
             int? limitMatches,
             DateTimeOffset? minDate,
@@ -749,74 +712,35 @@ public class EddnLookupService(
 
         foreach (var bodyid in bodyIds)
         {
-            var query =
-                ctx.Set<Models.FileLineBody>()
-                   .Where(e => e.BodyId == bodyid)
-                   .LeftJoin(
-                        ctx.Set<Models.FileInfo>(),
-                        o => o.FileId,
-                        i => i.Id,
-                        (o, i) => new { Body = o, File = i }
-                    )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineInfo>()
-                           .Include(e => e.Software)
-                           .Include(e => e.SchemaEvent)
-                           .Include(e => e.GameVersion),
-                        o => new { o.Body.FileId, o.Body.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, Info = i, o.Body }
-                   )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineStation>()
-                           .Include(e => e.Station),
-                        o => new { o.Body.FileId, o.Body.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, o.Info, o.Body, Station = i }
-                   )
+            matches[bodyid] = await
+                ctx.QueryBodyMatchLines(bodyid, minDate, maxDate, limitMatches)
                    .Select(e => new MatchEntry
                    {
-                       FileName = e.File!.FileName,
+                       FileName = e.File.FileName,
                        LineNo = e.Body.LineNo,
-                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
-                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
-                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                       Timestamp = e.Info!.Timestamp,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
                        GatewayTimestamp = e.Body.GatewayTimestamp,
-                       SystemId = e.Info!.SystemId,
+                       SystemId = e.Info.SystemId,
                        BodyId = e.Body.BodyId,
                        StationId = e.Station == null ? null : e.Station.StationId,
                        StationName = e.Station == null || e.Station.Station == null ? null : e.Station.Station.StationName,
                        MarketId = e.Station == null || e.Station.Station == null ? null : e.Station.Station.MarketId
-                   });
-
-            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp >= minTS);
-            }
-
-            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp <= maxTS);
-            }
-
-            matches[bodyid] = await
-                query
-                    .OrderByDescending(e => e.GatewayTimestamp)
-                    .Take(limitMatches ?? 1000)
-                    .Where(e => e.FileName != null)
-                    .ToListAsync(canceltoken);
+                   })
+                   .ToListAsync(canceltoken);
         }
 
         return matches;
     }
 
-    private async Task<Dictionary<int, List<MatchEntry>>> GetStationMatchEntriesAsync(
+    private protected async Task<Dictionary<int, List<MatchEntry>>> GetStationMatchEntriesAsync(
             ICollection<int> stationIds,
             int? limitMatches,
             DateTimeOffset? minDate,
@@ -830,88 +754,33 @@ public class EddnLookupService(
 
         foreach (var stationid in stationIds)
         {
-            var query =
-                ctx.Set<Models.FileLineStation>()
-                   .Where(e => e.StationId == stationid)
-                   .LeftJoin(
-                        ctx.Set<Models.FileInfo>(),
-                        o => o.FileId,
-                        i => i.Id,
-                        (o, i) => new { Station = o, File = i }
-                    )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineInfo>()
-                           .Include(e => e.Software)
-                           .Include(e => e.SchemaEvent)
-                           .Include(e => e.GameVersion),
-                        o => new { o.Station.FileId, o.Station.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, Info = i, o.Station }
-                   )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineBody>(),
-                        o => new { o.Station.FileId, o.Station.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.File, o.Info, Body = i, o.Station }
-                   )
+            matches[stationid] = await
+                ctx.QueryStationMatchLines(stationid, minDate, maxDate, limitMatches)
                    .Select(e => new MatchEntry
                    {
-                       FileName = e.File!.FileName,
-                       LineNo = e.Station!.LineNo,
-                       SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
-                       SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
-                       Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
-                       EventType = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
-                       GameVersion = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
-                       GameBuild = e.Info!.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
-                       IsOdyssey = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
-                       IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
-                       Timestamp = e.Info!.Timestamp,
+                       FileName = e.File.FileName,
+                       LineNo = e.Station.LineNo,
+                       SoftwareName = e.Info.Software == null ? null : e.Info.Software.SoftwareName,
+                       SoftwareVersion = e.Info.Software == null ? null : e.Info.Software.SoftwareVersion,
+                       Schema = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
+                       EventType = e.Info.SchemaEvent == null ? null : e.Info.SchemaEvent.EventType,
+                       GameVersion = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameVersion,
+                       GameBuild = e.Info.GameVersion == null ? null : e.Info.GameVersion.GameBuild,
+                       IsOdyssey = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsOdyssey,
+                       IsHorizons = e.Info.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
+                       Timestamp = e.Info.Timestamp,
                        GatewayTimestamp = e.Station.GatewayTimestamp,
-                       SystemId = e.Info!.SystemId,
+                       SystemId = e.Info.SystemId,
                        BodyId = e.Body == null ? null : e.Body.BodyId,
                        StationId = e.Station.StationId
-                   });
-
-            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp >= minTS);
-            }
-
-            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp <= maxTS);
-            }
-
-            matches[stationid] = await
-                query
-                    .OrderByDescending(e => e.GatewayTimestamp)
-                    .Take(limitMatches ?? 1000)
-                    .Where(e => e.FileName != null)
-                    .ToListAsync(canceltoken);
+                   })
+                   .ToListAsync(canceltoken);
         }
 
-        var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
-
-        var systems = await GetSystemsAsync<SystemData>(systemIds, true, canceltoken);
-
-        return matches.ToDictionary(
-            kvp => kvp.Key,
-            kvp => kvp.Value
-                      .Select(e => e.SystemId is not int sysid
-                                || systems.GetValueOrDefault(sysid) is not { } sys
-                                ? e
-                                : e with
-                                {
-                                    SystemName = sys.Name,
-                                    SystemAddress = sys.SystemAddress
-                                }
-                      )
-                      .ToList()
-        );
+        return await FillMatchSystemData(matches, canceltoken);
     }
 
-    private async Task<Dictionary<int, List<MatchEntry>>> GetSignalMatchEntriesAsync(
+    private protected async Task<Dictionary<int, List<MatchEntry>>> GetSignalMatchEntriesAsync(
             ICollection<int> signalIds,
             int? limitMatches,
             DateTimeOffset? minDate,
@@ -925,34 +794,12 @@ public class EddnLookupService(
 
         foreach (var signalId in signalIds)
         {
-            var query =
-                ctx.Set<Models.FileLineSignal>()
-                   .Join(
-                        ctx.Set<Models.SignalInfoSetItem>(),
-                        o => o.SignalSetId,
-                        i => i.SignalInfoSetId,
-                        (o, i) => new { i.SignalInfoId, SignalLine = o }
-                   )
-                   .Where(e => e.SignalInfoId == signalId)
-                   .LeftJoin(
-                        ctx.Set<Models.FileInfo>(),
-                        o => o.SignalLine.FileId,
-                        i => i.Id,
-                        (o, i) => new { o.SignalInfoId, o.SignalLine, File = i }
-                    )
-                   .LeftJoin(
-                        ctx.Set<Models.FileLineInfo>()
-                           .Include(e => e.Software)
-                           .Include(e => e.SchemaEvent)
-                           .Include(e => e.GameVersion),
-                        o => new { o.SignalLine.FileId, o.SignalLine.LineNo },
-                        i => new { i.FileId, i.LineNo },
-                        (o, i) => new { o.SignalInfoId, o.SignalLine, o.File, Info = i }
-                   )
+            matches[signalId] = await
+                ctx.QuerySignalMatchLines(signalId, minDate, maxDate, limitMatches)
                    .Select(e => new MatchEntry
                    {
-                       FileName = e.File!.FileName,
-                       LineNo = e.SignalLine!.LineNo,
+                       FileName = e.File.FileName,
+                       LineNo = e.SignalLine.LineNo,
                        SoftwareName = e.Info!.Software == null ? null : e.Info.Software.SoftwareName,
                        SoftwareVersion = e.Info!.Software == null ? null : e.Info.Software.SoftwareVersion,
                        Schema = e.Info!.SchemaEvent == null ? null : e.Info.SchemaEvent.Schema,
@@ -963,100 +810,40 @@ public class EddnLookupService(
                        IsHorizons = e.Info!.GameVersion == null ? null : e.Info.GameVersion.IsHorizons,
                        Timestamp = e.Info!.Timestamp,
                        GatewayTimestamp = e.SignalLine.GatewayTimestamp,
-                       SystemId = e.Info!.SystemId,
-                       SignalId = e.SignalInfoId
-                   });
-
-            if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp >= minTS);
-            }
-
-            if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
-            {
-                query = query.Where(e => e.GatewayTimestamp <= maxTS);
-            }
-
-            matches[signalId] = await
-                query
-                    .OrderByDescending(e => e.GatewayTimestamp)
-                    .Take(limitMatches ?? 1000)
-                    .Where(e => e.FileName != null)
-                    .ToListAsync(canceltoken);
+                       SystemId = e.Info!.SystemId
+                   })
+                   .ToListAsync(canceltoken);
         }
 
-        var systemIds = matches.Values.SelectMany(e => e).Select(e => e.SystemId).OfType<int>().ToList();
-
-        var systems = await GetSystemsAsync<SystemData>(systemIds, true, canceltoken);
-
-        return matches.ToDictionary(
-            kvp => kvp.Key,
-            kvp => kvp.Value
-                      .Select(e => e.SystemId is not int sysid
-                                || systems.GetValueOrDefault(sysid) is not { } sys
-                                ? e
-                                : e with
-                                {
-                                    SystemName = sys.Name,
-                                    SystemAddress = sys.SystemAddress
-                                }
-                      )
-                      .ToList()
-        );
+        return await FillMatchSystemData(matches, canceltoken);
     }
 
-    private async Task<Dictionary<int, int>> GetSystemMatchCountsAsync(ICollection<int> systemIds, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, int>> GetSystemMatchCountsAsync(ICollection<int> systemIds, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return await
-            ctx.Set<Models.FileLineInfo>()
-               .Where(e => e.SystemId != null && systemIds.Contains(e.SystemId.Value))
-               .GroupBy(e => e.SystemId!.Value)
-               .Select(g => new { SystemId = g.Key, Count = g.Count() })
-               .ToDictionaryAsync(e => e.SystemId, e => e.Count, cancellationToken: canceltoken);
+        return await ctx.GetSystemMatchCountsAsync(systemIds, canceltoken);
     }
 
-    private async Task<Dictionary<long, int>> GetBodyMatchCountsAsync(ICollection<long> bodyIds, CancellationToken canceltoken)
+    private protected async Task<Dictionary<long, int>> GetBodyMatchCountsAsync(ICollection<long> bodyIds, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return await
-            ctx.Set<Models.FileLineBody>()
-               .Where(e => bodyIds.Contains(e.BodyId))
-               .GroupBy(e => e.BodyId)
-               .Select(g => new { BodyId = g.Key, Count = g.Count() })
-               .ToDictionaryAsync(e => e.BodyId, e => e.Count, cancellationToken: canceltoken);
+        return await ctx.GetBodyMatchCountsAsync(bodyIds, canceltoken);
     }
 
-    private async Task<Dictionary<int, int>> GetStationMatchCountsAsync(ICollection<int> stationIds, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, int>> GetStationMatchCountsAsync(ICollection<int> stationIds, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return await
-            ctx.Set<Models.FileLineStation>()
-               .Where(e => stationIds.Contains(e.StationId))
-               .GroupBy(e => e.StationId)
-               .Select(g => new { StationId = g.Key, Count = g.Count() })
-               .ToDictionaryAsync(e => e.StationId, e => e.Count, cancellationToken: canceltoken);
+        return await ctx.GetStationMatchCountsAsync(stationIds, canceltoken);
     }
 
-    private async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(ICollection<int> signalIds, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(ICollection<int> signalIds, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return await
-            ctx.Set<Models.FileLineSignal>()
-               .Join(
-                    ctx.Set<Models.SignalInfoSetItem>(),
-                    o => o.SignalSetId,
-                    i => i.SignalInfoId,
-                    (o, i) => new { i.SignalInfoId }
-               )
-               .Where(e => signalIds.Contains(e.SignalInfoId))
-               .GroupBy(e => e.SignalInfoId)
-               .Select(g => new { SignalInfoId = g.Key, Count = g.Count() })
-               .ToDictionaryAsync(e => e.SignalInfoId, e => e.Count, cancellationToken: canceltoken);
+        return await ctx.GetSignalMatchCountsAsync(signalIds, canceltoken);
     }
 
     /// <summary>Lookup systems</summary>
@@ -2097,12 +1884,13 @@ public class EddnLookupService(
 
         foreach (var (name, path) in Settings.DumpDirs)
         {
-            var (size, filecount) =
+            var (size, filecount) = await
                 _fileSystem
                     .Directory
                     .EnumerateFiles(path, "*", SearchOption.AllDirectories)
-                    .Select(e => _fileSystem.FileInfo.New(e))
-                    .Aggregate((size: 0L, filecount: 0), (a, e) => (a.size + e.Length, a.filecount + 1));
+                    .Select(_fileSystem.FileInfo.New)
+                    .ToAsyncEnumerable()
+                    .AggregateAsync((size: 0L, filecount: 0), (a, e) => (a.size + e.Length, a.filecount + 1), canceltoken);
 
             dirusages[name] = new DumpDirectoryUsage
             {

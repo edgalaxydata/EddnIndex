@@ -140,10 +140,4 @@ public record class MatchEntry
     /// </summary>
     [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
     public int? StationId { get; init; }
-
-    /// <summary>
-    /// Internal Signal Id
-    /// </summary>
-    [IgnoreDataMember, System.Text.Json.Serialization.JsonIgnore, Newtonsoft.Json.JsonIgnore]
-    public int? SignalId { get; init; }
 }

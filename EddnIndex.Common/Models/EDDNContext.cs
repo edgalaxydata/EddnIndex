@@ -368,4 +368,310 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.EventType).HasMaxLength(32);
         });
     }
+
+    public virtual async Task<Dictionary<int, int>> GetSystemMatchCountsAsync(ICollection<int> systemIds, CancellationToken canceltoken)
+    {
+        return await Set<FileLineInfo>()
+            .Where(e => e.SystemId != null && systemIds.Contains(e.SystemId.Value))
+            .GroupBy(e => e.SystemId!.Value)
+            .Select(g => new { SystemId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(e => e.SystemId, e => e.Count, cancellationToken: canceltoken);
+    }
+
+    public virtual async Task<Dictionary<long, int>> GetBodyMatchCountsAsync(ICollection<long> bodyIds, CancellationToken canceltoken)
+    {
+        return await Set<FileLineBody>()
+            .Where(e => bodyIds.Contains(e.BodyId))
+            .GroupBy(e => e.BodyId)
+            .Select(g => new { BodyId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(e => e.BodyId, e => e.Count, cancellationToken: canceltoken);
+    }
+
+    public virtual async Task<Dictionary<int, int>> GetStationMatchCountsAsync(ICollection<int> stationIds, CancellationToken canceltoken)
+    {
+        return await Set<FileLineStation>()
+            .Where(e => stationIds.Contains(e.StationId))
+            .GroupBy(e => e.StationId)
+            .Select(g => new { StationId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(e => e.StationId, e => e.Count, cancellationToken: canceltoken);
+    }
+
+    public virtual async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(ICollection<int> signalIds, CancellationToken canceltoken)
+    {
+        return await Set<FileLineSignal>()
+            .Join(
+                Set<SignalInfoSetItem>(),
+                o => o.SignalSetId,
+                i => i.SignalInfoId,
+                (o, i) => new { i.SignalInfoId }
+            )
+            .Where(e => signalIds.Contains(e.SignalInfoId))
+            .GroupBy(e => e.SignalInfoId)
+            .Select(g => new { SignalInfoId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(e => e.SignalInfoId, e => e.Count, cancellationToken: canceltoken);
+    }
+
+    public virtual IQueryable<(FileInfo File, FileLineInfo Info, FileLineBody? Body, FileLineStation? Station)> QuerySystemMatchLines(
+            int systemId,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            int? maxResults
+        )
+    {
+        var query = Set<FileLineInfo>()
+            .Where(e => e.SystemId == systemId)
+            .Include(e => e.Software)
+            .Include(e => e.SchemaEvent)
+            .Include(e => e.GameVersion)
+            .LeftJoin(
+                Set<FileInfo>(),
+                o => o.FileId,
+                i => i.Id,
+                (o, i) => new { Info = o, File = i }
+            )
+            .LeftJoin(
+                Set<FileLineBody>(),
+                o => new { o.Info.FileId, o.Info.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, o.Info, Body = i }
+            )
+            .LeftJoin(
+                Set<FileLineStation>()
+                    .Include(e => e.Station),
+                o => new { o.Info.FileId, o.Info.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, o.Info, o.Body, Station = i }
+            );
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.Info.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.Info.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.Info.GatewayTimestamp)
+                .Take(maxResults ?? 1000)
+                .Where(e => e.File != null)
+                .Select(e => new ValueTuple<FileInfo, FileLineInfo, FileLineBody?, FileLineStation?>(
+                    e.File!,
+                    e.Info,
+                    e.Body,
+                    e.Station
+                 ));
+    }
+
+    public virtual IQueryable<(FileInfo File, FileLineNavRoute RouteEntry, FileLineInfo Info)> QuerySystemRouteMatchLines(
+            int systemId,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            int? maxResults
+        )
+    {
+        var query = Set<FileLineNavRoute>()
+            .Where(e => e.SystemId == systemId)
+            .LeftJoin(
+                Set<FileInfo>(),
+                o => o.FileId,
+                i => i.Id,
+                (o, i) => new { RouteEntry = o, File = i }
+            )
+            .LeftJoin(
+                Set<FileLineInfo>()
+                    .Include(e => e.Software)
+                    .Include(e => e.SchemaEvent)
+                    .Include(e => e.GameVersion),
+                o => new { o.RouteEntry.FileId, o.RouteEntry.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, Info = i, o.RouteEntry }
+            );
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.RouteEntry.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.RouteEntry.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.RouteEntry.GatewayTimestamp)
+                .Take(maxResults ?? 1000)
+                .Where(e => e.File != null && e.Info != null)
+                .Select(e => new ValueTuple<FileInfo, FileLineNavRoute, FileLineInfo>(
+                    e.File!,
+                    e.RouteEntry,
+                    e.Info!
+                ));
+    }
+
+    public virtual IQueryable<(FileInfo File, FileLineBody Body, FileLineInfo Info, FileLineStation? Station)> QueryBodyMatchLines(
+            long bodyId,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            int? maxResults
+        )
+    {
+        var query = Set<FileLineBody>()
+            .Where(e => e.BodyId == bodyId)
+            .LeftJoin(
+                Set<FileInfo>(),
+                o => o.FileId,
+                i => i.Id,
+                (o, i) => new { Body = o, File = i }
+            )
+            .LeftJoin(
+                Set<FileLineInfo>()
+                    .Include(e => e.Software)
+                    .Include(e => e.SchemaEvent)
+                    .Include(e => e.GameVersion),
+                o => new { o.Body.FileId, o.Body.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, Info = i, o.Body }
+            )
+            .LeftJoin(
+                Set<FileLineStation>()
+                    .Include(e => e.Station),
+                o => new { o.Body.FileId, o.Body.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, o.Info, o.Body, Station = i }
+            );
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.Body.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.Body.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.Body.GatewayTimestamp)
+                .Take(maxResults ?? 1000)
+                .Where(e => e.File != null && e.Info != null)
+                .Select(e => new ValueTuple<FileInfo, FileLineBody, FileLineInfo, FileLineStation?>(
+                    e.File!,
+                    e.Body,
+                    e.Info!,
+                    e.Station
+                 ));
+    }
+
+    public virtual IQueryable<(FileInfo File, FileLineStation Station, FileLineInfo Info, FileLineBody? Body)> QueryStationMatchLines(
+            int stationId,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            int? maxResults
+        )
+    {
+        var query = Set<FileLineStation>()
+            .Where(e => e.StationId == stationId)
+            .LeftJoin(
+                Set<FileInfo>(),
+                o => o.FileId,
+                i => i.Id,
+                (o, i) => new { Station = o, File = i }
+            )
+            .LeftJoin(
+                Set<FileLineInfo>()
+                    .Include(e => e.Software)
+                    .Include(e => e.SchemaEvent)
+                    .Include(e => e.GameVersion),
+                o => new { o.Station.FileId, o.Station.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, Info = i, o.Station }
+            )
+            .LeftJoin(
+                Set<FileLineBody>(),
+                o => new { o.Station.FileId, o.Station.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.File, o.Info, Body = i, o.Station }
+            );
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.Station.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.Station.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.Station.GatewayTimestamp)
+                .Take(maxResults ?? 1000)
+                .Where(e => e.File != null && e.Info != null)
+                .Select(e => new ValueTuple<FileInfo, FileLineStation, FileLineInfo, FileLineBody?>(
+                    e.File!,
+                    e.Station,
+                    e.Info!,
+                    e.Body
+                 ));
+    }
+
+    public virtual IQueryable<(FileInfo File, FileLineSignal SignalLine, FileLineInfo Info)> QuerySignalMatchLines(
+            int signalId,
+            DateTimeOffset? minDate,
+            DateTimeOffset? maxDate,
+            int? maxResults
+        )
+    {
+        var query = Set<FileLineSignal>()
+            .Join(
+                Set<SignalInfoSetItem>(),
+                o => o.SignalSetId,
+                i => i.SignalInfoSetId,
+                (o, i) => new { i.SignalInfoId, SignalLine = o }
+            )
+            .Where(e => e.SignalInfoId == signalId)
+            .LeftJoin(
+                Set<FileInfo>(),
+                o => o.SignalLine.FileId,
+                i => i.Id,
+                (o, i) => new { o.SignalLine, File = i }
+            )
+            .LeftJoin(
+                Set<FileLineInfo>()
+                    .Include(e => e.Software)
+                    .Include(e => e.SchemaEvent)
+                    .Include(e => e.GameVersion),
+                o => new { o.SignalLine.FileId, o.SignalLine.LineNo },
+                i => new { i.FileId, i.LineNo },
+                (o, i) => new { o.SignalLine, o.File, Info = i }
+            );
+
+        if (minDate?.ToUniversalTime().DateTime is DateTime minTS)
+        {
+            query = query.Where(e => e.SignalLine.GatewayTimestamp >= minTS);
+        }
+
+        if (maxDate?.ToUniversalTime().DateTime is DateTime maxTS)
+        {
+            query = query.Where(e => e.SignalLine.GatewayTimestamp <= maxTS);
+        }
+
+        return
+            query
+                .OrderByDescending(e => e.SignalLine.GatewayTimestamp)
+                .Take(maxResults ?? 1000)
+                .Where(e => e.File != null && e.Info != null)
+                .Select(e => new ValueTuple<FileInfo, FileLineSignal, FileLineInfo>(
+                    e.File!,
+                    e.SignalLine,
+                    e.Info!
+                 ));
+    }
 }
