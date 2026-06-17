@@ -402,7 +402,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             .Join(
                 Set<SignalInfoSetItem>(),
                 o => o.SignalSetId,
-                i => i.SignalInfoId,
+                i => i.SignalInfoSetId,
                 (o, i) => new { i.SignalInfoId }
             )
             .Where(e => signalIds.Contains(e.SignalInfoId))
