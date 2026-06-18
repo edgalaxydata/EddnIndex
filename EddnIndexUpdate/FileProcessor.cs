@@ -54,7 +54,7 @@ public partial class FileProcessor(
 
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
-    private static readonly int Version = 1;
+    private static readonly int Version = 2;
     private static readonly int MaxLength = 4194304;
 
     private bool InitComplete = false;
