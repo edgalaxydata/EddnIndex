@@ -242,10 +242,15 @@ public partial class FileProcessor(
             Stations[(stationName, marketId, stationType, systemName, systemAddress, bodyName)] = stnlist = [];
         }
 
-        if (stnlist.FirstOrDefault(e => e.Latitude > latitude - 0.001m
-                                     && e.Latitude < latitude + 0.001m
-                                     && e.Longitude > longitude - 0.001m
-                                     && e.Longitude < longitude + 0.001m) is { } stn)
+        if (stnlist.FirstOrDefault(e => e.Latitude == latitude && e.Longitude == longitude) is { } stnExact)
+        {
+            return stnExact;
+        }
+
+        if (stnlist.FirstOrDefault(e => e.Latitude > latitude - 0.0001m
+                                     && e.Latitude < latitude + 0.0001m
+                                     && e.Longitude > longitude - 0.0001m
+                                     && e.Longitude < longitude + 0.0001m) is { } stn)
         {
             return stn;
         }
@@ -286,6 +291,7 @@ public partial class FileProcessor(
 
         ctx.Add(signal);
         ctx.SaveChanges();
+
         Signals[(name, type, isStation)] = signal;
         SignalsById[signal.Id] = signal;
         return signal;
@@ -307,6 +313,7 @@ public partial class FileProcessor(
 
         ctx.Add(schemaEvent);
         ctx.SaveChanges();
+
         SchemaEvents[(schema, eventType)] = schemaEvent;
         return schemaEvent;
     }

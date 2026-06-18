@@ -422,7 +422,7 @@ public partial class FileProcessor
                         Assert(TryProcessNavRoute(ref reader, ref data));
                         break;
                     case ("Rings", JsonTokenType.StartArray):
-                        Assert(TryProcessRings(ref reader, ref data)); ;
+                        Assert(TryProcessRings(ref reader, ref data));
                         break;
                     case ("odyssey", JsonTokenType.True or JsonTokenType.False):
                         data.IsOdyssey = reader.GetBoolean();
