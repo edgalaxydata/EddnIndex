@@ -9,7 +9,7 @@ namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private readonly Dictionary<(string? BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.BodyInfo>> BodyCache = [];
+    private readonly Dictionary<(string BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.BodyInfo>> BodyCache = [];
     private readonly Dictionary<long, Models.BodyInfo> BodyCacheById = [];
 
     private readonly Dictionary<string, Models.BodyName> BodyNames = [];
@@ -322,9 +322,9 @@ public partial class FileProcessor
         return false;
     }
 
-    private int? GetOrAddBodyName(
-            string? name,
-            string? systemName,
+    private int GetOrAddBodyName(
+            string name,
+            string systemName,
             Models.SystemInfo system,
             int? bodyId,
             string? bodyType,
@@ -334,8 +334,6 @@ public partial class FileProcessor
         )
     {
         systemNameId = null;
-
-        if (name == null || systemName == null) return null;
 
         if (!BodyNameOverrides.ContainsKey(name)
             && TryGetBodyDesignation(name, systemName, bodyId, bodyType, argOfPeriapsis, inclination, out var desig))
@@ -536,8 +534,8 @@ public partial class FileProcessor
     }
 
     private (Models.BodyInfo body, short? smaerror, short? aoperror, short? incerror) GetOrAddBody(
-            string? name,
-            string? systemName,
+            string name,
+            string systemName,
             int? bodyId,
             string? bodyType,
             string? parentJson,

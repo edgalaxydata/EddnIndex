@@ -17,7 +17,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.8")
+                .HasAnnotation("ProductVersion", "10.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -98,7 +98,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<int?>("BodyId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("BodyNameId")
+                    b.Property<int>("BodyNameId")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("FirstSeen")
@@ -388,6 +388,8 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
+                    b.HasIndex("BodyId");
+
                     b.HasIndex("BodyId", "GatewayTimestamp");
 
                     b.ToTable("FileLineBodies", (string)null);
@@ -423,6 +425,10 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .HasColumnType("decimal(9,6)");
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
+
+                    b.HasIndex("BodyId");
+
+                    b.HasIndex("BodySignalId");
 
                     b.HasIndex("BodyId", "GatewayTimestamp");
 
@@ -491,6 +497,8 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasIndex("SoftwareId");
 
+                    b.HasIndex("SystemId");
+
                     b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineInfo", (string)null);
@@ -516,6 +524,8 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
+                    b.HasIndex("SystemId");
+
                     b.HasIndex("SystemId", "GatewayTimestamp");
 
                     b.ToTable("FileLineNavRoutes", (string)null);
@@ -540,6 +550,10 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("FileId", "LineNo");
+
+                    b.HasIndex("SignalSetId");
+
+                    b.HasIndex("SystemId");
 
                     b.HasIndex("SignalSetId", "GatewayTimestamp");
 
@@ -570,6 +584,8 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .HasColumnType("int");
 
                     b.HasKey("FileId", "LineNo");
+
+                    b.HasIndex("StationId");
 
                     b.HasIndex("StationId", "GatewayTimestamp");
 
@@ -888,6 +904,32 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.HasIndex("FirstSignalId", "LastSignalId", "SignalCount");
 
                     b.ToTable("SignalInfoSets", (string)null);
+                });
+
+            modelBuilder.Entity("EddnIndex.Common.Models.SignalInfoSetItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Count")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SignalInfoId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SignalInfoSetId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SignalInfoId");
+
+                    b.HasIndex("SignalInfoSetId");
+
+                    b.ToTable("SignalInfoSetItem", (string)null);
                 });
 
             modelBuilder.Entity("EddnIndex.Common.Models.SoftwareInfo", b =>
@@ -1289,45 +1331,25 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("EddnIndex.Common.Models.SignalInfoSetItem", b =>
+                {
+                    b.HasOne("EddnIndex.Common.Models.SignalInfo", "Signal")
+                        .WithMany()
+                        .HasForeignKey("SignalInfoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("EddnIndex.Common.Models.SignalInfoSet", null)
+                        .WithMany("SignalSetItems")
+                        .HasForeignKey("SignalInfoSetId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Signal");
+                });
+
             modelBuilder.Entity("EddnIndex.Common.Models.SignalInfoSet", b =>
                 {
-                    b.OwnsMany("EddnIndex.Common.Models.SignalInfoSetItem", "SignalSetItems", b1 =>
-                        {
-                            b1.Property<int>("Id")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("int");
-
-                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<int>("Id"));
-
-                            b1.Property<int>("Count")
-                                .HasColumnType("int");
-
-                            b1.Property<int>("SignalInfoId")
-                                .HasColumnType("int");
-
-                            b1.Property<int>("SignalInfoSetId")
-                                .HasColumnType("int");
-
-                            b1.HasKey("Id");
-
-                            b1.HasIndex("SignalInfoId");
-
-                            b1.HasIndex("SignalInfoSetId");
-
-                            b1.ToTable("SignalInfoSetItem");
-
-                            b1.HasOne("EddnIndex.Common.Models.SignalInfo", "Signal")
-                                .WithMany()
-                                .HasForeignKey("SignalInfoId")
-                                .OnDelete(DeleteBehavior.Cascade)
-                                .IsRequired();
-
-                            b1.WithOwner()
-                                .HasForeignKey("SignalInfoSetId");
-
-                            b1.Navigation("Signal");
-                        });
-
                     b.Navigation("SignalSetItems");
                 });
 #pragma warning restore 612, 618

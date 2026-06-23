@@ -498,8 +498,8 @@ public class EddnLookupService(
 
         if (bodyName != null)
         {
-            query = query.Where(e => bodyNameIds.Contains(e.BodyNameId!.Value)
-                                  || (sysNameIds.Contains(e.SystemNameId!.Value) && bodyDesigIds.Contains(e.BodyNameId!.Value)));
+            query = query.Where(e => bodyNameIds.Contains(e.BodyNameId)
+                                  || (sysNameIds.Contains(e.SystemNameId!.Value) && bodyDesigIds.Contains(e.BodyNameId)));
         }
 
         if (systems != null && bodyId != null)

@@ -3,74 +3,70 @@ using System;
 using EddnIndex.Common.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
+namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 {
     [DbContext(typeof(EDDNContext))]
-    partial class EDDNContextModelSnapshot : ModelSnapshot
+    [Migration("20260623170646_NonNullBodyNameId")]
+    partial class NonNullBodyNameId
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.9")
-                .HasAnnotation("Relational:MaxIdentifierLength", 64);
-
-            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
             modelBuilder.Entity("EddnIndex.Common.Models.BodyDesignation", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("BarycentreLength")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ClusterNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("CometNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Designation")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("DesignationId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("DesignationType")
                         .IsRequired()
-                        .HasColumnType("enum('Unknown','StellarBarycentre','StellarBody','Belt','AsteroidCluster','Comet','PlanetaryBarycentre','PlanetaryBody','PlanetaryRing','PlanetaryComet','Moon1Barycentre','Moon1Body','Moon1Ring','Moon1Comet','Moon2Barycentre','Moon2Body','Moon2Ring','Moon2Comet','Moon3Barycentre','Moon3Body','Moon3Ring','Moon3Comet')");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("Moon1Num")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("Moon2Num")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("Moon3Num")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("PlanetNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("RingNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("StarNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("StellarBarycentreLength")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -83,61 +79,59 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("ArgOfPeriapsis")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("BodyDesignationId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("BodyId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BodyNameId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Inclination")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsRejected")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ParentSetId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("SemiMajorAxis")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<sbyte>("SemiMajorAxisScale")
-                        .HasColumnType("tinyint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SystemId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("SystemNameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -156,14 +150,12 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -176,56 +168,54 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("ArgOfPeriapsis")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BodyDesignation")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("BodyID")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BodyName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("BodyType")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Inclination")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SinceVersion")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SystemAddress")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SystemName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("UntilVersion")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -236,48 +226,46 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Category")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("EntryID")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Region")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("SignalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SignalType")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SubCategory")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -290,64 +278,62 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("BodyLineCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("BodySignalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("CompressedSize")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateOnly?>("Date")
-                        .HasColumnType("date");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ErrorCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EventType")
                         .HasMaxLength(32)
-                        .HasColumnType("varchar(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsTest")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("LineCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("NavRouteSystemCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PrimarySchema")
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("PrimarySchemaEventId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ProcessedVersion")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SignalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("StationLineCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SystemLineCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("UncompressedSize")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -361,29 +347,29 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineBody", b =>
                 {
                     b.Property<int>("FileId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineNo")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("EntryNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<short?>("ArgOfPeriapsisError")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("BodyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<short?>("InclinationError")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<short?>("SemiMajorAxisError")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
@@ -397,31 +383,31 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineBodySignal", b =>
                 {
                     b.Property<int>("FileId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineNo")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("EntryNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("BodyId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("BodySignalId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Longitude")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
@@ -439,54 +425,54 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineInfo", b =>
                 {
                     b.Property<int>("FileId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineNo")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("BodySignalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("GameVersionId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("HasBody")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("HasStation")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("IsBad")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineLength")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("NavRouteSystemCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("ProcessedVersion")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SchemaEventId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SignalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SoftwareId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SystemId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("Timestamp")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("FileId", "LineNo");
 
@@ -506,20 +492,20 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineNavRoute", b =>
                 {
                     b.Property<int>("FileId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineNo")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("EntryNum")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SystemId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FileId", "LineNo", "EntryNum");
 
@@ -533,20 +519,20 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineSignal", b =>
                 {
                     b.Property<int>("FileId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineNo")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("SignalSetId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SystemId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FileId", "LineNo");
 
@@ -564,23 +550,23 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineStation", b =>
                 {
                     b.Property<int>("FileId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LineNo")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<short?>("LatitudeError")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<short?>("LongitudeError")
-                        .HasColumnType("smallint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("StationId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("FileId", "LineNo");
 
@@ -595,25 +581,23 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EventType")
                         .HasMaxLength(32)
-                        .HasColumnType("varchar(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("FilenamePrefix")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsTest")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PrimarySchema")
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -624,37 +608,35 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Description")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsAlphaOrBeta")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Season")
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("UpdateEndTime")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("UpdateStartTime")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("UpdateTime")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -665,31 +647,29 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GameBuild")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("GameVersion")
                         .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsHorizons")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("IsOdyssey")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -702,23 +682,21 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("BodyID")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BodyType")
                         .HasMaxLength(50)
-                        .HasColumnType("varchar(50)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("ParentJson")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("ParentSetId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -735,24 +713,22 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("EventType")
                         .HasMaxLength(32)
-                        .HasColumnType("varchar(32)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("FirstSeen")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastSeen")
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Schema")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -765,63 +741,61 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("HASectorPriority")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("IsHASector")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("SectorAddress")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal?>("SizeX")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("SizeY")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("SizeZ")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("X0")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Y0")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Z0")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -838,37 +812,35 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsStation")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SignalName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SignalType")
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -881,22 +853,20 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("FirstSignalId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("LastSignalId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SignalCount")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SignalSetJson")
                         .IsRequired()
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -909,18 +879,16 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Count")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SignalInfoId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("SignalInfoSetId")
-                        .HasColumnType("int");
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -935,27 +903,25 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SoftwareName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("SoftwareVersion")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -968,57 +934,55 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("BodyName")
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsRejected")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Longitude")
                         .HasPrecision(9, 6)
-                        .HasColumnType("decimal(9,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("MarketId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StationName")
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("StationType")
-                        .HasColumnType("longtext");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("SystemAddress")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SystemName")
                         .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1035,102 +999,77 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<bool?>("IsHASystem")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("tinyint(1)")
-                        .HasComputedColumnSql("`SystemNameId` >= 1 << 60");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("IsNamedSystem")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("tinyint(1)")
-                        .HasComputedColumnSql("`SystemNameId` < 0");
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool?>("IsRejected")
-                        .HasColumnType("tinyint(1)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime(6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("ModSystemAddress")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("NameModSystemAddress")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("NameSysAddr_PGSuffix")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)")
-                        .HasComputedColumnSql("concat(' ',char((`NameModSystemAddress` >> 16 & 0x1fffff) MOD 26 + 65),char(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / 26 MOD 26) + 65),'-',char(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / (26 * 26) MOD 26) + 65),' ',char((`NameModSystemAddress` >> 37 & 7) + 97),if(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)) = 0,'',concat(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)),'-')),`NameModSystemAddress` & 65535)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("NameSysAddr_SectorAddress")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("int")
-                        .HasComputedColumnSql("`NameModSystemAddress` >> 40");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("PGSuffix")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)")
-                        .HasComputedColumnSql("if(`SystemNameId` >= 0,concat(' ',char((`SystemNameId` >> 16 & 0x1fffff) MOD 26 + 65),char(floor((`SystemNameId` >> 16 & 0x1fffff) / 26 MOD 26) + 65),'-',char(floor((`SystemNameId` >> 16 & 0x1fffff) / (26 * 26) MOD 26) + 65),' ',char((`SystemNameId` >> 37 & 7) + 97),if(floor((`SystemNameId` >> 16 & 0x1fffff) / (26 * 26 * 26)) = 0,'',concat(floor((`SystemNameId` >> 16 & 0x1fffff) / (26 * 26 * 26)),'-')),`SystemNameId` & 65535),NULL)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("SectorAddress")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("int")
-                        .HasComputedColumnSql("if(`SystemNameId` > 0 and `SystemNameId` < 1 << 60,`SystemNameId` >> 40,NULL)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("SectorId")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("int")
-                        .HasComputedColumnSql("if(`SystemNameId` >= 1 << 60,(`SystemNameId` >> 40) - 0x100000,NULL)");
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("SysAddr_PGSuffix")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)")
-                        .HasComputedColumnSql("concat(' ',char((`ModSystemAddress` >> 16 & 0x1fffff) MOD 26 + 65),char(floor((`ModSystemAddress` >> 16 & 0x1fffff) / 26 MOD 26) + 65),'-',char(floor((`ModSystemAddress` >> 16 & 0x1fffff) / (26 * 26) MOD 26) + 65),' ',char((`ModSystemAddress` >> 37 & 7) + 97),if(floor((`ModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)) = 0,'',concat(floor((`ModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)),'-')),`ModSystemAddress` & 65535)");
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("SysAddr_SectorAddress")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("int")
-                        .HasComputedColumnSql("`ModSystemAddress` >> 40");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("SystemAddress")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bigint")
-                        .HasComputedColumnSql("(`ModSystemAddress` & 0xffff) << 44 - (`ModSystemAddress` >> 37 & 7) * 3 | (`ModSystemAddress` >> 40 & 0x7f) << 37 - (`ModSystemAddress` >> 37 & 7) * 3 | (`ModSystemAddress` >> 16 & 0x7f) << 30 - (`ModSystemAddress` >> 37 & 7) * 2 | (`ModSystemAddress` >> 47 & 0x3f) << 24 - (`ModSystemAddress` >> 37 & 7) * 2 | (`ModSystemAddress` >> 23 & 0x7f) << 17 - (`ModSystemAddress` >> 37 & 7) * 1 | (`ModSystemAddress` >> 53 & 0x7f) << 10 - (`ModSystemAddress` >> 37 & 7) * 1 | (`ModSystemAddress` >> 30 & 0x7f) << 3 | `ModSystemAddress` >> 37 & 7");
+                        .HasColumnType("INTEGER");
 
                     b.Property<long?>("SystemNameId")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("X")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Y")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Z")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1147,14 +1086,12 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
@@ -1167,37 +1104,35 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("varchar(255)");
+                        .HasColumnType("TEXT");
 
                     b.Property<long>("SystemAddress")
-                        .HasColumnType("bigint");
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime(0)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("X")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Y")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("Z")
                         .HasPrecision(12, 6)
-                        .HasColumnType("decimal(12,6)");
+                        .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 

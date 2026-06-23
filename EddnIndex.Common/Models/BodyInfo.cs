@@ -7,7 +7,7 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
     public long? SystemNameId { get; init; }
     public int? BodyId { get; init; }
     public int? ParentSetId { get; set; }
-    public int? BodyNameId { get; init; }
+    public int BodyNameId { get; init; }
     public int? BodyDesignationId { get; set; }
     public decimal? ArgOfPeriapsis { get; init; }
     public decimal? Inclination { get; init; }
