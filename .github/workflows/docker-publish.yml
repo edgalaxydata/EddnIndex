@@ -61,7 +61,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image for EddnIndexUpdate
         id: build-and-push_update
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: EddnIndexUpdate.Dockerfile
@@ -92,7 +92,7 @@ jobs:
       # https://github.com/docker/build-push-action
       - name: Build and push Docker image for EddnIndexLookup
         id: build-and-push_lookup
-        uses: docker/build-push-action@v7.2.0
+        uses: docker/build-push-action@v7.3.0
         with:
           context: .
           file: EddnIndexLookup.Dockerfile
