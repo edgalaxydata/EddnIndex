@@ -49,7 +49,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata for EddnIndexUpdate
         id: meta_update
-        uses: docker/metadata-action@v6.1.0
+        uses: docker/metadata-action@v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-Update
           tags: |
@@ -79,7 +79,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata for EddnIndexLookup
         id: meta_lookup
-        uses: docker/metadata-action@v6.1.0
+        uses: docker/metadata-action@v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-Lookup
           tags: |
