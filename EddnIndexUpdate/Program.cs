@@ -77,6 +77,8 @@ builder.Services.AddOptions<FileProcessorSettings>()
                 .ValidateDataAnnotations()
                 .ValidateOnStart();
 
+builder.Services.AddSingleton<FileProcessor>();
+
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
