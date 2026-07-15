@@ -247,6 +247,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasKey(e => e.Id);
             m.HasIndex(e => new { e.FirstSignalId, e.LastSignalId, e.SignalCount });
             m.HasMany(e => e.SignalSetItems).WithOne().HasForeignKey(e => e.SignalInfoSetId).HasPrincipalKey(e => e.Id);
+            m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
         });
 
         modelBuilder.Entity<SignalInfoSetItem>(m =>
@@ -256,6 +257,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => e.SignalInfoId);
             m.HasIndex(e => e.SignalInfoSetId);
             m.HasOne(e => e.Signal).WithMany().HasForeignKey(e => e.SignalInfoId).HasPrincipalKey(e => e.Id);
+            m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
         });
 
         modelBuilder.Entity<SoftwareInfo>(m =>

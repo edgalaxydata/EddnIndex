@@ -17,7 +17,7 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.9")
+                .HasAnnotation("ProductVersion", "10.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
@@ -898,7 +898,12 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                         .IsRequired()
                         .HasColumnType("longtext");
 
+                    b.Property<int?>("SystemId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("SystemId");
 
                     b.HasIndex("FirstSignalId", "LastSignalId", "SignalCount");
 
@@ -922,11 +927,16 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Property<int>("SignalInfoSetId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("SystemId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("SignalInfoId");
 
                     b.HasIndex("SignalInfoSetId");
+
+                    b.HasIndex("SystemId");
 
                     b.ToTable("SignalInfoSetItem", (string)null);
                 });
@@ -1333,6 +1343,15 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("EddnIndex.Common.Models.SignalInfoSet", b =>
+                {
+                    b.HasOne("EddnIndex.Common.Models.SystemInfo", "System")
+                        .WithMany()
+                        .HasForeignKey("SystemId");
+
+                    b.Navigation("System");
+                });
+
             modelBuilder.Entity("EddnIndex.Common.Models.SignalInfoSetItem", b =>
                 {
                     b.HasOne("EddnIndex.Common.Models.SignalInfo", "Signal")
@@ -1347,7 +1366,13 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EddnIndex.Common.Models.SystemInfo", "System")
+                        .WithMany()
+                        .HasForeignKey("SystemId");
+
                     b.Navigation("Signal");
+
+                    b.Navigation("System");
                 });
 
             modelBuilder.Entity("EddnIndex.Common.Models.SignalInfoSet", b =>

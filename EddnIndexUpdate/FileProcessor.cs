@@ -29,7 +29,7 @@ public partial class FileProcessor(
     private readonly IFileSystem _fileSystem = fileSystem;
     protected readonly FileProcessorSettings Settings = options.Value;
 
-    protected readonly Dictionary<string, Models.SignalInfoSet> SignalInfoSetCache = [];
+    protected readonly Dictionary<(string SignalSetJson, long? SystemNameId, long? SystemAddress, decimal? X, decimal? Y, decimal? Z), Models.SignalInfoSet> SignalInfoSetCache = [];
     protected readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
     protected readonly Dictionary<int, int> SignalInfoSetCounts = [];
     protected readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
@@ -318,7 +318,7 @@ public partial class FileProcessor(
         return schemaEvent;
     }
 
-    protected Models.SignalInfoSet GetOrAddSignalInfoSet(ICollection<Models.SignalInfo> signals)
+    protected Models.SignalInfoSet GetOrAddSignalInfoSet(ICollection<Models.SignalInfo> signals, Models.SystemInfo? system)
     {
         var signalIds = signals.Select(e => e.Id).Order().ToList();
         var signalIdsJson =
@@ -328,7 +328,7 @@ public partial class FileProcessor(
                     .Select(g => g.Count() == 1 ? (object)g.Key : new[] { g.Key, g.Count() })
             );
 
-        if (SignalInfoSetCache.TryGetValue(signalIdsJson, out var signalSet))
+        if (SignalInfoSetCache.TryGetValue((signalIdsJson, system?.SystemNameId, system?.ModSystemAddress, system?.X, system?.Y, system?.Z), out var signalSet))
         {
             return signalSet;
         }
@@ -342,7 +342,11 @@ public partial class FileProcessor(
         signalSet =
             ctx.Set<Models.SignalInfoSet>()
                .Include(e => e.SignalSetItems)
-               .FirstOrDefault(e => e.FirstSignalId == firstSigId && e.LastSignalId == lastSigId && e.SignalCount == signalCount && e.SignalSetJson == signalIdsJson);
+               .FirstOrDefault(e => e.FirstSignalId == firstSigId
+                                 && e.LastSignalId == lastSigId
+                                 && e.SignalCount == signalCount
+                                 && e.SignalSetJson == signalIdsJson
+                                 && ((system == null && e.SystemId == null) || e.SystemId == system!.Id));
 
         if (signalSet != null)
         {
@@ -352,7 +356,7 @@ public partial class FileProcessor(
                 SignalInfoSetCounts[signalSet.Id] = signalSet.SignalCount;
             }
 
-            SignalInfoSetCache[signalIdsJson] = byid;
+            SignalInfoSetCache[(signalIdsJson, system?.SystemNameId, system?.ModSystemAddress, system?.X, system?.Y, system?.Z)] = byid;
             return byid;
         }
 
@@ -366,11 +370,13 @@ public partial class FileProcessor(
             {
                 SignalInfoId = g.Key,
                 Signal = g.First(),
-                Count = g.Count()
-            })]
+                Count = g.Count(),
+                System = system
+            })],
+            System = system
         };
 
-        SignalInfoSetCache[signalIdsJson] = signalSet;
+        SignalInfoSetCache[(signalIdsJson, system?.SystemNameId, system?.ModSystemAddress, system?.X, system?.Y, system?.Z)] = signalSet;
         return signalSet;
     }
 
@@ -1014,7 +1020,7 @@ public partial class FileProcessor(
 
         if (data.Signals.Count != 0)
         {
-            var signalSet = GetOrAddSignalInfoSet(data.Signals.Values);
+            var signalSet = GetOrAddSignalInfoSet(data.Signals.Values, data.System);
 
             context.NewSignalEntries[data.LineNo] = new Models.FileLineSignal
             {
@@ -1170,9 +1176,24 @@ public partial class FileProcessor(
             {
                 if (sig.Signal != null)
                 {
+                    Assert(sig.Signal.Id > 0);
                     sig.SignalInfoId = sig.Signal.Id;
                     sig.Signal = null;
                 }
+
+                if (sig.System != null)
+                {
+                    Assert(sig.System.Id > 0);
+                    sig.SystemId = sig.System.Id;
+                    sig.System = null;
+                }
+            }
+
+            if (ent.System != null)
+            {
+                Assert(ent.System.Id > 0);
+                ent.SystemId = ent.System.Id;
+                ent.System = null;
             }
 
             if (ent.Id == 0)

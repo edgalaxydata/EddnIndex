@@ -358,28 +358,21 @@ public partial class FileProcessor
             }
 
             system = byid;
-
-            SystemCache.Add((name, systemAddress, x, y, z), system);
-
-            if (systemAddress != null && modsysaddr == namemodsysaddr)
-            {
-                SystemCache.Add((name, null, x, y, z), system);
-            }
-
-            return system;
         }
-
-        system = new Models.SystemInfo
+        else
         {
-            SystemNameId = nameid,
-            ModSystemAddress = modsysaddr,
-            NameModSystemAddress = namemodsysaddr,
-            X = x,
-            Y = y,
-            Z = z,
-            ValidFrom = validFrom ?? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            ValidTo = validTo ?? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
-        };
+            system = new Models.SystemInfo
+            {
+                SystemNameId = nameid,
+                ModSystemAddress = modsysaddr,
+                NameModSystemAddress = namemodsysaddr,
+                X = x,
+                Y = y,
+                Z = z,
+                ValidFrom = validFrom ?? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                ValidTo = validTo ?? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+            };
+        }
 
         SystemCache.Add((name, systemAddress, x, y, z), system);
 
