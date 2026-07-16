@@ -1266,7 +1266,24 @@ public class EddnLookupService(
                .Select(e => e.Id)
                .ToListAsync(canceltoken);
 
-        var signalSystemIds = new Dictionary<int, List<int>>();
+        var signals = await
+            ctx.Set<Models.SignalInfo>()
+               .Where(e => signalIds.Contains(e.Id))
+               .Select(e => new SignalData
+               {
+                    Id = e.Id,
+                    SignalName = e.SignalName,
+                    SignalType = e.SignalType,
+                    IsStation = e.IsStation,
+                    FirstSeen = e.FirstSeen,
+                    LastSeen = e.LastSeen,
+                    ValidFrom = e.ValidFrom,
+                    ValidTo = e.ValidTo,
+               })
+               .OrderByDescending(e => e.LastSeen)
+               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
+
+        var signalSystems = new Dictionary<int, List<SignalSystem>>();
         var signalSets = new Dictionary<int, List<int>>();
 
         var query = ctx.Set<Models.SignalInfoSetItem>().AsQueryable();
@@ -1288,46 +1305,35 @@ public class EddnLookupService(
 
         foreach (var signalId in signalIds)
         {
-            signalSystemIds[signalId] = await
+            var systemSpans = await
                 query
-                    .Where(e => e.SignalInfoId == signalId)
-                    .Select(e => e.SystemId)
-                    .OfType<int>()
-                    .ToListAsync(canceltoken);
+                    .Where(e => e.SignalInfoId == signalId && e.SystemId != null)
+                    .GroupBy(e => e.SystemId!.Value)
+                    .Select(e => new { SystemId = e.Key, FirstSeen = e.Min(v => v.FirstSeen), LastSeen = e.Max(v => v.LastSeen) })
+                    .ToDictionaryAsync(e => e.SystemId, e => (e.FirstSeen, e.LastSeen), cancellationToken: canceltoken);
+
+            var systems = await GetSystemsAsync<SignalSystem>(systemSpans.Keys, false, canceltoken);
+
+            signalSystems[signalId] =
+                systems
+                    .Values
+                    .Select(e => new SignalSystem
+                    {
+                        Id = e.Id,
+                        Name = e.Name,
+                        SystemAddress = e.SystemAddress,
+                        FirstSeen = systemSpans.GetValueOrDefault(e.Id).FirstSeen,
+                        LastSeen = systemSpans.GetValueOrDefault(e.Id).LastSeen
+                    })
+                    .ToList();
 
             signalSets[signalId] = await
                 query
                     .OrderByDescending(e => e.LastSeen)
-                    .Take((limitMatches ?? 1000) + 1)
+                    .Take(limitMatches ?? 1000)
                     .Select(e => e.SignalInfoSetId)
                     .ToListAsync(canceltoken);
         }
-
-        var signals = await
-            ctx.Set<Models.SignalInfo>()
-               .Where(e => signalIds.Contains(e.Id))
-               .Select(e => new SignalData
-               {
-                    Id = e.Id,
-                    SignalName = e.SignalName,
-                    SignalType = e.SignalType,
-                    IsStation = e.IsStation,
-                    FirstSeen = e.FirstSeen,
-                    LastSeen = e.LastSeen,
-                    ValidFrom = e.ValidFrom,
-                    ValidTo = e.ValidTo,
-               })
-               .OrderByDescending(e => e.LastSeen)
-               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
-
-        var signalSystems = brief ? [] : await
-            signalSystemIds
-                .ToAsyncEnumerable()
-                .ToDictionaryAsync(
-                    async (kvp, ct) => kvp.Key,
-                    async (kvp, ct) => await GetSystemsAsync<SignalSystem>(kvp.Value, false, canceltoken),
-                    cancellationToken: canceltoken
-                );
 
         var matches = brief
                     ? []
@@ -1341,9 +1347,9 @@ public class EddnLookupService(
         {
             entries[id] = signal with
             {
-                SystemCount = signalSystemIds.GetValueOrDefault(id)?.Count,
-                Systems = signalSystems.GetValueOrDefault(id)?.Values.ToList(),
-                MatchCount = matchCounts.GetValueOrDefault(id),
+                SystemCount = signalSystems.GetValueOrDefault(id)?.Count,
+                Systems = brief ? [] : signalSystems.GetValueOrDefault(id),
+                MatchCount = (signalSets.GetValueOrDefault(id)?.Count == (limitMatches ?? 1000)) ? null : matchCounts.GetValueOrDefault(id),
                 Matches = matches.GetValueOrDefault(id)
             };
         }
