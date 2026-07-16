@@ -871,11 +871,11 @@ public class EddnLookupService(
         return await ctx.GetStationMatchCountsAsync(stationIds, canceltoken);
     }
 
-    private protected async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(ICollection<int> signalIds, CancellationToken canceltoken)
+    private protected async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(Dictionary<int, List<int>> signalSetIds, CancellationToken canceltoken)
     {
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        return await ctx.GetSignalMatchCountsAsync(signalIds, canceltoken);
+        return await ctx.GetSignalMatchCountsAsync(signalSetIds, canceltoken);
     }
 
     /// <summary>Lookup systems</summary>
@@ -1275,11 +1275,19 @@ public class EddnLookupService(
             query = query.Where(e => systemIds.Contains(e.SystemId!.Value));
         }
 
-        var signalSets = await
+        var signalSystemSets = await
             query
                 .AsAsyncEnumerable()
-                .GroupBy(e => e.SignalId, e => e.SignalInfoSetId)
+                .GroupBy(e => e.SignalId, e => (e.SignalInfoSetId, e.SystemId))
                 .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
+
+        var signalSets =
+            signalSystemSets
+                .ToDictionary(e => e.Key, e => e.Value.Select(v => v.SignalInfoSetId).ToList());
+
+        var signalSystemCounts =
+            signalSystemSets
+                .ToDictionary(e => e.Key, e => e.Value.Select(e => e.SystemId).Distinct().Count());
 
         var signals = await
             ctx.Set<Models.SignalInfo>()
@@ -1302,31 +1310,7 @@ public class EddnLookupService(
                     ? []
                     : await GetSignalMatchEntriesAsync(signalSets, limitMatches, minDate, maxDate, canceltoken);
 
-        if (systemName != null)
-        {
-            matches = matches.ToDictionary(
-                e => e.Key,
-                e => e.Value.Where(s => string.Equals(s.SystemName, systemName, StringComparison.OrdinalIgnoreCase)).ToList()
-            );
-
-            signals = signals
-                .Where(e => matches.GetValueOrDefault(e.Key)?.Count > 0)
-                .ToDictionary();
-        }
-
-        if (systemAddress != null)
-        {
-            matches = matches.ToDictionary(
-                e => e.Key,
-                e => e.Value.Where(s => s.SystemAddress == systemAddress).ToList()
-            );
-
-            signals = signals
-                .Where(e => matches.GetValueOrDefault(e.Key)?.Count > 0)
-                .ToDictionary();
-        }
-
-        var matchCounts = await GetSignalMatchCountsAsync(signals.Keys, canceltoken);
+        var matchCounts = await GetSignalMatchCountsAsync(signalSets, canceltoken);
 
         var entries = new Dictionary<int, SignalData>();
 
@@ -1334,6 +1318,7 @@ public class EddnLookupService(
         {
             entries[id] = signal with
             {
+                SystemCount = signalSystemCounts.GetValueOrDefault(id),
                 MatchCount = matchCounts.GetValueOrDefault(id),
                 Matches = matches.GetValueOrDefault(id)
             };

@@ -56,6 +56,12 @@ namespace EddnIndexLookup.DTO
         /// <summary>
         /// Number of events matching these details
         /// </summary>
+        [DataMember(Name = "SystemCount")]
+        public int? SystemCount { get; init; }
+
+        /// <summary>
+        /// Number of events matching these details
+        /// </summary>
         [DataMember(Name = "MatchCount")]
         public int? MatchCount { get; init; }
 

@@ -399,19 +399,16 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             .ToDictionaryAsync(e => e.StationId, e => e.Count, cancellationToken: canceltoken);
     }
 
-    public virtual async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(ICollection<int> signalIds, CancellationToken canceltoken)
+    public virtual async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(Dictionary<int, List<int>> signalSetIds, CancellationToken canceltoken)
     {
-        return await Set<FileLineSignal>()
-            .Join(
-                Set<SignalInfoSetItem>(),
-                o => o.SignalSetId,
-                i => i.SignalInfoSetId,
-                (o, i) => new { i.SignalInfoId }
-            )
-            .Where(e => signalIds.Contains(e.SignalInfoId))
-            .GroupBy(e => e.SignalInfoId)
-            .Select(g => new { SignalInfoId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(e => e.SignalInfoId, e => e.Count, cancellationToken: canceltoken);
+        return await signalSetIds
+            .ToAsyncEnumerable()
+            .Where(e => e.Value.Count < 1000)
+            .ToDictionaryAsync(
+                async (kvp, ct) => await ValueTask.FromResult(kvp.Key),
+                async (kvp, ct) => await Set<FileLineSignal>().CountAsync(e => kvp.Value.Contains(e.SignalSetId), canceltoken),
+                cancellationToken: canceltoken
+            );
     }
 
     public virtual IQueryable<(FileInfo File, FileLineInfo Info, FileLineBody? Body, FileLineStation? Station)> QuerySystemMatchLines(
