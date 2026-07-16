@@ -256,6 +256,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasKey(e => e.Id);
             m.HasIndex(e => e.SignalInfoId);
             m.HasIndex(e => e.SignalInfoSetId);
+            m.HasIndex(e => new { e.SignalInfoId, e.SystemId });
             m.HasOne(e => e.Signal).WithMany().HasForeignKey(e => e.SignalInfoId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
         });
@@ -625,25 +626,19 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
     }
 
     public virtual IQueryable<(FileInfo File, FileLineSignal SignalLine, FileLineInfo Info)> QuerySignalMatchLines(
-            int signalId,
+            List<int> signalSetIds,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
             int? maxResults
         )
     {
         var query = Set<FileLineSignal>()
-            .Join(
-                Set<SignalInfoSetItem>(),
-                o => o.SignalSetId,
-                i => i.SignalInfoSetId,
-                (o, i) => new { i.SignalInfoId, SignalLine = o }
-            )
-            .Where(e => e.SignalInfoId == signalId)
+            .Where(e => signalSetIds.Contains(e.SignalSetId))
             .LeftJoin(
                 Set<FileInfo>(),
-                o => o.SignalLine.FileId,
+                o => o.FileId,
                 i => i.Id,
-                (o, i) => new { o.SignalLine, File = i }
+                (o, i) => new { SignalLine = o, File = i }
             )
             .LeftJoin(
                 Set<FileLineInfo>()

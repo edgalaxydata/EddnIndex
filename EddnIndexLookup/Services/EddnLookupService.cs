@@ -197,6 +197,38 @@ public class EddnLookupService(
         }
     }
 
+    private protected async Task<List<int>?> GetSystemIdsAsync(string? systemName, long? systemAddress, CancellationToken canceltoken)
+    {
+        if (string.IsNullOrWhiteSpace(systemName) && (systemAddress == null || systemAddress <= 0))
+        {
+            return null;
+        }
+
+        List<long> sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
+        long? modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
+
+        if ((modsysaddr == null && systemAddress != null) || (sysNameIds.Count == 0 && systemName != null))
+        {
+            return null;
+        }
+
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+
+        IQueryable<Models.SystemInfo> query = ctx.Set<Models.SystemInfo>();
+
+        if (sysNameIds.Count != 0)
+        {
+            query = query.Where(e => e.SystemNameId != null && sysNameIds.Contains(e.SystemNameId.Value));
+        }
+
+        if (modsysaddr != null)
+        {
+            query = query.Where(e => e.ModSystemAddress == modsysaddr);
+        }
+
+        return await query.Select(e => e.Id).ToListAsync(canceltoken);
+    }
+
     private protected async Task<Dictionary<int, TSystem>?> GetSystemsAsync<TSystem>(string? systemName, long? systemAddress, bool includeRejected, CancellationToken canceltoken)
         where TSystem : class, ISystemData, new()
     {
@@ -781,7 +813,7 @@ public class EddnLookupService(
     }
 
     private protected async Task<Dictionary<int, List<MatchEntry>>> GetSignalMatchEntriesAsync(
-            ICollection<int> signalIds,
+            Dictionary<int, List<int>> signalSetIds,
             int? limitMatches,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
@@ -792,10 +824,10 @@ public class EddnLookupService(
 
         var matches = new Dictionary<int, List<MatchEntry>>();
 
-        foreach (var signalId in signalIds)
+        foreach (var (signalId, setIds) in signalSetIds)
         {
             matches[signalId] = await
-                ctx.QuerySignalMatchLines(signalId, minDate, maxDate, limitMatches)
+                ctx.QuerySignalMatchLines(setIds, minDate, maxDate, limitMatches)
                    .Select(e => new MatchEntry
                    {
                        FileName = e.File.FileName,
@@ -1228,12 +1260,32 @@ public class EddnLookupService(
 
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        var query = ctx.Set<Models.SignalInfo>().Where(e => e.SignalName == signalName);
+        var query =
+            ctx.Set<Models.SignalInfo>()
+               .Where(e => e.SignalName == signalName)
+               .Join(
+                    ctx.Set<Models.SignalInfoSetItem>(),
+                    o => o.Id,
+                    i => i.SignalInfoId,
+                    (o, i) => new { SignalId = o.Id, i.SystemId, i.SignalInfoSetId }
+               );
+
+        if ((systemName != null || systemAddress != null) && await GetSystemIdsAsync(systemName, systemAddress, canceltoken) is [..] systemIds)
+        {
+            query = query.Where(e => systemIds.Contains(e.SystemId!.Value));
+        }
+
+        var signalSets = await
+            query
+                .AsAsyncEnumerable()
+                .GroupBy(e => e.SignalId, e => e.SignalInfoSetId)
+                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
 
         var signals = await
-            query
-                .Select(e => new SignalData
-                {
+            ctx.Set<Models.SignalInfo>()
+               .Where(e => signalSets.Keys.Contains(e.Id))
+               .Select(e => new SignalData
+               {
                     Id = e.Id,
                     SignalName = e.SignalName,
                     SignalType = e.SignalType,
@@ -1242,13 +1294,13 @@ public class EddnLookupService(
                     LastSeen = e.LastSeen,
                     ValidFrom = e.ValidFrom,
                     ValidTo = e.ValidTo,
-                })
-                .OrderByDescending(e => e.LastSeen)
-                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
+               })
+               .OrderByDescending(e => e.LastSeen)
+               .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
         var matches = brief
                     ? []
-                    : await GetSignalMatchEntriesAsync(signals.Keys, limitMatches, minDate, maxDate, canceltoken);
+                    : await GetSignalMatchEntriesAsync(signalSets, limitMatches, minDate, maxDate, canceltoken);
 
         if (systemName != null)
         {
