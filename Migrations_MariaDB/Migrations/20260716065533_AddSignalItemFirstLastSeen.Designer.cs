@@ -4,23 +4,26 @@ using EddnIndex.Common.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
 
-namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
+namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
 {
     [DbContext(typeof(EDDNContext))]
-    partial class EDDNContextModelSnapshot : ModelSnapshot
+    [Migration("20260716065533_AddSignalItemFirstLastSeen")]
+    partial class AddSignalItemFirstLastSeen
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "10.0.10")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
 
             modelBuilder.Entity("EddnIndex.Common.Models.BodyDesignation", b =>
                 {
@@ -28,7 +31,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("BarycentreLength")
                         .HasColumnType("int");
@@ -42,15 +45,14 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<string>("Designation")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<int?>("DesignationId")
                         .HasColumnType("int");
 
                     b.Property<string>("DesignationType")
                         .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("enum('Unknown','StellarBarycentre','StellarBody','Belt','AsteroidCluster','Comet','PlanetaryBarycentre','PlanetaryBody','PlanetaryRing','PlanetaryComet','Moon1Barycentre','Moon1Body','Moon1Ring','Moon1Comet','Moon2Barycentre','Moon2Body','Moon2Ring','Moon2Comet','Moon3Barycentre','Moon3Body','Moon3Ring','Moon3Comet')");
 
                     b.Property<int?>("Moon1Num")
                         .HasColumnType("int");
@@ -86,7 +88,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<decimal?>("ArgOfPeriapsis")
                         .HasPrecision(9, 6)
@@ -103,18 +105,18 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<decimal?>("Inclination")
                         .HasPrecision(9, 6)
                         .HasColumnType("decimal(9,6)");
 
                     b.Property<bool?>("IsRejected")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<int?>("ParentSetId")
                         .HasColumnType("int");
@@ -123,8 +125,8 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .HasPrecision(9, 6)
                         .HasColumnType("decimal(9,6)");
 
-                    b.Property<short>("SemiMajorAxisScale")
-                        .HasColumnType("smallint");
+                    b.Property<sbyte>("SemiMajorAxisScale")
+                        .HasColumnType("tinyint");
 
                     b.Property<int>("SystemId")
                         .HasColumnType("int");
@@ -134,11 +136,11 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.HasKey("Id");
 
@@ -159,12 +161,12 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.HasKey("Id");
 
@@ -179,7 +181,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<decimal?>("ArgOfPeriapsis")
                         .HasPrecision(12, 6)
@@ -188,7 +190,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<string>("BodyDesignation")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<int>("BodyID")
                         .HasColumnType("int");
@@ -196,18 +198,18 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<string>("BodyName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("BodyType")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<decimal?>("Inclination")
                         .HasPrecision(12, 6)
                         .HasColumnType("decimal(12,6)");
 
                     b.Property<string>("SinceVersion")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("longtext");
 
                     b.Property<long>("SystemAddress")
                         .HasColumnType("bigint");
@@ -215,18 +217,18 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<string>("SystemName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("UntilVersion")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("longtext");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.HasKey("Id");
 
@@ -239,26 +241,26 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Category")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<long?>("EntryID")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Region")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<int?>("SignalCount")
                         .HasColumnType("int");
@@ -266,19 +268,19 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.Property<string>("SignalType")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("SubCategory")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.HasKey("Id");
 
@@ -293,7 +295,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("BodyLineCount")
                         .HasColumnType("int");
@@ -312,15 +314,15 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<string>("EventType")
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("varchar(32)");
 
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<bool?>("IsTest")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int?>("LineCount")
                         .HasColumnType("int");
@@ -330,7 +332,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<string>("PrimarySchema")
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<int?>("PrimarySchemaEventId")
                         .HasColumnType("int");
@@ -378,7 +380,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<short?>("InclinationError")
                         .HasColumnType("smallint");
@@ -414,7 +416,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
@@ -453,16 +455,16 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<bool?>("HasBody")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool?>("HasStation")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool?>("IsBad")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<int>("LineLength")
                         .HasColumnType("int");
@@ -487,7 +489,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("Timestamp")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.HasKey("FileId", "LineNo");
 
@@ -517,7 +519,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<int>("SystemId")
                         .HasColumnType("int");
@@ -541,7 +543,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<int>("SignalSetId")
                         .HasColumnType("int");
@@ -572,7 +574,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("GatewayTimestamp")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<short?>("LatitudeError")
                         .HasColumnType("smallint");
@@ -598,23 +600,23 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("EventType")
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("varchar(32)");
 
                     b.Property<string>("FilenamePrefix")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<bool>("IsTest")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<string>("PrimarySchema")
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.HasKey("Id");
 
@@ -627,35 +629,35 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("varchar(100)");
 
                     b.Property<bool?>("IsAlphaOrBeta")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<string>("Season")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<DateTime?>("UpdateEndTime")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("UpdateStartTime")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime>("UpdateTime")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<string>("Version")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("varchar(50)");
 
                     b.HasKey("Id");
 
@@ -668,29 +670,29 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("GameBuild")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("varchar(100)");
 
                     b.Property<string>("GameVersion")
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("varchar(100)");
 
                     b.Property<bool?>("IsHorizons")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<bool?>("IsOdyssey")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.HasKey("Id");
 
@@ -705,18 +707,18 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int?>("BodyID")
                         .HasColumnType("int");
 
                     b.Property<string>("BodyType")
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("varchar(50)");
 
                     b.Property<string>("ParentJson")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<int?>("ParentSetId")
                         .HasColumnType("int");
@@ -738,22 +740,22 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("EventType")
                         .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
+                        .HasColumnType("varchar(32)");
 
                     b.Property<DateTime?>("FirstSeen")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("LastSeen")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Schema")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.HasKey("Id");
 
@@ -768,26 +770,26 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<int?>("HASectorPriority")
                         .HasColumnType("int");
 
                     b.Property<bool?>("IsHASector")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<int?>("SectorAddress")
                         .HasColumnType("int");
@@ -806,11 +808,11 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<decimal?>("X0")
                         .HasPrecision(12, 6)
@@ -841,35 +843,35 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<bool?>("IsStation")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("SignalName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("SignalType")
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.HasKey("Id");
 
@@ -884,7 +886,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("FirstSignalId")
                         .HasColumnType("int");
@@ -897,7 +899,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<string>("SignalSetJson")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("longtext");
 
                     b.Property<int?>("SystemId")
                         .HasColumnType("int");
@@ -917,16 +919,16 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("Count")
                         .HasColumnType("int");
 
                     b.Property<DateTime?>("FirstSeen")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("LastSeen")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<int>("SignalInfoId")
                         .HasColumnType("int");
@@ -958,25 +960,25 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<string>("SoftwareName")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<string>("SoftwareVersion")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.HasKey("Id");
 
@@ -991,22 +993,22 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("BodyName")
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<bool?>("IsRejected")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<decimal?>("Latitude")
                         .HasPrecision(9, 6)
@@ -1021,25 +1023,25 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<string>("StationName")
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<string>("StationType")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("longtext");
 
                     b.Property<long?>("SystemAddress")
                         .HasColumnType("bigint");
 
                     b.Property<string>("SystemName")
                         .HasMaxLength(128)
-                        .HasColumnType("nvarchar(128)");
+                        .HasColumnType("varchar(128)");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.HasKey("Id");
 
@@ -1058,28 +1060,28 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime?>("FirstSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<bool?>("IsHASystem")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bit")
-                        .HasComputedColumnSql("CAST(IIF(SystemNameId >= 0x1000000000000000, 1, 0) AS BIT)");
+                        .HasColumnType("tinyint(1)")
+                        .HasComputedColumnSql("`SystemNameId` >= 1 << 60");
 
                     b.Property<bool?>("IsNamedSystem")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bit")
-                        .HasComputedColumnSql("CAST(IIF(SystemNameId < 0, 1, 0) AS BIT)");
+                        .HasColumnType("tinyint(1)")
+                        .HasComputedColumnSql("`SystemNameId` < 0");
 
                     b.Property<bool?>("IsRejected")
-                        .HasColumnType("bit");
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<DateTime?>("LastSeen")
                         .HasPrecision(6)
-                        .HasColumnType("datetime2(6)");
+                        .HasColumnType("datetime(6)");
 
                     b.Property<long?>("ModSystemAddress")
                         .HasColumnType("bigint");
@@ -1089,54 +1091,57 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
 
                     b.Property<string>("NameSysAddr_PGSuffix")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("nvarchar(max)")
-                        .HasComputedColumnSql("CONCAT(' ',CHAR((NameModSystemAddress >> 16 & 0x1FFFFF) % 26 + 65),CHAR(FLOOR((NameModSystemAddress >> 16 & 0x1FFFFF) / 26) % 26 + 65),'-',CHAR(FLOOR((NameModSystemAddress >> 16 & 0x1FFFFF) / (26 * 26)) % 26 + 65),' ',CHAR(NameModSystemAddress >> 37 & 7 + 97),IIF(FLOOR((NameModSystemAddress >> 16 & 0x1FFFFF) / (26 * 26 * 26)) > 0,CONCAT(FLOOR((NameModSystemAddress >> 16 & 0x1FFFFF) / (26 * 26 * 26)), '-'),''),NameModSystemAddress & 0xFFFF)");
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)")
+                        .HasComputedColumnSql("concat(' ',char((`NameModSystemAddress` >> 16 & 0x1fffff) MOD 26 + 65),char(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / 26 MOD 26) + 65),'-',char(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / (26 * 26) MOD 26) + 65),' ',char((`NameModSystemAddress` >> 37 & 7) + 97),if(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)) = 0,'',concat(floor((`NameModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)),'-')),`NameModSystemAddress` & 65535)");
 
                     b.Property<int?>("NameSysAddr_SectorAddress")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int")
-                        .HasComputedColumnSql("CAST(NameModSystemAddress >> 40 AS INT)");
+                        .HasComputedColumnSql("`NameModSystemAddress` >> 40");
 
                     b.Property<string>("PGSuffix")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("nvarchar(max)")
-                        .HasComputedColumnSql("IIF(SystemNameId >= 0,CONCAT(' ',CHAR((SystemNameId >> 16 & 0x1FFFFF) % 26 + 65),CHAR(FLOOR((SystemNameId >> 16 & 0x1FFFFF) / 26) % 26 + 65),'-',CHAR(FLOOR((SystemNameId >> 16 & 0x1FFFFF) / (26 * 26)) % 26 + 65),' ',CHAR(SystemNameId >> 37 & 7 + 97),IIF(FLOOR((SystemNameId >> 16 & 0x1FFFFF) / (26 * 26 * 26)) > 0,CONCAT(FLOOR((SystemNameId >> 16 & 0x1FFFFF) / (26 * 26 * 26)), '-'),''),SystemNameId & 0xFFFF),NULL)");
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)")
+                        .HasComputedColumnSql("if(`SystemNameId` >= 0,concat(' ',char((`SystemNameId` >> 16 & 0x1fffff) MOD 26 + 65),char(floor((`SystemNameId` >> 16 & 0x1fffff) / 26 MOD 26) + 65),'-',char(floor((`SystemNameId` >> 16 & 0x1fffff) / (26 * 26) MOD 26) + 65),' ',char((`SystemNameId` >> 37 & 7) + 97),if(floor((`SystemNameId` >> 16 & 0x1fffff) / (26 * 26 * 26)) = 0,'',concat(floor((`SystemNameId` >> 16 & 0x1fffff) / (26 * 26 * 26)),'-')),`SystemNameId` & 65535),NULL)");
 
                     b.Property<int?>("SectorAddress")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int")
-                        .HasComputedColumnSql("CAST(IIF(SystemNameId >= 0 AND SystemNameId < 0x1000000000000000, (SystemNameId >> 40), NULL) AS INT)");
+                        .HasComputedColumnSql("if(`SystemNameId` > 0 and `SystemNameId` < 1 << 60,`SystemNameId` >> 40,NULL)");
 
                     b.Property<int?>("SectorId")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int")
-                        .HasComputedColumnSql("CAST(IIF(SystemNameId >= 0x1000000000000000, (SystemNameId >> 40) - 0x100000, NULL) AS INT)");
+                        .HasComputedColumnSql("if(`SystemNameId` >= 1 << 60,(`SystemNameId` >> 40) - 0x100000,NULL)");
 
                     b.Property<string>("SysAddr_PGSuffix")
                         .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("nvarchar(max)")
-                        .HasComputedColumnSql("CONCAT(' ',CHAR((ModSystemAddress >> 16 & 0x1FFFFF) % 26 + 65),CHAR(FLOOR((ModSystemAddress >> 16 & 0x1FFFFF) / 26) % 26 + 65),'-',CHAR(FLOOR((ModSystemAddress >> 16 & 0x1FFFFF) / (26 * 26)) % 26 + 65),' ',CHAR(ModSystemAddress >> 37 & 7 + 97),IIF(FLOOR((ModSystemAddress >> 16 & 0x1FFFFF) / (26 * 26 * 26)) > 0,CONCAT(FLOOR((ModSystemAddress >> 16 & 0x1FFFFF) / (26 * 26 * 26)), '-'),''),ModSystemAddress & 0xFFFF)");
+                        .HasMaxLength(128)
+                        .HasColumnType("varchar(128)")
+                        .HasComputedColumnSql("concat(' ',char((`ModSystemAddress` >> 16 & 0x1fffff) MOD 26 + 65),char(floor((`ModSystemAddress` >> 16 & 0x1fffff) / 26 MOD 26) + 65),'-',char(floor((`ModSystemAddress` >> 16 & 0x1fffff) / (26 * 26) MOD 26) + 65),' ',char((`ModSystemAddress` >> 37 & 7) + 97),if(floor((`ModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)) = 0,'',concat(floor((`ModSystemAddress` >> 16 & 0x1fffff) / (26 * 26 * 26)),'-')),`ModSystemAddress` & 65535)");
 
                     b.Property<int?>("SysAddr_SectorAddress")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("int")
-                        .HasComputedColumnSql("CAST(ModSystemAddress >> 40 AS INT)");
+                        .HasComputedColumnSql("`ModSystemAddress` >> 40");
 
                     b.Property<long?>("SystemAddress")
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bigint")
-                        .HasComputedColumnSql("((ModSystemAddress & 0xFFFF) << (44 - (ModSystemAddress >> 37 & 7) * 3)) | ((ModSystemAddress >> 40 & 0x7F) << (37 - (ModSystemAddress >> 37 & 7) * 3)) | ((ModSystemAddress >> 16 & 0x7F) << (30 - (ModSystemAddress >> 37 & 7) * 2)) | ((ModSystemAddress >> 47 & 0x3F) << (24 - (ModSystemAddress >> 37 & 7) * 2)) | ((ModSystemAddress >> 23 & 0x7F) << (17 - (ModSystemAddress >> 37 & 7) * 1)) | ((ModSystemAddress >> 53 & 0x7F) << (10 - (ModSystemAddress >> 37 & 7) * 1)) | ((ModSystemAddress >> 16 & 0x7F) << 3) | (ModSystemAddress >> 37 & 7)");
+                        .HasComputedColumnSql("(`ModSystemAddress` & 0xffff) << 44 - (`ModSystemAddress` >> 37 & 7) * 3 | (`ModSystemAddress` >> 40 & 0x7f) << 37 - (`ModSystemAddress` >> 37 & 7) * 3 | (`ModSystemAddress` >> 16 & 0x7f) << 30 - (`ModSystemAddress` >> 37 & 7) * 2 | (`ModSystemAddress` >> 47 & 0x3f) << 24 - (`ModSystemAddress` >> 37 & 7) * 2 | (`ModSystemAddress` >> 23 & 0x7f) << 17 - (`ModSystemAddress` >> 37 & 7) * 1 | (`ModSystemAddress` >> 53 & 0x7f) << 10 - (`ModSystemAddress` >> 37 & 7) * 1 | (`ModSystemAddress` >> 30 & 0x7f) << 3 | `ModSystemAddress` >> 37 & 7");
 
                     b.Property<long?>("SystemNameId")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<decimal?>("X")
                         .HasPrecision(12, 6)
@@ -1167,12 +1172,12 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.HasKey("Id");
 
@@ -1187,23 +1192,23 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("nvarchar(255)");
+                        .HasColumnType("varchar(255)");
 
                     b.Property<long>("SystemAddress")
                         .HasColumnType("bigint");
 
                     b.Property<DateTime?>("ValidFrom")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<DateTime?>("ValidTo")
                         .HasPrecision(0)
-                        .HasColumnType("datetime2(0)");
+                        .HasColumnType("datetime(0)");
 
                     b.Property<decimal?>("X")
                         .HasPrecision(12, 6)

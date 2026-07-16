@@ -54,10 +54,16 @@ namespace EddnIndexLookup.DTO
         public DateTime? LastSeen { get; init; }
 
         /// <summary>
-        /// Number of events matching these details
+        /// Number of systems matching these details
         /// </summary>
         [DataMember(Name = "SystemCount")]
         public int? SystemCount { get; init; }
+
+        /// <summary>
+        /// Systems matching these details
+        /// </summary>
+        [DataMember(Name = "Systems")]
+        public List<SignalSystem>? Systems { get; init; }
 
         /// <summary>
         /// Number of events matching these details

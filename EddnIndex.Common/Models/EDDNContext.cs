@@ -257,6 +257,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.HasIndex(e => e.SignalInfoId);
             m.HasIndex(e => e.SignalInfoSetId);
             m.HasIndex(e => new { e.SignalInfoId, e.SystemId });
+            m.HasIndex(e => new { e.SignalInfoId, e.LastSeen, e.FirstSeen, e.SystemId });
             m.HasOne(e => e.Signal).WithMany().HasForeignKey(e => e.SignalInfoId).HasPrincipalKey(e => e.Id);
             m.HasOne(e => e.System).WithMany().HasForeignKey(e => e.SystemId).HasPrincipalKey(e => e.Id);
         });

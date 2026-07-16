@@ -886,6 +886,12 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.Property<int>("Count")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("FirstSeen")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastSeen")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("SignalInfoId")
                         .HasColumnType("INTEGER");
 
@@ -904,6 +910,8 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.HasIndex("SystemId");
 
                     b.HasIndex("SignalInfoId", "SystemId");
+
+                    b.HasIndex("SignalInfoId", "LastSeen", "FirstSeen", "SystemId");
 
                     b.ToTable("SignalInfoSetItem", (string)null);
                 });

@@ -1260,38 +1260,52 @@ public class EddnLookupService(
 
         await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        var query =
+        var signalIds = await
             ctx.Set<Models.SignalInfo>()
                .Where(e => e.SignalName == signalName)
-               .Join(
-                    ctx.Set<Models.SignalInfoSetItem>(),
-                    o => o.Id,
-                    i => i.SignalInfoId,
-                    (o, i) => new { SignalId = o.Id, i.SystemId, i.SignalInfoSetId }
-               );
+               .Select(e => e.Id)
+               .ToListAsync(canceltoken);
+
+        var signalSystemIds = new Dictionary<int, List<int>>();
+        var signalSets = new Dictionary<int, List<int>>();
+
+        var query = ctx.Set<Models.SignalInfoSetItem>().AsQueryable();
 
         if ((systemName != null || systemAddress != null) && await GetSystemIdsAsync(systemName, systemAddress, canceltoken) is [..] systemIds)
         {
-            query = query.Where(e => systemIds.Contains(e.SystemId!.Value));
+            query = query.Where(e => e.SystemId != null && systemIds.Contains(e.SystemId!.Value));
         }
 
-        var signalSystemSets = await
-            query
-                .AsAsyncEnumerable()
-                .GroupBy(e => e.SignalId, e => (e.SignalInfoSetId, e.SystemId))
-                .ToDictionaryAsync(g => g.Key, g => g.ToList(), cancellationToken: canceltoken);
+        if (minDate != null)
+        {
+            query = query.Where(e => e.LastSeen >= minDate);
+        }
 
-        var signalSets =
-            signalSystemSets
-                .ToDictionary(e => e.Key, e => e.Value.Select(v => v.SignalInfoSetId).ToList());
+        if (maxDate != null)
+        {
+            query = query.Where(e => e.FirstSeen <= maxDate);
+        }
 
-        var signalSystemCounts =
-            signalSystemSets
-                .ToDictionary(e => e.Key, e => e.Value.Select(e => e.SystemId).Distinct().Count());
+        foreach (var signalId in signalIds)
+        {
+            signalSystemIds[signalId] = await
+                query
+                    .Where(e => e.SignalInfoId == signalId)
+                    .Select(e => e.SystemId)
+                    .OfType<int>()
+                    .ToListAsync(canceltoken);
+
+            signalSets[signalId] = await
+                query
+                    .OrderByDescending(e => e.LastSeen)
+                    .Take((limitMatches ?? 1000) + 1)
+                    .Select(e => e.SignalInfoSetId)
+                    .ToListAsync(canceltoken);
+        }
 
         var signals = await
             ctx.Set<Models.SignalInfo>()
-               .Where(e => signalSets.Keys.Contains(e.Id))
+               .Where(e => signalIds.Contains(e.Id))
                .Select(e => new SignalData
                {
                     Id = e.Id,
@@ -1306,6 +1320,15 @@ public class EddnLookupService(
                .OrderByDescending(e => e.LastSeen)
                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);
 
+        var signalSystems = brief ? [] : await
+            signalSystemIds
+                .ToAsyncEnumerable()
+                .ToDictionaryAsync(
+                    async (kvp, ct) => kvp.Key,
+                    async (kvp, ct) => await GetSystemsAsync<SignalSystem>(kvp.Value, false, canceltoken),
+                    cancellationToken: canceltoken
+                );
+
         var matches = brief
                     ? []
                     : await GetSignalMatchEntriesAsync(signalSets, limitMatches, minDate, maxDate, canceltoken);
@@ -1318,7 +1341,8 @@ public class EddnLookupService(
         {
             entries[id] = signal with
             {
-                SystemCount = signalSystemCounts.GetValueOrDefault(id),
+                SystemCount = signalSystemIds.GetValueOrDefault(id)?.Count,
+                Systems = signalSystems.GetValueOrDefault(id)?.Values.ToList(),
                 MatchCount = matchCounts.GetValueOrDefault(id),
                 Matches = matches.GetValueOrDefault(id)
             };

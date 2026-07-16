@@ -1445,6 +1445,7 @@ public partial class FileProcessor(
         await using var ctx = await ContextFactory.CreateDbContextAsync();
 
         var signalUpdates = new Dictionary<int, (Models.SignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
+        var signalItemUpdates = new Dictionary<int, (Models.SignalInfoSetItem Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
         foreach (var _ent in newSignalEntries.Values)
         {
@@ -1462,11 +1463,14 @@ public partial class FileProcessor(
                 SignalInfoSet = null
             };
 
-            foreach (var signal in siginfoset.SignalSetItems
-                                             .Select(e => SignalsById.GetValueOrDefault(e.SignalInfoId))
-                                             .OfType<Models.SignalInfo>())
+            foreach (var signalItem in siginfoset.SignalSetItems)
             {
-                AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
+                AddOrUpdateInfo(signalItemUpdates, signalItem, gatewayTimestamp);
+
+                if (SignalsById.TryGetValue(signalItem.SignalInfoId, out var signal))
+                {
+                    AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
+                }
             }
 
             if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))

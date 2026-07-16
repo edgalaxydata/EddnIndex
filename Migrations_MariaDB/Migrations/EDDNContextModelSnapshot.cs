@@ -921,6 +921,12 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.Property<int>("Count")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("FirstSeen")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<DateTime?>("LastSeen")
+                        .HasColumnType("datetime(6)");
+
                     b.Property<int>("SignalInfoId")
                         .HasColumnType("int");
 
@@ -939,6 +945,8 @@ namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
                     b.HasIndex("SystemId");
 
                     b.HasIndex("SignalInfoId", "SystemId");
+
+                    b.HasIndex("SignalInfoId", "LastSeen", "FirstSeen", "SystemId");
 
                     b.ToTable("SignalInfoSetItem", (string)null);
                 });
