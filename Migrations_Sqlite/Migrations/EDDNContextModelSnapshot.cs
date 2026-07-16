@@ -903,6 +903,8 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
 
                     b.HasIndex("SystemId");
 
+                    b.HasIndex("SignalInfoId", "SystemId");
+
                     b.ToTable("SignalInfoSetItem", (string)null);
                 });
 
