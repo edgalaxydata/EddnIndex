@@ -412,7 +412,7 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             );
     }
 
-    public virtual IQueryable<(FileInfo File, FileLineInfo Info, FileLineBody? Body, FileLineStation? Station)> QuerySystemMatchLines(
+    public virtual IQueryable<SystemMatchLineEntry> QuerySystemMatchLines(
             int systemId,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
@@ -459,15 +459,16 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
                 .OrderByDescending(e => e.Info.GatewayTimestamp)
                 .Take(maxResults ?? 1000)
                 .Where(e => e.File != null)
-                .Select(e => new ValueTuple<FileInfo, FileLineInfo, FileLineBody?, FileLineStation?>(
-                    e.File!,
-                    e.Info,
-                    e.Body,
-                    e.Station
-                 ));
+                .Select(e => new SystemMatchLineEntry
+                {
+                    File = e.File!,
+                    Info = e.Info,
+                    Body = e.Body,
+                    Station = e.Station
+                });
     }
 
-    public virtual IQueryable<(FileInfo File, FileLineNavRoute RouteEntry, FileLineInfo Info)> QuerySystemRouteMatchLines(
+    public virtual IQueryable<SystemRouteMatchLineEntry> QuerySystemRouteMatchLines(
             int systemId,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
@@ -507,14 +508,15 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
                 .OrderByDescending(e => e.RouteEntry.GatewayTimestamp)
                 .Take(maxResults ?? 1000)
                 .Where(e => e.File != null && e.Info != null)
-                .Select(e => new ValueTuple<FileInfo, FileLineNavRoute, FileLineInfo>(
-                    e.File!,
-                    e.RouteEntry,
-                    e.Info!
-                ));
+                .Select(e => new SystemRouteMatchLineEntry
+                {
+                    File = e.File!,
+                    RouteEntry = e.RouteEntry,
+                    Info = e.Info!
+                });
     }
 
-    public virtual IQueryable<(FileInfo File, FileLineBody Body, FileLineInfo Info, FileLineStation? Station)> QueryBodyMatchLines(
+    public virtual IQueryable<BodyMatchLineEntry> QueryBodyMatchLines(
             long bodyId,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
@@ -561,15 +563,16 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
                 .OrderByDescending(e => e.Body.GatewayTimestamp)
                 .Take(maxResults ?? 1000)
                 .Where(e => e.File != null && e.Info != null)
-                .Select(e => new ValueTuple<FileInfo, FileLineBody, FileLineInfo, FileLineStation?>(
-                    e.File!,
-                    e.Body,
-                    e.Info!,
-                    e.Station
-                 ));
+                .Select(e => new BodyMatchLineEntry
+                {
+                    File = e.File!,
+                    Body = e.Body,
+                    Info = e.Info!,
+                    Station = e.Station
+                });
     }
 
-    public virtual IQueryable<(FileInfo File, FileLineStation Station, FileLineInfo Info, FileLineBody? Body)> QueryStationMatchLines(
+    public virtual IQueryable<StationMatchLineEntry> QueryStationMatchLines(
             int stationId,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
@@ -615,15 +618,16 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
                 .OrderByDescending(e => e.Station.GatewayTimestamp)
                 .Take(maxResults ?? 1000)
                 .Where(e => e.File != null && e.Info != null)
-                .Select(e => new ValueTuple<FileInfo, FileLineStation, FileLineInfo, FileLineBody?>(
-                    e.File!,
-                    e.Station,
-                    e.Info!,
-                    e.Body
-                 ));
+                .Select(e => new StationMatchLineEntry
+                {
+                    File = e.File!,
+                    Station = e.Station,
+                    Info = e.Info!,
+                    Body = e.Body
+                });
     }
 
-    public virtual IQueryable<(FileInfo File, FileLineSignal SignalLine, FileLineInfo Info)> QuerySignalMatchLines(
+    public virtual IQueryable<SignalMatchLineEntry> QuerySignalMatchLines(
             List<int> signalSetIds,
             DateTimeOffset? minDate,
             DateTimeOffset? maxDate,
@@ -663,10 +667,11 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
                 .OrderByDescending(e => e.SignalLine.GatewayTimestamp)
                 .Take(maxResults ?? 1000)
                 .Where(e => e.File != null && e.Info != null)
-                .Select(e => new ValueTuple<FileInfo, FileLineSignal, FileLineInfo>(
-                    e.File!,
-                    e.SignalLine,
-                    e.Info!
-                 ));
+                .Select(e => new SignalMatchLineEntry
+                {
+                    File = e.File!,
+                    SignalLine = e.SignalLine,
+                    Info = e.Info!
+                });
     }
 }
