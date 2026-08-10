@@ -26,7 +26,7 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_SignalInfoSetItem_SignalInfoId_LastSeen_FirstSeen_SystemId",
                 table: "SignalInfoSetItem",
-                columns: new[] { "SignalInfoId", "LastSeen", "FirstSeen", "SystemId" });
+                columns: ["SignalInfoId", "LastSeen", "FirstSeen", "SystemId"]);
         }
 
         /// <inheritdoc />

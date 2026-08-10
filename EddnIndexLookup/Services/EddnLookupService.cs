@@ -1314,7 +1314,7 @@ public class EddnLookupService(
 
             var systems = await GetSystemsAsync<SignalSystem>(systemSpans.Keys, false, canceltoken);
 
-            signalSystems[signalId] =
+            signalSystems[signalId] = [..
                 systems
                     .Values
                     .Select(e => new SignalSystem
@@ -1325,7 +1325,7 @@ public class EddnLookupService(
                         FirstSeen = systemSpans.GetValueOrDefault(e.Id).FirstSeen,
                         LastSeen = systemSpans.GetValueOrDefault(e.Id).LastSeen
                     })
-                    .ToList();
+            ];
 
             signalSets[signalId] = await
                 query
