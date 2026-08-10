@@ -53,7 +53,7 @@ public partial class FileProcessor
                     case ("horizons", JsonTokenType.False or JsonTokenType.True):
                     case ("odyssey", JsonTokenType.False or JsonTokenType.True):
                         break;
-                    case ("messageID", JsonTokenType.String):
+                    case ("messageID", _):
                         break;
                     default:
                         Fail($"Unknown header field {name}");
