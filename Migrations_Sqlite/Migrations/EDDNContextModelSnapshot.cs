@@ -419,6 +419,26 @@ namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
                     b.ToTable("FileLineBodySignals", (string)null);
                 });
 
+            modelBuilder.Entity("EddnIndex.Common.Models.FileLineDataError", b =>
+                {
+                    b.Property<int>("FileId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("LineNo")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ErrorIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("FileId", "LineNo", "ErrorIndex");
+
+                    b.ToTable("FileLineDataErrors", (string)null);
+                });
+
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineInfo", b =>
                 {
                     b.Property<int>("FileId")

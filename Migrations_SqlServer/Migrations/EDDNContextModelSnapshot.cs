@@ -437,6 +437,26 @@ namespace EddnIndexUpdate.Migrations_SqlServer.Migrations
                     b.ToTable("FileLineBodySignals", (string)null);
                 });
 
+            modelBuilder.Entity("EddnIndex.Common.Models.FileLineDataError", b =>
+                {
+                    b.Property<int>("FileId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("LineNo")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ErrorIndex")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("FileId", "LineNo", "ErrorIndex");
+
+                    b.ToTable("FileLineDataErrors", (string)null);
+                });
+
             modelBuilder.Entity("EddnIndex.Common.Models.FileLineInfo", b =>
                 {
                     b.Property<int>("FileId")

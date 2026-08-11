@@ -4,6 +4,7 @@ using EddnIndex.Common.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace EddnIndexUpdate.Migrations_MariaDB.Migrations
 {
     [DbContext(typeof(EDDNContext))]
-    partial class EDDNContextModelSnapshot : ModelSnapshot
+    [Migration("20260811230856_AddDataErrors")]
+    partial class AddDataErrors
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

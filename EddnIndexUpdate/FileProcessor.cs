@@ -33,6 +33,7 @@ public partial class FileProcessor(
     protected readonly Dictionary<int, Models.SignalInfoSet> SignalInfoSetCacheById = [];
     protected readonly Dictionary<int, int> SignalInfoSetCounts = [];
     protected readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineBody> BodyInfoCache = [];
+    protected readonly Dictionary<(int FileId, int LineNo, int EntryNum), Models.FileLineDataError> DataErrorCache = [];
     protected readonly Dictionary<(int FileId, int LineNo), int> BodyInfoCounts = [];
     protected readonly Dictionary<(int FileId, int LineNo), Models.FileLineInfo> LineInfoCache = [];
     protected readonly Dictionary<(int FileId, int LineNo), Models.FileLineStation> StationInfoCache = [];
@@ -428,6 +429,11 @@ public partial class FileProcessor(
         foreach (var line in ctx.Set<Models.FileLineInfo>().Where(e => e.FileId == fileid).AsNoTracking())
         {
             LineInfoCache[(line.FileId, line.LineNo)] = line;
+        }
+
+        foreach (var line in ctx.Set<Models.FileLineDataError>().Where(e => e.FileId == fileid).AsNoTracking())
+        {
+            DataErrorCache[(line.FileId, line.LineNo, line.ErrorIndex)] = line;
         }
 
         foreach (var line in ctx.Set<Models.FileLineBody>().Where(e => e.FileId == fileid).AsNoTracking())
@@ -835,6 +841,7 @@ public partial class FileProcessor(
         SignalInfoSetCacheById.Clear();
 
         LineInfoCache.Clear();
+        DataErrorCache.Clear();
         BodyInfoCache.Clear();
         StationInfoCache.Clear();
         NavRouteCache.Clear();
@@ -880,6 +887,7 @@ public partial class FileProcessor(
         if (line.Length < 2 || line.Length >= MaxLength)
         {
             data.IsBad = true;
+            data.Errors.Add(line.Length < 2 ? $"Line too short ({line.Length}c)" : $"Line too long ({line.Length}c)");
         }
         else
         {
@@ -900,7 +908,25 @@ public partial class FileProcessor(
                     }
 
                     data.IsBad = true;
+                    data.Errors.Add("Incomplete message");
                     context.ErrorCount++;
+                }
+                else if (data.IsBad)
+                {
+                    foreach (var error in data.Errors)
+                    {
+                        Logger.LogBadData(null, context.FilePath, context.LineCount, error);
+                    }
+
+                    if (Settings.BreakOnBadData != false && Debugger.IsAttached)
+                    {
+                        Debugger.Break();
+                    }
+
+                    if (Settings.ExitOnBadData != false)
+                    {
+                        Environment.Exit(1);
+                    }
                 }
             }
             catch (System.Text.Json.JsonException ex)
@@ -908,6 +934,7 @@ public partial class FileProcessor(
                 HandleBadData(context.FilePath, context.LineCount, ex);
 
                 data.IsBad = true;
+                data.Errors.Add(ex.Message);
                 context.ErrorCount++;
             }
             catch (BadDataException ex)
@@ -915,6 +942,7 @@ public partial class FileProcessor(
                 HandleBadData(context.FilePath, context.LineCount, ex);
 
                 data.IsBad = true;
+                data.Errors.Add(ex.Message);
                 context.ErrorCount++;
             }
 
@@ -927,6 +955,8 @@ public partial class FileProcessor(
                 && data.EventType != "NavRoute")
             {
                 Logger.LogNoDataAvailable(context.FilePath, context.LineCount);
+                data.IsBad = true;
+                data.Errors.Add("No data available");
 
                 if (Settings.BreakOnBadData != false && Debugger.IsAttached)
                 {
@@ -974,6 +1004,20 @@ public partial class FileProcessor(
             BodySignalCount = data.BodySignals.Count,
             SignalCount = data.Signals.Count,
         };
+
+        if (data.IsBad)
+        {
+            for (int i = 0; i < data.Errors.Count; i++)
+            {
+                context.NewDataErrors[(data.LineNo, i + 1)] = new Models.FileLineDataError
+                {
+                    FileId = context.File.Id,
+                    LineNo = data.LineNo,
+                    ErrorIndex = i + 1,
+                    ErrorMessage = data.Errors[i]
+                };
+            }
+        }
 
         if (data.Body != null)
         {
@@ -1112,6 +1156,10 @@ public partial class FileProcessor(
         await SaveLinesAsync(context.NewLines);
 
         context.NewLines.Clear();
+
+        await SaveErrorsAsync(context.NewDataErrors);
+
+        context.NewDataErrors.Clear();
 
         await SaveBodyLinesAsync(context.NewBodyLines);
 
@@ -1300,6 +1348,21 @@ public partial class FileProcessor(
             var entry = ctx.Attach(info);
             entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
+        await ctx.SaveChangesAsync();
+    }
+
+    private async Task SaveErrorsAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineDataError> newDataErrors)
+    {
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
+
+        foreach (var ent in newDataErrors.Values)
+        {
+            if (!DataErrorCache.ContainsKey((ent.FileId, ent.LineNo, ent.ErrorIndex)))
+            {
+                ctx.Add(ent);
+            }
         }
 
         await ctx.SaveChangesAsync();

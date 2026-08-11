@@ -15,6 +15,7 @@ public struct FileLineData
     public int LineNo { get; set; }
     public int LineLength { get; set; }
     public bool IsBad { get; set; }
+    public List<string> Errors { get => field ??= []; set; }
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
     public DateTime? Timestamp { get; set; }

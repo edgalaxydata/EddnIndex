@@ -174,6 +174,12 @@ public class EDDNContext(DbContextOptions<EDDNContext> options) : DbContext(opti
             m.Property(e => e.GatewayTimestamp).HasPrecision(6);
         });
 
+        modelBuilder.Entity<FileLineDataError>(m =>
+        {
+            m.ToTable("FileLineDataErrors");
+            m.HasKey(e => new { e.FileId, e.LineNo, e.ErrorIndex });
+        });
+
         modelBuilder.Entity<GameVersionDate>(m =>
         {
             m.ToTable("GameVersionDates");

@@ -55,7 +55,7 @@ internal static partial class FileProcessorMessages
     public static partial void LogNoDataAvailable(this ILogger logger, string fileName, int lineNo);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error in file {FileName} line number {LineNo}: {Message}")]
-    public static partial void LogBadData(this ILogger logger, Exception exception, string fileName, int lineNo, string message);
+    public static partial void LogBadData(this ILogger logger, Exception? exception, string fileName, int lineNo, string message);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Loading body names")]
     public static partial void LogLoadingBodyNames(this ILogger logger);

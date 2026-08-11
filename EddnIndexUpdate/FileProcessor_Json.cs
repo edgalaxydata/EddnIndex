@@ -62,6 +62,20 @@ public partial class FileProcessor
             }
         }
 
+        if (softwareName?.Length > 255)
+        {
+            softwareName = softwareName[..255];
+            data.IsBad = true;
+            data.Errors.Add("Software name too long");
+        }
+
+        if (softwareVersion?.Length > 255)
+        {
+            softwareVersion = softwareVersion[..255];
+            data.IsBad = true;
+            data.Errors.Add("Software version too long");
+        }
+
         //Assert(softwareName != null && softwareVersion != null);
 
         data.Software = GetOrAddSoftware(softwareName ?? "", softwareVersion ?? "");

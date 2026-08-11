@@ -26,6 +26,7 @@ public class FileProcessingContext(
     public Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> NewNavRouteEntries { get; } = [];
     public Dictionary<int, Models.FileLineSignal> NewSignalEntries { get; } = [];
     public Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> NewBodySignalEntries { get; } = [];
+    public Dictionary<(int LineNo, int EntryNum), Models.FileLineDataError> NewDataErrors { get; } = [];
     public int LineCount { get; set; } = 0;
     public int SystemLineCount { get; set; } = 0;
     public int StationLineCount { get; set; } = 0;
