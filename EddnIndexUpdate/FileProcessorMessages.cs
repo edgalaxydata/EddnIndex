@@ -10,6 +10,9 @@ internal static partial class FileProcessorMessages
     [LoggerMessage(Level = LogLevel.Information, Message = "Loading file info")]
     public static partial void LogLoadingFileInfo(this ILogger logger);
 
+    [LoggerMessage(Level = LogLevel.Information, Message = "Loading file errors")]
+    public static partial void LogLoadingFileErrors(this ILogger logger);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Loading software versions")]
     public static partial void LogLoadingSoftwareVersions(this ILogger logger);
 

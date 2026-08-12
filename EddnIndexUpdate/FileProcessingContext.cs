@@ -7,6 +7,7 @@ public class FileProcessingContext(
         string filepath,
         long filelen,
         Models.FileInfo file,
+        Dictionary<int, Dictionary<int, Models.FileLineDataError>> errors,
         IPath path
     )
 {
@@ -27,6 +28,7 @@ public class FileProcessingContext(
     public Dictionary<int, Models.FileLineSignal> NewSignalEntries { get; } = [];
     public Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> NewBodySignalEntries { get; } = [];
     public Dictionary<(int LineNo, int EntryNum), Models.FileLineDataError> NewDataErrors { get; } = [];
+    public Dictionary<int, Dictionary<int, Models.FileLineDataError>> DataErrors { get; } = errors;
     public int LineCount { get; set; } = 0;
     public int SystemLineCount { get; set; } = 0;
     public int StationLineCount { get; set; } = 0;

@@ -45,6 +45,7 @@ public partial class FileProcessor(
     protected readonly Dictionary<(int FileId, int LineNo), int> BodySignalInfoCounts = [];
 
     protected readonly Dictionary<string, Models.FileInfo> Files = [];
+    protected readonly Dictionary<int, Dictionary<int, Dictionary<int, Models.FileLineDataError>>> FileDataErrors = [];
     protected readonly Dictionary<(string Name, string Version), Models.SoftwareInfo> Software = [];
     protected readonly Dictionary<(string? Version, string? Build, bool? IsOdyssey, bool? IsHorizons), Models.GameVersionInfo> GameVersions = [];
     protected readonly Dictionary<(string SignalName, string? SignalType, bool? IsStation), Models.SignalInfo> Signals = [];
@@ -100,6 +101,31 @@ public partial class FileProcessor(
             foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking())
             {
                 Files[file.FileName] = file;
+
+                if (!FileDataErrors.ContainsKey(file.Id))
+                {
+                    FileDataErrors[file.Id] = [];
+                }
+            }
+        }
+
+        if (FileDataErrors.Count == 0)
+        {
+            Logger.LogLoadingFileErrors();
+
+            foreach (var error in ctx.Set<Models.FileLineDataError>().AsNoTracking())
+            {
+                if (!FileDataErrors.TryGetValue(error.FileId, out var errors))
+                {
+                    FileDataErrors[error.FileId] = errors = [];
+                }
+
+                if (!errors.TryGetValue(error.LineNo, out var lineErrors))
+                {
+                    errors[error.LineNo] = lineErrors = [];
+                }
+
+                lineErrors[error.ErrorIndex] = error with { ErrorMessage = string.Intern(error.ErrorMessage) };
             }
         }
 
@@ -431,11 +457,6 @@ public partial class FileProcessor(
             LineInfoCache[(line.FileId, line.LineNo)] = line;
         }
 
-        foreach (var line in ctx.Set<Models.FileLineDataError>().Where(e => e.FileId == fileid).AsNoTracking())
-        {
-            DataErrorCache[(line.FileId, line.LineNo, line.ErrorIndex)] = line;
-        }
-
         foreach (var line in ctx.Set<Models.FileLineBody>().Where(e => e.FileId == fileid).AsNoTracking())
         {
             BodyInfoCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
@@ -725,17 +746,22 @@ public partial class FileProcessor(
     {
         var file = await GetOrAddFileAsync(filepath);
 
+        if (!FileDataErrors.TryGetValue(file.Id, out var errors))
+        {
+            FileDataErrors[file.Id] = errors = [];
+        }
+
         if (file.CompressedSize == filelen
             && file.UncompressedSize != null
             && file.LineCount != null
-            && file.ErrorCount == 0
+            && file.ErrorCount == errors.Count
             && file.ProcessedVersion == Version
             && Settings.Reprocess != true)
         {
             return;
         }
 
-        var context = new FileProcessingContext(filepath, filelen, file, _fileSystem.Path);
+        var context = new FileProcessingContext(filepath, filelen, file, errors, _fileSystem.Path);
 
         if (Settings.IndexedDir != null)
         {
@@ -841,7 +867,6 @@ public partial class FileProcessor(
         SignalInfoSetCacheById.Clear();
 
         LineInfoCache.Clear();
-        DataErrorCache.Clear();
         BodyInfoCache.Clear();
         StationInfoCache.Clear();
         NavRouteCache.Clear();
@@ -866,6 +891,7 @@ public partial class FileProcessor(
             && lineInfo.NavRouteSystemCount is int lineNavRouteSystemCount
             && lineInfo.BodySignalCount is int lineBodySignalCount
             && lineInfo.SignalCount is int lineSignalCount
+            && context.DataErrors.ContainsKey(lineInfo.LineNo) == lineInfo.IsBad
             && BodyInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo, 0)) == hasBody
             && StationInfoCache.ContainsKey((lineInfo.FileId, lineInfo.LineNo)) == hasStation
             && BodySignalInfoCounts.GetValueOrDefault((lineInfo.FileId, lineInfo.LineNo)) == lineBodySignalCount
@@ -878,6 +904,7 @@ public partial class FileProcessor(
             context.NavRouteSystemCount += lineNavRouteSystemCount;
             context.SignalCount += lineSignalCount;
             context.BodySignalCount += lineBodySignalCount;
+            context.ErrorCount += lineInfo.IsBad == true ? 1 : 0;
 
             return;
         }
@@ -888,6 +915,7 @@ public partial class FileProcessor(
         {
             data.IsBad = true;
             data.Errors.Add(line.Length < 2 ? $"Line too short ({line.Length}c)" : $"Line too long ({line.Length}c)");
+            context.ErrorCount++;
         }
         else
         {
@@ -913,6 +941,8 @@ public partial class FileProcessor(
                 }
                 else if (data.IsBad)
                 {
+                    context.ErrorCount++;
+
                     foreach (var error in data.Errors)
                     {
                         Logger.LogBadData(null, context.FilePath, context.LineCount, error);
@@ -1359,9 +1389,24 @@ public partial class FileProcessor(
 
         foreach (var ent in newDataErrors.Values)
         {
-            if (!DataErrorCache.ContainsKey((ent.FileId, ent.LineNo, ent.ErrorIndex)))
+            if (!FileDataErrors.TryGetValue(ent.FileId, out var fileErrors))
+            {
+                FileDataErrors[ent.FileId] = fileErrors = [];
+            }
+
+            if (!fileErrors.TryGetValue(ent.LineNo, out var lineErrors))
+            {
+                fileErrors[ent.LineNo] = lineErrors = [];
+            }
+
+            if (!lineErrors.TryGetValue(ent.ErrorIndex, out var currentError))
             {
                 ctx.Add(ent);
+            }
+            else if (currentError.ErrorMessage != ent.ErrorMessage)
+            {
+                var entry = ctx.Attach(currentError);
+                entry.Property(e => e.ErrorMessage).CurrentValue = ent.ErrorMessage;
             }
         }
 
