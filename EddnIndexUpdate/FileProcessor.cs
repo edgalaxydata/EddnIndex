@@ -101,11 +101,6 @@ public partial class FileProcessor(
             foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking())
             {
                 Files[file.FileName] = file;
-
-                if (!FileDataErrors.ContainsKey(file.Id))
-                {
-                    FileDataErrors[file.Id] = [];
-                }
             }
         }
 
