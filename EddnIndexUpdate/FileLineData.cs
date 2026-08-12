@@ -63,5 +63,6 @@ public struct FileLineData
         NavRouteSystems.Clear();
         Signals.Clear();
         BodySignals.Clear();
+        Errors.Clear();
     }
 }
