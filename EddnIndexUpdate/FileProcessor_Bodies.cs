@@ -18,11 +18,11 @@ public partial class FileProcessor
 
     private async Task Init_BodiesAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (BodyNames.Count == 0)
         {
-            Logger.LogLoadingBodyNames();
+            _logger.LogLoadingBodyNames();
 
             await foreach (var bodyname in ctx.Set<Models.BodyName>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -32,7 +32,7 @@ public partial class FileProcessor
 
         if (BodyDesignations.Count == 0)
         {
-            Logger.LogLoadingBodyDesignations();
+            _logger.LogLoadingBodyDesignations();
 
             await foreach (var desig in ctx.Set<Models.BodyDesignation>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -42,7 +42,7 @@ public partial class FileProcessor
 
         if (ParentSets.Count == 0)
         {
-            Logger.LogLoadingParentSets();
+            _logger.LogLoadingParentSets();
 
             await foreach (var ps in ctx.Set<Models.ParentSet>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -309,7 +309,7 @@ public partial class FileProcessor
         {
             desig = desig with { DesignationId = desig.GetDesignationId() };
 
-            await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+            await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
             ctx.Add(desig);
             await ctx.SaveChangesAsync(canceltoken);
 
@@ -348,7 +348,7 @@ public partial class FileProcessor
                 Debugger.Break();
             }
 
-            Logger.LogPotentialAnomalousBodyNameParsingCase(name, systemName);
+            _logger.LogPotentialAnomalousBodyNameParsingCase(name, systemName);
         }
 
         if (BodyNames.TryGetValue(name, out var bodyName))
@@ -372,7 +372,7 @@ public partial class FileProcessor
             }
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         bodyName = new Models.BodyName
         {
@@ -421,7 +421,7 @@ public partial class FileProcessor
             }
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var set = new Models.ParentSet
         {
@@ -569,7 +569,7 @@ public partial class FileProcessor
 
         if (system.Id != 0 && bodyList.Count == 0)
         {
-            await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+            await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
             bodyList.AddRange(
                 ctx.Set<Models.BodyInfo>()
@@ -643,7 +643,7 @@ public partial class FileProcessor
                     Debugger.Break();
                 }
 
-                Logger.LogMultipleBodyDesignationOverridesMatched(systemName, bodyId, bodyType, timestamp, overrides.Count);
+                _logger.LogMultipleBodyDesignationOverridesMatched(systemName, bodyId, bodyType, timestamp, overrides.Count);
             }
 
             if (overrides is [{ } ovr]

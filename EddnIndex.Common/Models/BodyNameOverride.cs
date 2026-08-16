@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class BodyNameOverride : IHasId<int>
 {
@@ -18,9 +18,9 @@ public record class BodyNameOverride : IHasId<int>
 
     public bool? ArgOfPeriapsisEquals(decimal? other)
     {
-        if (this.ArgOfPeriapsis is decimal thisVal && other is decimal otherVal)
+        if (ArgOfPeriapsis is decimal thisVal && other is decimal otherVal)
         {
-            return Math.Abs((thisVal + 360) % 360 - (otherVal + 360) % 360) < 1;
+            return Math.Abs(((thisVal + 360) % 360) - ((otherVal + 360) % 360)) < 1;
         }
 
         return null;
@@ -28,9 +28,9 @@ public record class BodyNameOverride : IHasId<int>
 
     public bool? InclinationEquals(decimal? other)
     {
-        if (this.Inclination is decimal thisVal && other is decimal otherVal)
+        if (Inclination is decimal thisVal && other is decimal otherVal)
         {
-            return Math.Abs((thisVal + 360) % 360 - (otherVal + 360) % 360) < 1;
+            return Math.Abs(((thisVal + 360) % 360) - ((otherVal + 360) % 360)) < 1;
         }
 
         return null;

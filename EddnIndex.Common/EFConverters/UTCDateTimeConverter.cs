@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Linq.Expressions;
 
 namespace EddnIndex.Common.EFConverters;
@@ -11,7 +11,7 @@ public class UTCDateTimeConverter(int precision)
 {
     private static Expression<Func<DateTime?, DateTime?>> TruncateDateTimeExpr(int precision)
     {
-        var mult = precision switch
+        int mult = precision switch
         {
             >= 7 => 1,
             6 => 10,
@@ -33,7 +33,7 @@ public class UTCDateTimeConverter(int precision)
             return null;
         }
 
-        var tick = (value.Ticks / mult) * mult;
+        long tick = long.CreateTruncating(value.Ticks / mult) * mult;
         return new DateTime(tick, DateTimeKind.Unspecified);
     }
 

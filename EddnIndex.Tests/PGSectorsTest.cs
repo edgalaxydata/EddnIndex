@@ -1,11 +1,11 @@
-﻿using EddnIndex.Common.Sectors;
+using EddnIndex.Common.Sectors;
 
 namespace EddnIndex.Tests;
 
 public class PGSectorsTest
 {
     // Top 100 most visited procgen sectors
-    private static readonly Dictionary<string, int> SectorNameToId = new()
+    private static readonly Dictionary<string, int> _sectorNameToId = new()
     {
         ["Synuefe"] = 151463,
         ["Wregoe"] = 151591,
@@ -115,7 +115,7 @@ public class PGSectorsTest
         for (int sectorId = 0; sectorId < 128 * 64 * 128; sectorId++)
         {
             var pos = PGSectors.SectorCoord.FromSectorId(sectorId);
-            var name = PGSectors.GetC1SectorName(pos);
+            string name = PGSectors.GetC1SectorName(pos);
             Assert.That(PGSectors.GetSectorPos(name), Is.EqualTo(pos), $"C1 sector name did not round-trip for SectorId {sectorId} => Name {name}");
         }
     }
@@ -126,7 +126,7 @@ public class PGSectorsTest
         for (int sectorId = 0; sectorId < 128 * 64 * 128; sectorId++)
         {
             var pos = PGSectors.SectorCoord.FromSectorId(sectorId);
-            var name = PGSectors.GetC2SectorName(pos, true);
+            string name = PGSectors.GetC2SectorName(pos, true);
             Assert.That(PGSectors.GetSectorPos(name), Is.EqualTo(pos), $"C2 sector name did not round-trip for SectorId {sectorId} => Name {name}");
         }
     }
@@ -134,7 +134,7 @@ public class PGSectorsTest
     [Test]
     public void TestSectorNameToId()
     {
-        foreach (var (name, id) in SectorNameToId)
+        foreach (var (name, id) in _sectorNameToId)
         {
             Assert.That(PGSectors.GetSectorPos(name).SectorId, Is.EqualTo(id), $"Sector name to id mapping failed for Name {name}");
         }
@@ -143,7 +143,7 @@ public class PGSectorsTest
     [Test]
     public void TestSectorIdToName()
     {
-        foreach (var (name, id) in SectorNameToId)
+        foreach (var (name, id) in _sectorNameToId)
         {
             Assert.That(PGSectors.GetSectorName(id), Is.EqualTo(name), $"Sector id to name mapping failed for SectorId {id}");
         }

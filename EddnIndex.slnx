@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
     <File Path=".github/workflows/docker-publish.yml" />
+    <File Path=".gitignore" />
     <File Path="EddnIndexLookup.Dockerfile" />
     <File Path="EddnIndexUpdate.Dockerfile" />
   </Folder>

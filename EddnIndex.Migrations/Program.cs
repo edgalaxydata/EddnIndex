@@ -1,4 +1,4 @@
-﻿using EddnIndex.Common;
+using EddnIndex.Common;
 using EddnIndex.Common.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,14 +18,14 @@ for (int i = 0; i < args.Length; i++)
 
 var asms = AppDomain.CurrentDomain.GetAssemblies();
 var curasm = Assembly.GetExecutingAssembly();
-var curasmname = Path.GetFileNameWithoutExtension(curasm.Location);
-var curasmloc = Path.GetDirectoryName(curasm.Location);
-var prefix = curasmname + ".";
+string curasmname = Path.GetFileNameWithoutExtension(curasm.Location);
+string? curasmloc = Path.GetDirectoryName(curasm.Location);
+string prefix = curasmname + ".";
 
 foreach (var asm in asms)
 {
-    var asmloc = Path.GetDirectoryName(asm.Location);
-    var asmname = Path.GetFileNameWithoutExtension(asm.Location);
+    string? asmloc = Path.GetDirectoryName(asm.Location);
+    string asmname = Path.GetFileNameWithoutExtension(asm.Location);
 
     if (asmloc == curasmloc
         && asmname.StartsWith(prefix))
@@ -39,7 +39,7 @@ if (providerName == null)
     throw new InvalidOperationException("Specify a project and provider");
 }
 
-var sectionName = "Database_" + providerName;
+string sectionName = "Database_" + providerName;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Configuration.AddJsonFile("appsettings.json", optional: true);

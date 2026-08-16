@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class SoftwareInfo : IHasFirstLastSeen, IHasId<int>
 {
@@ -13,12 +13,10 @@ public record class SoftwareInfo : IHasFirstLastSeen, IHasId<int>
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
 
-        return this.SoftwareName == other.SoftwareName
-            && this.SoftwareVersion == other.SoftwareVersion;
+        return SoftwareName == other.SoftwareName
+            && SoftwareVersion == other.SoftwareVersion;
     }
 
     public override int GetHashCode()
-    {
-        return HashCode.Combine(SoftwareName, SoftwareVersion);
-    }
+        => HashCode.Combine(SoftwareName, SoftwareVersion);
 }

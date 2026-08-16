@@ -1,4 +1,6 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
+using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
@@ -7,82 +9,80 @@ namespace EddnIndex.Common.Sectors;
 
 public static class PGSectors
 {
-    private const int OrdBits = 7;
-    private const int XBits = 7;
-    private const int YBits = 6;
-    private const int ZBits = 7;
-    private const int OrdMask = (1 << OrdBits) - 1;
-    private const int XMask = (1 << XBits) - 1;
-    private const int YMask = (1 << YBits) - 1;
-    private const int ZMask = (1 << ZBits) - 1;
-    private const int XShift = 0;
-    private const int YShift = XShift + XBits;
-    private const int ZShift = YShift + YBits;
-    private const int OrdXShift = 0;
-    private const int OrdYShift = OrdXShift + OrdBits;
-    private const int OrdZShift = OrdYShift + OrdBits;
-    private const int OrdXStride = 1;
-    private const int OrdYStride = OrdXStride << OrdBits;
-    private const int OrdZStride = OrdYStride << OrdBits;
-    private const int XStride = 1;
-    private const int YStride = XStride << XBits;
-    private const int ZStride = YStride << YBits;
-    private const int MaxOrd = (1 << (OrdBits * 3)) - 1;
-    private const int MaxSectorId = (1 << (XBits + YBits + ZBits)) - 1;
+    private const int ORD_BITS = 7;
+    private const int X_BITS = 7;
+    private const int Y_BITS = 6;
+    private const int Z_BITS = 7;
+    private const int ORD_MASK = (1 << ORD_BITS) - 1;
+    private const int X_MASK = (1 << X_BITS) - 1;
+    private const int Y_MASK = (1 << Y_BITS) - 1;
+    private const int Z_MASK = (1 << Z_BITS) - 1;
+    private const int X_SHIFT = 0;
+    private const int Y_SHIFT = X_SHIFT + X_BITS;
+    private const int Z_SHIFT = Y_SHIFT + Y_BITS;
+    private const int ORD_X_SHIFT = 0;
+    private const int ORD_Y_SHIFT = ORD_X_SHIFT + ORD_BITS;
+    private const int ORD_Z_SHIFT = ORD_Y_SHIFT + ORD_BITS;
+    private const int ORD_X_STRIDE = 1;
+    private const int ORD_Y_STRIDE = ORD_X_STRIDE << ORD_BITS;
+    private const int ORD_Z_STRIDE = ORD_Y_STRIDE << ORD_BITS;
+    private const int X_STRIDE = 1;
+    private const int Y_STRIDE = X_STRIDE << X_BITS;
+    private const int Z_STRIDE = Y_STRIDE << Y_BITS;
+    private const int MAX_ORD = (1 << (ORD_BITS * 3)) - 1;
+    private const int MAX_SECTOR_ID = (1 << (X_BITS + Y_BITS + Z_BITS)) - 1;
 
-    private const uint _mask8x3u8 = 0b000_000_000_000_000_011_111_111U;
-    private const uint _mask4x3u8 = 0b000_000_001_111_000_000_001_111U;
-    private const uint _mask2x3u8 = 0b000_011_000_011_000_011_000_011U;
-    private const uint _mask1x3u8 = 0b001_001_001_001_001_001_001_001U;
+    private const uint MASK_8X3_U8 = 0b000_000_000_000_000_011_111_111U;
+    private const uint MASK_4X3_U8 = 0b000_000_001_111_000_000_001_111U;
+    private const uint MASK_2X3_U8 = 0b000_011_000_011_000_011_000_011U;
+    private const uint MASK_1X3_U8 = 0b001_001_001_001_001_001_001_001U;
 
-    private const uint _mask16x2u16 = 0b0000_0000_0000_0000_1111_1111_1111_1111U;
-    private const uint _mask8x2u16  = 0b0000_0000_1111_1111_0000_0000_1111_1111U;
-    private const uint _mask4x2u16  = 0b0000_1111_0000_1111_0000_1111_0000_1111U;
-    private const uint _mask2x2u16  = 0b0011_0011_0011_0011_0011_0011_0011_0011U;
-    private const uint _mask1x2u16  = 0b0101_0101_0101_0101_0101_0101_0101_0101U;
+    private const uint MASK_16X2_U16 = 0b0000_0000_0000_0000_1111_1111_1111_1111U;
+    private const uint MASK_8X2_U16  = 0b0000_0000_1111_1111_0000_0000_1111_1111U;
+    private const uint MASK_4X2_U16  = 0b0000_1111_0000_1111_0000_1111_0000_1111U;
+    private const uint MASK_2X2_U16  = 0b0011_0011_0011_0011_0011_0011_0011_0011U;
+    private const uint MASK_1X2_U16  = 0b0101_0101_0101_0101_0101_0101_0101_0101U;
 
     public readonly record struct SectorCoord(sbyte X, sbyte Y, sbyte Z) : IComparable<SectorCoord>
     {
-        public readonly bool IsValid => X >= 0 && X <= XMask
-                                     && Y >= 0 && Y <= YMask
-                                     && Z >= 0 && Z <= ZMask;
+        public readonly bool IsValid => X is >= 0 and <= X_MASK
+                                     && Y is >= 0 and <= Y_MASK
+                                     && Z is >= 0 and <= Z_MASK;
 
         public readonly int Ord => IsValid
-                                 ? X * OrdXStride + Y * OrdYStride + Z * OrdZStride
+                                 ? (X * ORD_X_STRIDE) + (Y * ORD_Y_STRIDE) + (Z * ORD_Z_STRIDE)
                                  : -1;
 
         public readonly int SectorId => IsValid
-                                      ? X * XStride + Y * YStride + Z * ZStride
+                                      ? (X * X_STRIDE) + (Y * Y_STRIDE) + (Z * Z_STRIDE)
                                       : -1;
 
         public override readonly string ToString() => $"({X},{Y},{Z})";
 
         public readonly int CompareTo(SectorCoord other)
-        {
-            return (X, Y, Z).CompareTo((other.X, other.Y, other.Z));
-        }
+            => (X, Y, Z).CompareTo((other.X, other.Y, other.Z));
 
         public static readonly SectorCoord Invalid = new(sbyte.MinValue, sbyte.MinValue, sbyte.MinValue);
 
         public static SectorCoord FromSectorId(int sectorid)
             => new(
-                (sbyte)(sectorid >> XShift & XMask),
-                (sbyte)(sectorid >> YShift & YMask),
-                (sbyte)(sectorid >> ZShift & ZMask)
+                (sbyte)((sectorid >> X_SHIFT) & X_MASK),
+                (sbyte)((sectorid >> Y_SHIFT) & Y_MASK),
+                (sbyte)((sectorid >> Z_SHIFT) & Z_MASK)
             );
 
         public static SectorCoord FromOrdinal(int ordinal)
             => new(
-                (sbyte)(ordinal >> OrdXShift & OrdMask),
-                (sbyte)(ordinal >> OrdYShift & OrdMask),
-                (sbyte)(ordinal >> OrdZShift & OrdMask)
+                (sbyte)((ordinal >> ORD_X_SHIFT) & ORD_MASK),
+                (sbyte)((ordinal >> ORD_Y_SHIFT) & ORD_MASK),
+                (sbyte)((ordinal >> ORD_Z_SHIFT) & ORD_MASK)
             );
 
         public static SectorCoord FromOrdinal(uint ordinal)
             => new(
-                (sbyte)(ordinal >> OrdXShift & OrdMask),
-                (sbyte)(ordinal >> OrdYShift & OrdMask),
-                (sbyte)(ordinal >> OrdZShift & OrdMask)
+                (sbyte)((ordinal >> ORD_X_SHIFT) & ORD_MASK),
+                (sbyte)((ordinal >> ORD_Y_SHIFT) & ORD_MASK),
+                (sbyte)((ordinal >> ORD_Z_SHIFT) & ORD_MASK)
             );
     }
 
@@ -104,7 +104,7 @@ public static class PGSectors
         private const char MIN_VALUE = 'a';
         private const char MAX_VALUE = 'z';
 
-        private FragmentInfo Value;
+        private FragmentInfo _value;
         private readonly Lock _lock = new();
         private volatile uint _usedNodeMask = 0;
         private volatile FragmentTrieNode[] _childNodes = [];
@@ -115,17 +115,17 @@ public static class PGSectors
             {
                 if (subKey.Length == 0)
                 {
-                    if (Value.Value != null)
+                    if (_value.Value != null)
                     {
                         throw new ArgumentException($"An item with the same key exists: {fullKey}", nameof(fullKey));
                     }
 
-                    Value = frag;
+                    _value = frag;
                     return;
                 }
             }
 
-            var c0 = char.ToLowerInvariant(subKey[0]);
+            char c0 = char.ToLowerInvariant(subKey[0]);
 
             ArgumentOutOfRangeException.ThrowIfLessThan(c0, MIN_VALUE, nameof(fullKey));
             ArgumentOutOfRangeException.ThrowIfGreaterThan(c0, MAX_VALUE, nameof(fullKey));
@@ -179,18 +179,18 @@ public static class PGSectors
             {
                 if (subKey.Length == 0)
                 {
-                    frag = Value;
+                    frag = _value;
                     return frag.Value != null;
                 }
             }
 
-            var c0 = char.ToLowerInvariant(subKey[0]);
+            char c0 = char.ToLowerInvariant(subKey[0]);
 
-            if (c0 < MIN_VALUE || c0 > MAX_VALUE)
+            if (c0 is < MIN_VALUE or > MAX_VALUE)
             {
                 lock (_lock)
                 {
-                    frag = Value;
+                    frag = _value;
                     return frag.Value != null;
                 }
             }
@@ -213,8 +213,8 @@ public static class PGSectors
                 return childNodes[pos].TryFind(fullKey, subKey[1..], out frag);
             }
 
-            frag = Value;
-            return Value.Value != null;
+            frag = _value;
+            return _value.Value != null;
         }
 
         public bool TryFind(ReadOnlySpan<char> key, out FragmentInfo frag)
@@ -223,7 +223,7 @@ public static class PGSectors
 
     // Tables of prefixes, infixes and suffixes from https://bitbucket.org/Esvandiary/edts/src/develop/pgdata.py
     // Prefixes
-    private static readonly string[] Prefixes =
+    private static readonly ImmutableArray<string> _prefixes =
     [
         "Th",  "Eo",  "Oo",  "Eu",  "Tr",  "Sly", "Dry", "Ou",
         "Tz",  "Phl", "Ae",  "Sch", "Hyp", "Syst","Ai",  "Kyl",
@@ -242,14 +242,14 @@ public static class PGSectors
     ];
 
     // Vowelish infixes
-    private static readonly string[] VowelInfixes =
+    private static readonly ImmutableArray<string> _vowelInfixes =
     [
         "o",   "ai",  "a",   "oi",  "ea",  "ie",  "u",   "e",
         "ee",  "oo",  "ue",  "i",   "oa",  "au",  "ae",  "oe"
     ];
 
     // Consonantish infixes
-    private static readonly string[] NonVowelInfixes =
+    private static readonly ImmutableArray<string> _nonVowelInfixes =
     [
         "ll",  "ss",  "b",   "c",   "d",   "f",   "dg",  "g",
         "ng",  "h",   "j",   "k",   "l",   "m",   "n",   "mb",
@@ -259,7 +259,7 @@ public static class PGSectors
     ];
 
     // Vowelish suffixes
-    private static readonly string[] VowelSuffixes =
+    private static readonly ImmutableArray<string> _vowelSuffixes =
     [
         "oe",  "io",  "oea", "oi",  "aa",  "ua", "eia", "ae",
         "ooe", "oo",  "a",   "ue",  "ai",  "e",  "iae", "oae",
@@ -269,7 +269,7 @@ public static class PGSectors
     ];
 
     // Consonantish suffixes
-    private static readonly string[] NonVowelSuffixes =
+    private static readonly ImmutableArray<string> _nonVowelSuffixes =
     [
         "b",   "scs", "wsy", "c",   "d",   "vsky","f",   "sms",
         "dst", "g",   "rb",  "h",   "nts", "ch",  "rd",  "rld",
@@ -294,15 +294,16 @@ public static class PGSectors
     ];
 
     // Vowelish prefixes
-    private static readonly HashSet<string> VowelPrefixes = new(
-    [
-        "Eo",  "Oo",  "Eu",  "Ou",  "Ae",  "Ai",  "Eae", "Ao",
-        "Au",  "Aae", "A",   "Io",  "E",   "I",   "O",   "Ea",
-        "U",   "Ee",  "Ei",  "Oe"
-    ], StringComparer.OrdinalIgnoreCase);
+    private static readonly FrozenSet<string> _vowelPrefixes =
+        FrozenSet.Create(StringComparer.OrdinalIgnoreCase,
+        [
+            "Eo",  "Oo",  "Eu",  "Ou",  "Ae",  "Ai",  "Eae", "Ao",
+            "Au",  "Aae", "A",   "Io",  "E",   "I",   "O",   "Ea",
+            "U",   "Ee",  "Ei",  "Oe"
+        ]);
 
     // Prefixes using short run lengths
-    private static readonly Dictionary<string, int> PrefixRunLengths = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, int> _prefixRunLengths = new(StringComparer.OrdinalIgnoreCase)
     {
         { "Eu",   31 }, { "Sly",   4 }, { "Tz",    1 }, { "Phl",  13 },
         { "Ae",   12 }, { "Hyp",  25 }, { "Kyl",  30 }, { "Phr",  10 },
@@ -317,7 +318,7 @@ public static class PGSectors
     };
 
     // Infixes using short run lengths
-    private static readonly Dictionary<string, int> InfixRunLengths = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly Dictionary<string, int> _infixRunLengths = new(StringComparer.OrdinalIgnoreCase)
     {
         // Sequence 1
         { "oi",   88 }, { "ue",  147 }, { "oa",   57 },
@@ -326,15 +327,15 @@ public static class PGSectors
         { "dg",   31 }, { "tch",  20 }, { "wr",   31 },
     };
 
-    private static readonly FragmentTrieNode FragmentTrie = new();
+    private static readonly FragmentTrieNode _fragmentTrie = new();
 
-    private static readonly List<(string Value, int Offset, int RunLength)> PrefixesByOffset = [];
+    private static readonly List<(string Value, int Offset, int RunLength)> _prefixesByOffset = [];
 
-    private static readonly List<(string Value, int Offset, int RunLength)> VowelInfixesByOffset = [];
-    private static readonly List<(string Value, int Offset, int RunLength)> NonVowelInfixesByOffset = [];
+    private static readonly List<(string Value, int Offset, int RunLength)> _vowelInfixesByOffset = [];
+    private static readonly List<(string Value, int Offset, int RunLength)> _nonVowelInfixesByOffset = [];
 
-    private static readonly ConcurrentDictionary<SectorCoord, string> CachedSectorsByCoords = [];
-    private static readonly ConcurrentDictionary<string, SectorCoord> CachedSectorsByName = [];
+    private static readonly ConcurrentDictionary<SectorCoord, string> _cachedSectorsByCoords = [];
+    private static readonly ConcurrentDictionary<string, SectorCoord> _cachedSectorsByName = [];
 
     private static void AddOrUpdateFragment(
             Dictionary<string, FragmentInfo> frags,
@@ -345,9 +346,9 @@ public static class PGSectors
             Func<FragmentInfo, string, int, int, FragmentInfo> modifyAction
         )
     {
-        var valueLower = value.ToLowerInvariant();
+        string valueLower = value.ToLowerInvariant();
 
-        var frag = frags.TryGetValue(value, out FragmentInfo v)
+        var frag = frags.TryGetValue(value, out var v)
                  ? v
                  : new FragmentInfo(value);
 
@@ -370,7 +371,7 @@ public static class PGSectors
     {
         value = value.ToLowerInvariant();
 
-        var frag = frags.TryGetValue(value, out FragmentInfo v)
+        var frag = frags.TryGetValue(value, out var v)
                  ? v
                  : new FragmentInfo(value);
 
@@ -381,20 +382,20 @@ public static class PGSectors
     {
         Dictionary<string, FragmentInfo> frags = new(StringComparer.OrdinalIgnoreCase);
 
-        for (int i = 0; i < Prefixes.Length; i++)
+        for (int i = 0; i < _prefixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, PrefixesByOffset, Prefixes[i], PrefixRunLengths, 35, (e, p, o, r) => e with
+            AddOrUpdateFragment(frags, _prefixesByOffset, _prefixes[i], _prefixRunLengths, 35, (e, p, o, r) => e with
             {
                 IsPrefix = true,
-                IsVowelish = VowelPrefixes.Contains(p),
+                IsVowelish = _vowelPrefixes.Contains(p),
                 PrefixOffset = o,
                 PrefixRunLength = r
             });
         }
 
-        for (int i = 0; i < VowelInfixes.Length; i++)
+        for (int i = 0; i < _vowelInfixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, VowelInfixesByOffset, VowelInfixes[i], InfixRunLengths, NonVowelSuffixes.Length, (e, p, o, r) => e with
+            AddOrUpdateFragment(frags, _vowelInfixesByOffset, _vowelInfixes[i], _infixRunLengths, _nonVowelSuffixes.Length, (e, p, o, r) => e with
             {
                 IsInfix = true,
                 IsVowelish = true,
@@ -403,9 +404,9 @@ public static class PGSectors
             });
         }
 
-        for (int i = 0; i < NonVowelInfixes.Length; i++)
+        for (int i = 0; i < _nonVowelInfixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, NonVowelInfixesByOffset, NonVowelInfixes[i], InfixRunLengths, VowelSuffixes.Length, (e, p, o, r) => e with
+            AddOrUpdateFragment(frags, _nonVowelInfixesByOffset, _nonVowelInfixes[i], _infixRunLengths, _vowelSuffixes.Length, (e, p, o, r) => e with
             {
                 IsInfix = true,
                 IsVowelish = false,
@@ -414,9 +415,9 @@ public static class PGSectors
             });
         }
 
-        for (int i = 0; i < VowelSuffixes.Length; i++)
+        for (int i = 0; i < _vowelSuffixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, VowelSuffixes[i], (e, p) => e with
+            AddOrUpdateFragment(frags, _vowelSuffixes[i], (e, p) => e with
             {
                 IsSuffix = true,
                 IsVowelish = true,
@@ -424,9 +425,9 @@ public static class PGSectors
             });
         }
 
-        for (int i = 0; i < NonVowelSuffixes.Length; i++)
+        for (int i = 0; i < _nonVowelSuffixes.Length; i++)
         {
-            AddOrUpdateFragment(frags, NonVowelSuffixes[i], (e, p) => e with
+            AddOrUpdateFragment(frags, _nonVowelSuffixes[i], (e, p) => e with
             {
                 IsSuffix = true,
                 IsVowelish = false,
@@ -438,7 +439,7 @@ public static class PGSectors
 
         foreach (var frag in fragments)
         {
-            FragmentTrie.Add(in frag);
+            _fragmentTrie.Add(in frag);
         }
     }
 
@@ -450,27 +451,23 @@ public static class PGSectors
             throw new ArgumentException("Invalid sector position", nameof(pos));
         }
 
-        return CachedSectorsByCoords.GetOrAdd(pos, p => IsC1Sector(p.Ord) ? GetC1Name(p.Ord) : GetC2Name(p.Ord));
+        return _cachedSectorsByCoords.GetOrAdd(pos, p => IsC1Sector(p.Ord) ? GetC1Name(p.Ord) : GetC2Name(p.Ord));
     }
 
     public static string GetSectorName(int sectorid)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(sectorid, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(sectorid, MaxSectorId);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(sectorid, MAX_SECTOR_ID);
 
         var pos = SectorCoord.FromSectorId(sectorid);
         return GetSectorName(pos);
     }
 
     public static string GetC1SectorName(SectorCoord pos)
-    {
-        return GetC1Name(pos.Ord);
-    }
+        => GetC1Name(pos.Ord);
 
     public static string GetC2SectorName(SectorCoord pos, bool test = false)
-    {
-        return GetC2Name(pos.Ord, test);
-    }
+        => GetC2Name(pos.Ord, test);
 
     private static bool IsC1Sector(int offset)
     {
@@ -497,45 +494,45 @@ public static class PGSectors
 
     private static string ExtractC1Prefix(int offset, out int nextOffset, out bool isVowel)
     {
-        int offsetNumerator = Math.DivRem(offset, PrefixesByOffset.Count, out int prefixOffset);
-        var (prefix, ofs, runlen) = PrefixesByOffset[prefixOffset];
-        nextOffset = offsetNumerator * runlen + prefixOffset - ofs;
-        isVowel = VowelPrefixes.Contains(prefix);
+        int offsetNumerator = Math.DivRem(offset, _prefixesByOffset.Count, out int prefixOffset);
+        var (prefix, ofs, runlen) = _prefixesByOffset[prefixOffset];
+        nextOffset = (offsetNumerator * runlen) + prefixOffset - ofs;
+        isVowel = _vowelPrefixes.Contains(prefix);
         return prefix;
     }
 
     private static string ExtractC1Infix(int offset, bool isVowel, out int nextOffset)
     {
-        var infixes = isVowel ? VowelInfixesByOffset : NonVowelInfixesByOffset;
+        var infixes = isVowel ? _vowelInfixesByOffset : _nonVowelInfixesByOffset;
         int offsetNumerator = Math.DivRem(offset, infixes.Count, out int infixOffset);
         var (infix, start, runlen) = infixes[infixOffset];
-        nextOffset = offsetNumerator * runlen + infixOffset - start;
+        nextOffset = (offsetNumerator * runlen) + infixOffset - start;
         return infix;
     }
 
     private static string GetC1Name(int offset)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MaxOrd);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MAX_ORD);
 
         List<string> frags = [];
 
         frags.Add(ExtractC1Prefix(offset, out offset, out bool prefixIsVowel));
         frags.Add(ExtractC1Infix(offset, !prefixIsVowel, out offset));
 
-        var suffixes = prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
+        var suffixes = prefixIsVowel ? _vowelSuffixes : _nonVowelSuffixes;
 
         if (offset >= suffixes.Length)
         {
             frags.Add(ExtractC1Infix(offset, prefixIsVowel, out offset));
-            suffixes = !prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
+            suffixes = !prefixIsVowel ? _vowelSuffixes : _nonVowelSuffixes;
         }
 
         // This is theoretical as there are no systems where there would be a third infix
         if (offset >= suffixes.Length)
         {
             frags.Add(ExtractC1Infix(offset, !prefixIsVowel, out offset));
-            suffixes = prefixIsVowel ? VowelSuffixes : NonVowelSuffixes;
+            suffixes = prefixIsVowel ? _vowelSuffixes : _nonVowelSuffixes;
         }
 
         if (offset >= suffixes.Length)
@@ -550,27 +547,27 @@ public static class PGSectors
     private static string GetC2Name(int offset, bool test = false)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MaxOrd);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, MAX_ORD);
 
         var (offset1, offset2) = Deinterleave2((uint)offset);
 
-        if (offset1 >= PrefixesByOffset.Count)
+        if (offset1 >= _prefixesByOffset.Count)
         {
             throw new NotSupportedException("Bad C2 name 1 offset");
         }
 
-        if (offset2 >= PrefixesByOffset.Count)
+        if (offset2 >= _prefixesByOffset.Count)
         {
             throw new NotSupportedException("Bad C2 name 2 offset");
         }
 
-        var (prefix1, start1, _) = PrefixesByOffset[offset1];
-        var (prefix2, start2, _) = PrefixesByOffset[offset2];
+        var (prefix1, start1, _) = _prefixesByOffset[offset1];
+        var (prefix2, start2, _) = _prefixesByOffset[offset2];
 
-        string[] suffixes1 = VowelPrefixes.Contains(prefix1) ? NonVowelSuffixes : VowelSuffixes;
-        string[] suffixes2 = VowelPrefixes.Contains(prefix2) ? NonVowelSuffixes : VowelSuffixes;
-        var suffix1Offset = offset1 - start1;
-        var suffix2Offset = offset2 - start2;
+        var suffixes1 = _vowelPrefixes.Contains(prefix1) ? _nonVowelSuffixes : _vowelSuffixes;
+        var suffixes2 = _vowelPrefixes.Contains(prefix2) ? _nonVowelSuffixes : _vowelSuffixes;
+        int suffix1Offset = offset1 - start1;
+        int suffix2Offset = offset2 - start2;
 
         if (suffix1Offset < 0 || suffix1Offset >= suffixes1.Length)
         {
@@ -628,7 +625,7 @@ public static class PGSectors
 
     private static FragmentInfo FindFragment(ReadOnlySpan<char> current)
     {
-        if (FragmentTrie.TryFind(current, out var frag))
+        if (_fragmentTrie.TryFind(current, out var frag))
         {
             return frag;
         }
@@ -648,7 +645,7 @@ public static class PGSectors
             isPrefix |= current.StartsWith(" ");
             current = current.Trim();
 
-            FragmentInfo frag = FindFragment(current);
+            var frag = FindFragment(current);
 
             if (frag.Value == null)
             {
@@ -678,7 +675,7 @@ public static class PGSectors
 
     public static SectorCoord GetSectorPos(string name)
     {
-        return CachedSectorsByName.GetOrAdd(name.ToLowerInvariant(), n => GetSectorFragments(n) switch
+        return _cachedSectorsByName.GetOrAdd(name.ToLowerInvariant(), n => GetSectorFragments(n) switch
         {
             null => SectorCoord.Invalid,
             [{ IsPrefix: true } p1, { IsSuffix: true } s1, { IsPrefix: true } p2, { IsSuffix: true } s2]
@@ -722,14 +719,14 @@ public static class PGSectors
     }
 
     private static int C1ProcessInfixFragment(FragmentInfo frag, int offset)
-        => Math.DivRem(offset, frag.InfixRunLength, out int infixOffset)
-         * (frag.IsVowelish ? VowelInfixesByOffset.Count : NonVowelInfixesByOffset.Count)
+        => (Math.DivRem(offset, frag.InfixRunLength, out int infixOffset)
+         * (frag.IsVowelish ? _vowelInfixesByOffset.Count : _nonVowelInfixesByOffset.Count))
          + infixOffset
          + frag.InfixOffset;
 
     private static int C1ProcessPrefixFragment(FragmentInfo frag, int offset)
-        => Math.DivRem(offset, frag.PrefixRunLength, out int prefixOffset)
-         * PrefixesByOffset.Count
+        => (Math.DivRem(offset, frag.PrefixRunLength, out int prefixOffset)
+         * _prefixesByOffset.Count)
          + prefixOffset
          + frag.PrefixOffset;
 
@@ -747,7 +744,7 @@ public static class PGSectors
         offset = C1ProcessInfixFragment(infix1, offset);
         offset = C1ProcessPrefixFragment(prefix, offset);
 
-        if (offset > MaxOrd)
+        if (offset > MAX_ORD)
         {
             return SectorCoord.Invalid;
         }
@@ -795,17 +792,17 @@ public static class PGSectors
 
             if (Bmi2.IsSupported)
             {
-                return Bmi2.ParallelBitDeposit(v1, _mask1x2u16)
-                     | Bmi2.ParallelBitDeposit(v2, _mask1x2u16 << 1);
+                return Bmi2.ParallelBitDeposit(v1, MASK_1X2_U16)
+                     | Bmi2.ParallelBitDeposit(v2, MASK_1X2_U16 << 1);
             }
             else if (Vector64<uint>.IsSupported)
             {
                 var x = Vector64.Create((uint)v1, (uint)v2);
 
-                x = (x | x << 8) & Vector64.Create(_mask8x2u16);
-                x = (x | x << 4) & Vector64.Create(_mask4x2u16);
-                x = (x | x << 2) & Vector64.Create(_mask2x2u16);
-                x = (x | x << 1) & Vector64.Create(_mask1x2u16);
+                x = (x | (x << 8)) & Vector64.Create(MASK_8X2_U16);
+                x = (x | (x << 4)) & Vector64.Create(MASK_4X2_U16);
+                x = (x | (x << 2)) & Vector64.Create(MASK_2X2_U16);
+                x = (x | (x << 1)) & Vector64.Create(MASK_1X2_U16);
 
                 return x[0] | (x[1] << 1);
             }
@@ -813,10 +810,10 @@ public static class PGSectors
             {
                 var (x1, x2) = ((uint)v1, (uint)v2);
 
-                (x1, x2) = ((x1 | (x1 << 8)) & _mask8x2u16, (x2 | (x2 << 8)) & _mask8x2u16);
-                (x1, x2) = ((x1 | (x1 << 4)) & _mask4x2u16, (x2 | (x2 << 4)) & _mask4x2u16);
-                (x1, x2) = ((x1 | (x1 << 2)) & _mask2x2u16, (x2 | (x2 << 2)) & _mask2x2u16);
-                (x1, x2) = ((x1 | (x1 << 1)) & _mask1x2u16, (x2 | (x2 << 1)) & _mask1x2u16);
+                (x1, x2) = ((x1 | (x1 << 8)) & MASK_8X2_U16, (x2 | (x2 << 8)) & MASK_8X2_U16);
+                (x1, x2) = ((x1 | (x1 << 4)) & MASK_4X2_U16, (x2 | (x2 << 4)) & MASK_4X2_U16);
+                (x1, x2) = ((x1 | (x1 << 2)) & MASK_2X2_U16, (x2 | (x2 << 2)) & MASK_2X2_U16);
+                (x1, x2) = ((x1 | (x1 << 1)) & MASK_1X2_U16, (x2 | (x2 << 1)) & MASK_1X2_U16);
 
                 return x1 | (x2 << 1);
             }
@@ -832,30 +829,30 @@ public static class PGSectors
             if (Bmi2.IsSupported)
             {
                 return (
-                    (ushort)Bmi2.ParallelBitExtract(val, _mask1x2u16),
-                    (ushort)Bmi2.ParallelBitExtract(val, _mask1x2u16 << 1)
+                    (ushort)Bmi2.ParallelBitExtract(val, MASK_1X2_U16),
+                    (ushort)Bmi2.ParallelBitExtract(val, MASK_1X2_U16 << 1)
                 );
             }
             else if (Vector64<uint>.IsSupported)
             {
-                var x = Vector64.Create(val, val >> 1) & Vector64.Create(_mask1x2u16);
+                var x = Vector64.Create(val, val >> 1) & Vector64.Create(MASK_1X2_U16);
 
-                x = (x | (x >> 1)) & Vector64.Create(_mask2x2u16);
-                x = (x | (x >> 2)) & Vector64.Create(_mask4x2u16);
-                x = (x | (x >> 4)) & Vector64.Create(_mask8x2u16);
-                x = (x | (x >> 8)) & Vector64.Create(_mask16x2u16);
+                x = (x | (x >> 1)) & Vector64.Create(MASK_2X2_U16);
+                x = (x | (x >> 2)) & Vector64.Create(MASK_4X2_U16);
+                x = (x | (x >> 4)) & Vector64.Create(MASK_8X2_U16);
+                x = (x | (x >> 8)) & Vector64.Create(MASK_16X2_U16);
 
                 return ((ushort)x[0], (ushort)x[1]);
             }
             else
             {
-                var (x1, x2) = (val & _mask1x2u16, (val >> 1) & _mask1x2u16);
+                var (x1, x2) = (val & MASK_1X2_U16, (val >> 1) & MASK_1X2_U16);
 
-                (x1, x2) = ((x1 | (x1 >> 1)) & _mask2x2u16, (x2 | (x2 >> 1)) & _mask2x2u16);
-                (x1, x2) = ((x1 | (x1 >> 2)) & _mask4x2u16, (x2 | (x2 >> 2)) & _mask4x2u16);
-                (x1, x2) = ((x1 | (x1 >> 4)) & _mask8x2u16, (x2 | (x2 >> 4)) & _mask8x2u16);
+                (x1, x2) = ((x1 | (x1 >> 1)) & MASK_2X2_U16, (x2 | (x2 >> 1)) & MASK_2X2_U16);
+                (x1, x2) = ((x1 | (x1 >> 2)) & MASK_4X2_U16, (x2 | (x2 >> 2)) & MASK_4X2_U16);
+                (x1, x2) = ((x1 | (x1 >> 4)) & MASK_8X2_U16, (x2 | (x2 >> 4)) & MASK_8X2_U16);
 
-                return ((ushort)((x1 | (x1 >> 8)) & _mask16x2u16), (ushort)((x2 | (x2 >> 8)) & _mask16x2u16));
+                return ((ushort)((x1 | (x1 >> 8)) & MASK_16X2_U16), (ushort)((x2 | (x2 >> 8)) & MASK_16X2_U16));
             }
         }
     }
@@ -868,17 +865,17 @@ public static class PGSectors
 
             if (Bmi2.IsSupported)
             {
-                return Bmi2.ParallelBitDeposit((uint)val.X, _mask1x3u8)
-                     | Bmi2.ParallelBitDeposit((uint)val.Y, _mask1x3u8 << 1)
-                     | Bmi2.ParallelBitDeposit((uint)val.Z, _mask1x3u8 << 2);
+                return Bmi2.ParallelBitDeposit((uint)val.X, MASK_1X3_U8)
+                     | Bmi2.ParallelBitDeposit((uint)val.Y, MASK_1X3_U8 << 1)
+                     | Bmi2.ParallelBitDeposit((uint)val.Z, MASK_1X3_U8 << 2);
             }
             else if (Vector128<uint>.IsSupported)
             {
                 var x = Vector128.Create((uint)val.X, (uint)val.Y, (uint)val.Z, 0);
 
-                x = (x | (x << 8)) & Vector128.Create(_mask4x3u8);
-                x = (x | (x << 4)) & Vector128.Create(_mask2x3u8);
-                x = (x | (x << 2)) & Vector128.Create(_mask1x3u8);
+                x = (x | (x << 8)) & Vector128.Create(MASK_4X3_U8);
+                x = (x | (x << 4)) & Vector128.Create(MASK_2X3_U8);
+                x = (x | (x << 2)) & Vector128.Create(MASK_1X3_U8);
 
                 // Fold the three separated 21-bit lanes together to produce the final
                 // 21-bit Morton code (bits ordered x0,y0,z0,x1,y1,z1,...).
@@ -888,9 +885,9 @@ public static class PGSectors
             {
                 var (x, y, z) = ((uint)val.X, (uint)val.Y, (uint)val.Z);
 
-                (x, y, z) = ((x | (x << 8)) & _mask4x3u8, (y | (y << 8)) & _mask4x3u8, (z | (z << 8)) & _mask4x3u8);
-                (x, y, z) = ((x | (x << 4)) & _mask2x3u8, (y | (y << 4)) & _mask2x3u8, (z | (z << 4)) & _mask2x3u8);
-                (x, y, z) = ((x | (x << 2)) & _mask1x3u8, (y | (y << 2)) & _mask1x3u8, (z | (z << 2)) & _mask1x3u8);
+                (x, y, z) = ((x | (x << 8)) & MASK_4X3_U8, (y | (y << 8)) & MASK_4X3_U8, (z | (z << 8)) & MASK_4X3_U8);
+                (x, y, z) = ((x | (x << 4)) & MASK_2X3_U8, (y | (y << 4)) & MASK_2X3_U8, (z | (z << 4)) & MASK_2X3_U8);
+                (x, y, z) = ((x | (x << 2)) & MASK_1X3_U8, (y | (y << 2)) & MASK_1X3_U8, (z | (z << 2)) & MASK_1X3_U8);
 
                 return x | (y << 1) | (z << 2);
             }
@@ -904,28 +901,28 @@ public static class PGSectors
             if (Bmi2.IsSupported)
             {
                 return new(
-                    (sbyte)Bmi2.ParallelBitExtract(val, _mask1x3u8),
-                    (sbyte)Bmi2.ParallelBitExtract(val, _mask1x3u8 << 1),
-                    (sbyte)Bmi2.ParallelBitExtract(val, _mask1x3u8 << 2)
+                    (sbyte)Bmi2.ParallelBitExtract(val, MASK_1X3_U8),
+                    (sbyte)Bmi2.ParallelBitExtract(val, MASK_1X3_U8 << 1),
+                    (sbyte)Bmi2.ParallelBitExtract(val, MASK_1X3_U8 << 2)
                 );
             }
             else if (Vector128<uint>.IsSupported)
             {
-                var x = Vector128.Create(val, val >> 1, val >> 2, 0) & Vector128.Create(_mask1x3u8);
+                var x = Vector128.Create(val, val >> 1, val >> 2, 0) & Vector128.Create(MASK_1X3_U8);
 
-                x = (x | (x >> 2)) & Vector128.Create(_mask2x3u8);
-                x = (x | (x >> 4)) & Vector128.Create(_mask4x3u8);
-                x = (x | (x >> 8)) & Vector128.Create(_mask8x3u8);
+                x = (x | (x >> 2)) & Vector128.Create(MASK_2X3_U8);
+                x = (x | (x >> 4)) & Vector128.Create(MASK_4X3_U8);
+                x = (x | (x >> 8)) & Vector128.Create(MASK_8X3_U8);
 
                 return new((sbyte)x[0], (sbyte)x[1], (sbyte)x[2]);
             }
             else
             {
-                var (x, y, z) = (val & _mask1x3u8, (val >> 1) & _mask1x3u8, (val >> 2) & _mask1x3u8);
+                var (x, y, z) = (val & MASK_1X3_U8, (val >> 1) & MASK_1X3_U8, (val >> 2) & MASK_1X3_U8);
 
-                (x, y, z) = ((x | (x >> 2)) & _mask2x3u8, (y | (y >> 2)) & _mask2x3u8, (z | (z >> 2)) & _mask2x3u8);
-                (x, y, z) = ((x | (x >> 4)) & _mask4x3u8, (y | (y >> 4)) & _mask4x3u8, (z | (z >> 4)) & _mask4x3u8);
-                (x, y, z) = ((x | (x >> 8)) & _mask8x3u8, (y | (y >> 8)) & _mask8x3u8, (z | (z >> 8)) & _mask8x3u8);
+                (x, y, z) = ((x | (x >> 2)) & MASK_2X3_U8, (y | (y >> 2)) & MASK_2X3_U8, (z | (z >> 2)) & MASK_2X3_U8);
+                (x, y, z) = ((x | (x >> 4)) & MASK_4X3_U8, (y | (y >> 4)) & MASK_4X3_U8, (z | (z >> 4)) & MASK_4X3_U8);
+                (x, y, z) = ((x | (x >> 8)) & MASK_8X3_U8, (y | (y >> 8)) & MASK_8X3_U8, (z | (z >> 8)) & MASK_8X3_U8);
 
                 return new((sbyte)x, (sbyte)y, (sbyte)z);
             }

@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
 {
@@ -24,7 +24,7 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
 
     public int? SysName_SectorId => SystemNameId >= (1L << 60) ? (int)(SystemNameId >> 40) - 0x100000 : null;
 
-    public int? SysName_SectorAddress => SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null;
+    public int? SysName_SectorAddress => SystemNameId is >= 0 and < (1L << 60) ? (int)(SystemNameId >> 40) : null;
 
     public string? SysName_PGSuffix => SystemHelpers.GetPGSuffix(SystemNameId);
 
@@ -33,18 +33,18 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
 
-        return this.SystemId == other.SystemId
-            && this.ParentSetId == other.ParentSetId
-            && this.BodyNameId == other.BodyNameId
-            && this.ArgOfPeriapsis == other.ArgOfPeriapsis
-            && this.Inclination == other.Inclination;
+        return SystemId == other.SystemId
+            && ParentSetId == other.ParentSetId
+            && BodyNameId == other.BodyNameId
+            && ArgOfPeriapsis == other.ArgOfPeriapsis
+            && Inclination == other.Inclination;
     }
 
     public bool? ArgOfPeriapsisEquals(decimal? other)
     {
-        if (this.ArgOfPeriapsis is decimal thisVal && other is decimal otherVal)
+        if (ArgOfPeriapsis is decimal thisVal && other is decimal otherVal)
         {
-            return Math.Abs((thisVal + 360) % 360 - (otherVal + 360) % 360) < 1;
+            return Math.Abs(((thisVal + 360) % 360) - ((otherVal + 360) % 360)) < 1;
         }
 
         return null;
@@ -52,16 +52,14 @@ public record class BodyInfo : IHasFirstLastSeen, IHasId<long>
 
     public bool? InclinationEquals(decimal? other)
     {
-        if (this.Inclination is decimal thisVal && other is decimal otherVal)
+        if (Inclination is decimal thisVal && other is decimal otherVal)
         {
-            return Math.Abs((thisVal + 360) % 360 - (otherVal + 360) % 360) < 1;
+            return Math.Abs(((thisVal + 360) % 360) - ((otherVal + 360) % 360)) < 1;
         }
 
         return null;
     }
 
     public override int GetHashCode()
-    {
-        return HashCode.Combine(SystemId, ParentSetId, BodyNameId, ArgOfPeriapsis, Inclination);
-    }
+        => HashCode.Combine(SystemId, ParentSetId, BodyNameId, ArgOfPeriapsis, Inclination);
 }

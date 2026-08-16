@@ -20,11 +20,11 @@ public partial class FileProcessor
 
     private async Task Init_SystemsAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (Sectors.Count == 0 || SectorsById.Count == 0)
         {
-            Logger.LogLoadingSectors();
+            _logger.LogLoadingSectors();
 
             foreach (var sector in ctx.Set<Models.Sector>().AsNoTracking())
             {
@@ -154,7 +154,7 @@ public partial class FileProcessor
     {
         if (Sectors.TryGetValue(name, out var sector)) return sector;
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         sector = new Models.Sector
         {
@@ -214,7 +214,7 @@ public partial class FileProcessor
             return -systemname.Id;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
         systemname = new Models.SystemName { Name = name };
         ctx.Add(systemname);
         await ctx.SaveChangesAsync(canceltoken);
@@ -346,7 +346,7 @@ public partial class FileProcessor
 
         systemAddress ??= namesysaddr;
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         system = await
             ctx.Set<Models.SystemInfo>()

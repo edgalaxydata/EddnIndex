@@ -33,11 +33,11 @@ public partial class FileProcessor
 
     private async Task Init_OverridesAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (SchemasByFilePrefix.Count == 0)
         {
-            Logger.LogLoadingMessageTypes();
+            _logger.LogLoadingMessageTypes();
 
             await foreach (var schema in ctx.Set<Models.FilePrefixSchema>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -46,7 +46,7 @@ public partial class FileProcessor
 
             if (_fileSystem.File.Exists(MessageTypesFile))
             {
-                Logger.LogProcessingMessageTypesFile();
+                _logger.LogProcessingMessageTypesFile();
 
                 await foreach (var line in _fileSystem.File.ReadLinesAsync(MessageTypesFile, canceltoken))
                 {
@@ -80,7 +80,7 @@ public partial class FileProcessor
 
         if (GameVersionDates.Count == 0)
         {
-            Logger.LogLoadingGameVersionDates();
+            _logger.LogLoadingGameVersionDates();
 
             await foreach (var ent in ctx.Set<Models.GameVersionDate>().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -89,7 +89,7 @@ public partial class FileProcessor
 
             if (!_fileSystem.File.Exists(GameVersionDatesFile))
             {
-                Logger.LogRetrievingGameVersionDates();
+                _logger.LogRetrievingGameVersionDates();
 
                 await DownloadGameVersionsAsync(GameVersionDatesFile, canceltoken);
             }
@@ -120,7 +120,7 @@ public partial class FileProcessor
 
         if (SystemNameOverrides.Count == 0)
         {
-            Logger.LogLoadingSystemNameOverrides();
+            _logger.LogLoadingSystemNameOverrides();
 
             await foreach (var ent in ctx.Set<Models.SystemNameOverride>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -134,7 +134,7 @@ public partial class FileProcessor
 
             if (!_fileSystem.File.Exists(SystemOverridesFile))
             {
-                Logger.LogRetrievingSystemNameOverrides();
+                _logger.LogRetrievingSystemNameOverrides();
 
                 await DownloadSystemNameOverridesAsync(SystemOverridesFile, canceltoken);
             }
@@ -172,7 +172,7 @@ public partial class FileProcessor
 
         if (BodyNameOverrides.Count == 0)
         {
-            Logger.LogLoadingBodyNameOverrides();
+            _logger.LogLoadingBodyNameOverrides();
 
             var bysysaddr = new Dictionary<long, List<Models.BodyNameOverride>>();
 
@@ -194,7 +194,7 @@ public partial class FileProcessor
 
             if (!_fileSystem.File.Exists(BodyOverridesFile))
             {
-                Logger.LogRetrievingBodyOverrides();
+                _logger.LogRetrievingBodyOverrides();
                 await DownloadBodyNameOverridesAsync(BodyOverridesFile, canceltoken);
             }
 

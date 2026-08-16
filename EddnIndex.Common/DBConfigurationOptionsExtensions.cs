@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using System.Data.Common;
 
@@ -10,30 +10,16 @@ public static class DBConfigurationOptionsExtensions
     {
         var dbsettings = section.Get<Dictionary<string, object>>() ?? [];
         dbsettings.Remove("Provider");
-        var provider = section.GetValue<string>("Provider")?.ToLowerInvariant();
-        DbConnectionStringBuilder csb;
-
-        if (provider == "mysql" || provider == "mariadb")
+        dbsettings.Remove("ServerVersion");
+        string? provider = section.GetValue<string>("Provider")?.ToLowerInvariant();
+        DbConnectionStringBuilder csb = provider switch
         {
-            csb = new MySqlConnector.MySqlConnectionStringBuilder();
-            dbsettings.Remove("ServerVersion");
-        }
-        else if (provider == "npgsql")
-        {
-            csb = new Npgsql.NpgsqlConnectionStringBuilder();
-        }
-        else if (provider == "sqlite")
-        {
-            csb = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder();
-        }
-        else if (provider == "mssql" || provider == "sqlserver" || provider == null)
-        {
-            csb = new Microsoft.Data.SqlClient.SqlConnectionStringBuilder();
-        }
-        else
-        {
-            throw new NotSupportedException();
-        }
+            "mysql" or "mariadb" => new MySqlConnector.MySqlConnectionStringBuilder(),
+            "npgsql" => new Npgsql.NpgsqlConnectionStringBuilder(),
+            "sqlite" => new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(),
+            "mssql" or "sqlserver" or null => new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(),
+            _ => throw new NotSupportedException(),
+        };
 
         foreach (var (name, value) in dbsettings)
         {
@@ -60,7 +46,7 @@ public static class DBConfigurationOptionsExtensions
             }
         }
 
-        var connstring = csb.ToString();
+        string connstring = csb.ToString();
 
         if (provider == "mariadb")
         {
@@ -69,6 +55,7 @@ public static class DBConfigurationOptionsExtensions
                 new MariaDbServerVersion(section.GetValue<string>("ServerVersion") ?? "11.0"),
                 dbopts => dbopts.MigrationsAssembly("EddnIndex.Migrations.MariaDB")
             );
+
             opts.AddInterceptors(new UTCTimeInterceptor());
         }
         else if (provider == "mysql")
@@ -78,6 +65,7 @@ public static class DBConfigurationOptionsExtensions
                 new MySqlServerVersion(section.GetValue<string>("ServerVersion") ?? "8.0"),
                 dbopts => dbopts.MigrationsAssembly("EddnIndex.Migrations.MySQL")
             );
+
             opts.AddInterceptors(new UTCTimeInterceptor());
         }
         else if (provider == "npgsql")

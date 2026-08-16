@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Sectors;
+namespace EddnIndex.Common.Sectors;
 
 public static class HandAuthoredSectors
 {
@@ -371,8 +371,8 @@ public static class HandAuthoredSectors
             new("IC 2165 Sector", 9024.47656m, -3006.29297m, -10272.34375m, 100),
             new("Butterfly Sector", 1747.16797m, 188.37109m, -2431.44336m, 100),
             new("NGC 2371/2 Sector", 661.47266m, 1497.67188m, -4084.04688m, 100),
-            new("Eskimo Sector", 234.63281m, 239.23438m, -726.43945m, 100, ValidTo: new DateTime(2021, 5, 9, 10, 0, 0, DateTimeKind.Utc)),
-            new("NGC 2392 Sector", 234.63281m, 239.23438m, -726.43945m, 100, ValidFrom: new DateTime(2021, 5, 9, 10, 0, 0, DateTimeKind.Utc)),
+            new("Eskimo Sector", 234.63281m, 239.23438m, -726.43945m, 100, validTo: new DateTime(2021, 5, 9, 10, 0, 0, DateTimeKind.Utc)),
+            new("NGC 2392 Sector", 234.63281m, 239.23438m, -726.43945m, 100, validFrom: new DateTime(2021, 5, 9, 10, 0, 0, DateTimeKind.Utc)),
             new("NGC 2438 Sector", 2508.30469m, 228.79297m, -1973.84180m, 100),
             new("NGC 2440 Sector", 4653.64062m, 238.69141m, -3282.78125m, 100),
             new("NGC 2452 Sector", 9387.19141m, -183.25000m, -4700.75391m, 100),

@@ -1,48 +1,47 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace EddnIndexUpdate.Migrations_Sqlite.Migrations
+namespace EddnIndexUpdate.Migrations_Sqlite.Migrations;
+
+/// <inheritdoc />
+public partial class AddSignalItemFirstLastSeen : Migration
 {
     /// <inheritdoc />
-    public partial class AddSignalItemFirstLastSeen : Migration
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        /// <inheritdoc />
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.AddColumn<DateTime>(
-                name: "FirstSeen",
-                table: "SignalInfoSetItem",
-                type: "TEXT",
-                nullable: true);
+        migrationBuilder.AddColumn<DateTime>(
+            name: "FirstSeen",
+            table: "SignalInfoSetItem",
+            type: "TEXT",
+            nullable: true);
 
-            migrationBuilder.AddColumn<DateTime>(
-                name: "LastSeen",
-                table: "SignalInfoSetItem",
-                type: "TEXT",
-                nullable: true);
+        migrationBuilder.AddColumn<DateTime>(
+            name: "LastSeen",
+            table: "SignalInfoSetItem",
+            type: "TEXT",
+            nullable: true);
 
-            migrationBuilder.CreateIndex(
-                name: "IX_SignalInfoSetItem_SignalInfoId_LastSeen_FirstSeen_SystemId",
-                table: "SignalInfoSetItem",
-                columns: ["SignalInfoId", "LastSeen", "FirstSeen", "SystemId"]);
-        }
+        migrationBuilder.CreateIndex(
+            name: "IX_SignalInfoSetItem_SignalInfoId_LastSeen_FirstSeen_SystemId",
+            table: "SignalInfoSetItem",
+            columns: ["SignalInfoId", "LastSeen", "FirstSeen", "SystemId"]);
+    }
 
-        /// <inheritdoc />
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropIndex(
-                name: "IX_SignalInfoSetItem_SignalInfoId_LastSeen_FirstSeen_SystemId",
-                table: "SignalInfoSetItem");
+    /// <inheritdoc />
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.DropIndex(
+            name: "IX_SignalInfoSetItem_SignalInfoId_LastSeen_FirstSeen_SystemId",
+            table: "SignalInfoSetItem");
 
-            migrationBuilder.DropColumn(
-                name: "FirstSeen",
-                table: "SignalInfoSetItem");
+        migrationBuilder.DropColumn(
+            name: "FirstSeen",
+            table: "SignalInfoSetItem");
 
-            migrationBuilder.DropColumn(
-                name: "LastSeen",
-                table: "SignalInfoSetItem");
-        }
+        migrationBuilder.DropColumn(
+            name: "LastSeen",
+            table: "SignalInfoSetItem");
     }
 }

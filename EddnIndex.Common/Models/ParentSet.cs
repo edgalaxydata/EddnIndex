@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class ParentSet : IHasId<int>
 {
@@ -15,14 +15,12 @@ public record class ParentSet : IHasId<int>
         if (other is null) return false;
         if (ReferenceEquals(other, this)) return true;
 
-        return this.BodyID == other.BodyID
-            && this.BodyType == other.BodyType
-            && this.ParentSetId == other.ParentSetId
-            && this.ParentJson == other.ParentJson;
+        return BodyID == other.BodyID
+            && BodyType == other.BodyType
+            && ParentSetId == other.ParentSetId
+            && ParentJson == other.ParentJson;
     }
 
     public override int GetHashCode()
-    {
-        return HashCode.Combine(BodyID, BodyType, ParentSetId, ParentJson);
-    }
+        => HashCode.Combine(BodyID, BodyType, ParentSetId, ParentJson);
 }

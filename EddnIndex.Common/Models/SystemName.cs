@@ -1,14 +1,12 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class SystemName : IHasId<int>
 {
     public int Id { get; set; }
     public required string Name { get; init; }
 
-    public virtual bool Equals(SystemName? other) => other?.Name == this.Name;
+    public virtual bool Equals(SystemName? other) => other?.Name == Name;
 
     public override int GetHashCode()
-    {
-        return Name.GetHashCode();
-    }
+        => Name.GetHashCode();
 }

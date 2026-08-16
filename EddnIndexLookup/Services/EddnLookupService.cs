@@ -1,8 +1,9 @@
-﻿using EddnIndex.Common;
+using EddnIndex.Common;
 using EddnIndexLookup.DTO;
 using EddnIndexLookup.Options;
 using Ionic.BZip2;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using System.Buffers;
@@ -30,16 +31,18 @@ public class EddnLookupService(
         IFileSystem fileSystem
     )
 {
-    private readonly IDbContextFactory<Models.EDDNContext> ContextFactory = contextFactory;
-    private readonly ILogger Logger = logger;
+    private readonly IDbContextFactory<Models.EDDNContext> _contextFactory = contextFactory;
+    private readonly ILogger _logger = logger;
     private readonly IFileSystem _fileSystem = fileSystem;
-    private readonly EddnLookupServiceSettings Settings = options.Value;
-    private readonly Dictionary<string, (DateTime LastMod, long Length, Dictionary<int, LinkedListNode<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)>> Entries)> LineCache = new(StringComparer.OrdinalIgnoreCase);
-    private readonly LinkedList<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)> LineCacheLRU = [];
-    private readonly Lock LineCacheLock = new();
+    private readonly EddnLookupServiceSettings _settings = options.Value;
+    private readonly Dictionary<string, (DateTime LastMod, long Length, Dictionary<int, LinkedListNode<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)>> Entries)> _lineCache = new(StringComparer.OrdinalIgnoreCase);
+    private readonly LinkedList<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)> _lineCacheLRU = [];
+    private readonly Lock _lineCacheLock = new();
 
-    private readonly TimeSpan MaxCacheAge = TimeSpan.FromHours(1);
-    private readonly int MaxCacheSize = 8192;
+    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = options.Value.MaxExtractCacheSize ?? (128 * 1048576) });
+
+    private readonly TimeSpan _maxCacheAge = TimeSpan.FromHours(1);
+    private readonly int _maxCacheSize = 8192;
 
     private protected async IAsyncEnumerable<long> GetSystemNameIdsAsync(string? name, [EnumeratorCancellation] CancellationToken canceltoken)
     {
@@ -50,38 +53,35 @@ public class EddnLookupService(
 
         name = name.Trim();
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var entry in await ctx.Set<Models.SystemName>().Where(e => e.Name == name).ToListAsync(canceltoken))
         {
             yield return -entry.Id;
         }
 
-        if (SystemHelpers.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode, true)
-            && n2 >= 0
-            && n2 < 65536
-            && mid >= 0
-            && mid < 0x200000
-            && masscode >= 0
-            && masscode < 8)
+        if (SystemHelpers.TrySplitProcgenName(name, out string? sectorName, out int mid, out int n2, out int masscode, true)
+            && n2 is >= 0 and < 65536
+            && mid is >= 0 and < 0x200000
+            && masscode is >= 0 and < 8)
         {
-            var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+            long boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
 
             foreach (var sector in ctx.Set<Models.Sector>().Where(e => e.Name == sectorName))
             {
                 if (sector.SectorAddress is int sectoraddr && sectoraddr >= 0 && sectoraddr < 0x100000)
                 {
-                    yield return (long)sectoraddr << 40 | boxelid;
+                    yield return ((long)sectoraddr << 40) | boxelid;
                 }
 
-                yield return ((long)sector.Id + 0x100000) << 40 | boxelid;
+                yield return (((long)sector.Id + 0x100000) << 40) | boxelid;
             }
         }
     }
 
     private protected async Task<Dictionary<string, List<long>>> GetSystemNameIdsAsync(ICollection<string> names, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var sysNames = await
             ctx.Set<Models.SystemName>()
@@ -99,7 +99,7 @@ public class EddnLookupService(
 
         var sysNameIds = new Dictionary<string, List<long>>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var sysname in names)
+        foreach (string sysname in names)
         {
             var ids = new List<long>();
 
@@ -112,16 +112,16 @@ public class EddnLookupService(
                 && masscode < 8
                 && sectors.TryGetValue(sectorname, out var sectorEnts))
             {
-                var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+                long boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
 
                 foreach (var sector in sectorEnts)
                 {
                     if (sector.SectorAddress is int sectoraddr && sectoraddr >= 0 && sectoraddr < 0x100000)
                     {
-                        ids.Add((long)sectoraddr << 40 | boxelid);
+                        ids.Add(((long)sectoraddr << 40) | boxelid);
                     }
 
-                    ids.Add(((long)sector.Id + 0x100000) << 40 | boxelid);
+                    ids.Add((((long)sector.Id + 0x100000) << 40) | boxelid);
                 }
             }
 
@@ -156,14 +156,14 @@ public class EddnLookupService(
             [""] = name
         };
 
-        for (var spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
+        for (int spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
         {
             nameEnts[name[spacePos..]] = name[..spacePos];
         }
 
         var sysNamesToIds = await GetSystemNameIdsAsync(nameEnts.Values, canceltoken);
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         await foreach (var entry in ctx.Set<Models.BodyName>().Where(e => e.Name == name).AsAsyncEnumerable())
         {
@@ -179,11 +179,11 @@ public class EddnLookupService(
 
         foreach (var (desigName, desigEnts) in desigs)
         {
-            if (nameEnts.TryGetValue(desigName, out var sysname) && sysNamesToIds.TryGetValue(sysname, out var sysNameIds))
+            if (nameEnts.TryGetValue(desigName, out string? sysname) && sysNamesToIds.TryGetValue(sysname, out var sysNameIds))
             {
                 foreach (var desigEnt in desigEnts)
                 {
-                    foreach (var sysNameId in sysNameIds)
+                    foreach (long sysNameId in sysNameIds)
                     {
                         yield return (sysNameId, -desigEnt.Id);
 
@@ -204,7 +204,7 @@ public class EddnLookupService(
             return null;
         }
 
-        List<long> sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
+        var sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
         long? modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
 
         if ((modsysaddr == null && systemAddress != null) || (sysNameIds.Count == 0 && systemName != null))
@@ -212,7 +212,7 @@ public class EddnLookupService(
             return null;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.SystemInfo> query = ctx.Set<Models.SystemInfo>();
 
@@ -237,7 +237,7 @@ public class EddnLookupService(
             return null;
         }
 
-        List<long> sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
+        var sysNameIds = await GetSystemNameIdsAsync(systemName, canceltoken).ToListAsync(canceltoken);
         long? modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
 
         if ((modsysaddr == null && systemAddress != null) || (sysNameIds.Count == 0 && systemName != null))
@@ -245,7 +245,7 @@ public class EddnLookupService(
             return null;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.SystemInfo> query = ctx.Set<Models.SystemInfo>();
 
@@ -280,15 +280,15 @@ public class EddnLookupService(
         )
         where TSystem : class, ISystemData, new()
     {
-        var systemId = system.Id;
+        int systemId = system.Id;
 
-        var name = system switch
+        string? name = system switch
         {
             { SystemNameId: long sysNameId }
-                when systemNames.TryGetValue(-sysNameId, out var sysname)
+                when systemNames.TryGetValue(-sysNameId, out string? sysname)
                 => sysname,
             { SectorId: int sectorId, PGSuffix: string pgSuffix }
-                when sectorsById.TryGetValue(sectorId, out var sectorName)
+                when sectorsById.TryGetValue(sectorId, out string? sectorName)
                 => sectorName + pgSuffix,
             { SectorAddress: int sectorAddr, PGSuffix: string pgSuffix }
                 => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
@@ -430,26 +430,26 @@ public class EddnLookupService(
 
         foreach (var (id, body) in bodies)
         {
-            var sysname = body switch
+            string? sysname = body switch
             {
                 { SystemNameId: long sysNameId }
-                    when systemNames.TryGetValue(-sysNameId, out var sn)
+                    when systemNames.TryGetValue(-sysNameId, out string? sn)
                     => sn,
                 { SysName_SectorId: int sectorId, SysName_PGSuffix: string pgSuffix }
-                    when sectorsById.TryGetValue(sectorId, out var sectorName)
+                    when sectorsById.TryGetValue(sectorId, out string? sectorName)
                     => sectorName + pgSuffix,
                 { SysName_SectorAddress: int sectorAddr, SysName_PGSuffix: string pgSuffix }
                     => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
                 _ => null
             };
 
-            var desigSysName = body.System switch
+            string? desigSysName = body.System switch
             {
                 { SystemNameId: long sysNameId }
-                    when systemNames.TryGetValue(-sysNameId, out var sn)
+                    when systemNames.TryGetValue(-sysNameId, out string? sn)
                     => sn,
                 { SectorId: int sectorId, PGSuffix: string pgSuffix }
-                    when sectorsById.TryGetValue(sectorId, out var sectorName)
+                    when sectorsById.TryGetValue(sectorId, out string? sectorName)
                     => sectorName + pgSuffix,
                 { SectorAddress: int sectorAddr, PGSuffix: string pgSuffix }
                     => (sectorsByAddr.GetValueOrDefault(sectorAddr) ?? Sectors.PGSectors.GetSectorName(sectorAddr)) + pgSuffix,
@@ -458,14 +458,14 @@ public class EddnLookupService(
 
             if (body.BodyNameId is int bodyNameId)
             {
-                var name = (sysname, bodyNameId) switch
+                string? name = (sysname, bodyNameId) switch
                 {
                     (_, > 0) when bodyNames.TryGetValue(bodyNameId, out var bn) => bn.Name,
                     (not null, _) when bodyDesigsByDesigId.TryGetValue(bodyNameId, out var bd) => sysname + bd.Designation,
                     _ => null
                 };
 
-                (string? desig, string? desigType, Models.BodyDesignation? desigData) =
+                (string? desig, string? desigType, var desigData) =
                     body.BodyDesignationId is not int bodyDesigId
                     ? (null, null, null)
                     : (desigSysName, bodyDesigId) switch
@@ -521,7 +521,7 @@ public class EddnLookupService(
         var bodyNameIds = sysAndBodyNameIds.Where(e => e.SystemNameId == null).Select(e => e.BodyNameId).ToList();
         var bodyDesigIds = sysAndBodyNameIds.Where(e => e.SystemNameId != null).Select(e => e.BodyNameId).ToList();
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.BodyInfo> query =
             ctx.Set<Models.BodyInfo>()
@@ -555,7 +555,7 @@ public class EddnLookupService(
     private protected async Task<Dictionary<int, TSystem>> GetSystemsAsync<TSystem>(ICollection<int> systemIds, bool includeRejected, CancellationToken canceltoken)
         where TSystem : class, ISystemData, new()
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var query =
             ctx.Set<Models.SystemInfo>()
@@ -576,7 +576,7 @@ public class EddnLookupService(
         )
         where TBodyData : class, IBodyData, new()
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var query =
             ctx.Set<Models.BodyInfo>()
@@ -602,9 +602,9 @@ public class EddnLookupService(
 
     private protected async Task<Dictionary<int, StationData>> GetStationsAsync(ICollection<int> stationIds, bool includeRejected, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
-        IQueryable<Models.StationInfo> query = ctx.Set<Models.StationInfo>().Where(e => stationIds.Contains(e.Id));
+        var query = ctx.Set<Models.StationInfo>().Where(e => stationIds.Contains(e.Id));
 
         if (!includeRejected)
         {
@@ -668,11 +668,11 @@ public class EddnLookupService(
             CancellationToken canceltoken
         )
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var matches = new Dictionary<int, List<MatchEntry>>();
 
-        foreach (var sysid in systemIds)
+        foreach (int sysid in systemIds)
         {
             var routeQueryResults = await
                 ctx.QuerySystemRouteMatchLines(sysid, minDate, maxDate, limitMatches)
@@ -738,11 +738,11 @@ public class EddnLookupService(
             CancellationToken canceltoken
         )
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var matches = new Dictionary<long, List<MatchEntry>>();
 
-        foreach (var bodyid in bodyIds)
+        foreach (long bodyid in bodyIds)
         {
             matches[bodyid] = await
                 ctx.QueryBodyMatchLines(bodyid, minDate, maxDate, limitMatches)
@@ -780,11 +780,11 @@ public class EddnLookupService(
             CancellationToken canceltoken
         )
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var matches = new Dictionary<int, List<MatchEntry>>();
 
-        foreach (var stationid in stationIds)
+        foreach (int stationid in stationIds)
         {
             matches[stationid] = await
                 ctx.QueryStationMatchLines(stationid, minDate, maxDate, limitMatches)
@@ -820,7 +820,7 @@ public class EddnLookupService(
             CancellationToken canceltoken
         )
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var matches = new Dictionary<int, List<MatchEntry>>();
 
@@ -852,28 +852,28 @@ public class EddnLookupService(
 
     private protected async Task<Dictionary<int, int>> GetSystemMatchCountsAsync(ICollection<int> systemIds, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         return await ctx.GetSystemMatchCountsAsync(systemIds, canceltoken);
     }
 
     private protected async Task<Dictionary<long, int>> GetBodyMatchCountsAsync(ICollection<long> bodyIds, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         return await ctx.GetBodyMatchCountsAsync(bodyIds, canceltoken);
     }
 
     private protected async Task<Dictionary<int, int>> GetStationMatchCountsAsync(ICollection<int> stationIds, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         return await ctx.GetStationMatchCountsAsync(stationIds, canceltoken);
     }
 
     private protected async Task<Dictionary<int, int>> GetSignalMatchCountsAsync(Dictionary<int, List<int>> signalSetIds, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         return await ctx.GetSignalMatchCountsAsync(signalSetIds, canceltoken);
     }
@@ -1169,7 +1169,7 @@ public class EddnLookupService(
 
         stationName = stationName?.Trim();
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.StationInfo> query = ctx.Set<Models.StationInfo>();
 
@@ -1178,7 +1178,7 @@ public class EddnLookupService(
             query = query.Where(e => e.StationName == stationName);
         }
 
-        if (marketId != null && marketId > 0)
+        if (marketId is not null and > 0)
         {
             query = query.Where(e => e.MarketId == marketId);
         }
@@ -1258,7 +1258,7 @@ public class EddnLookupService(
 
         signalName = signalName.Trim();
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var signalIds = await
             ctx.Set<Models.SignalInfo>()
@@ -1303,7 +1303,7 @@ public class EddnLookupService(
             query = query.Where(e => e.FirstSeen <= maxDate);
         }
 
-        foreach (var signalId in signalIds)
+        foreach (int signalId in signalIds)
         {
             var systemSpans = await
                 query
@@ -1367,7 +1367,7 @@ public class EddnLookupService(
     /// <returns></returns>
     public async Task<string?> ExtractLineAsync(string filename, int lineno, CancellationToken canceltoken)
     {
-        if (Settings.IndexedDir == null
+        if (_settings.IndexedDir == null
             || lineno <= 0
             || string.IsNullOrWhiteSpace(filename)
             || filename.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
@@ -1379,12 +1379,12 @@ public class EddnLookupService(
 
         lineno -= 1;
 
-        var chunkNo = lineno / 1024;
-        var itemNo = lineno % 1024;
+        int chunkNo = lineno / 1024;
+        int itemNo = lineno % 1024;
 
         Models.FileInfo? file;
 
-        await using (var ctx = await ContextFactory.CreateDbContextAsync(canceltoken))
+        await using (var ctx = await _contextFactory.CreateDbContextAsync(canceltoken))
         {
             file = await ctx.Set<Models.FileInfo>().FirstOrDefaultAsync(e => e.FileName == filename, cancellationToken: canceltoken);
 
@@ -1394,16 +1394,16 @@ public class EddnLookupService(
             }
         }
 
-        lock (LineCacheLock)
+        lock (_lineCacheLock)
         {
-            if (LineCache.TryGetValue(file.FileName, out var fileEnts)
+            if (_lineCache.TryGetValue(file.FileName, out var fileEnts)
                 && fileEnts.Entries.TryGetValue(chunkNo, out var ents)
                 && itemNo < ents.Value.Lines.Count)
             {
                 if (ents.Previous != null)
                 {
-                    LineCacheLRU.Remove(ents);
-                    LineCacheLRU.AddFirst(ents);
+                    _lineCacheLRU.Remove(ents);
+                    _lineCacheLRU.AddFirst(ents);
                 }
 
                 ents.ValueRef.LastUsed = DateTime.UtcNow;
@@ -1411,7 +1411,7 @@ public class EddnLookupService(
             }
         }
 
-        var indexFilename = _fileSystem.Path.Join(Settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
+        string indexFilename = _fileSystem.Path.Join(_settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
 
         if (!_fileSystem.File.Exists(indexFilename) || !_fileSystem.File.Exists(indexFilename + ".index"))
         {
@@ -1420,7 +1420,7 @@ public class EddnLookupService(
 
         var info = _fileSystem.FileInfo.New(indexFilename);
         var dataLastMod = info.LastWriteTimeUtc;
-        var dataSize = info.Length;
+        long dataSize = info.Length;
         Span<byte> ixStartEndPos = stackalloc byte[16];
 
         for (int retries = 3; retries > 0; retries--)
@@ -1432,9 +1432,9 @@ public class EddnLookupService(
                           ? _fileSystem.File.GetLastWriteTimeUtc(indexInnerStream.SafeFileHandle)
                           : _fileSystem.File.GetLastWriteTimeUtc(indexStream.Name);
 
-            var ixSize = indexStream.Length;
+            long ixSize = indexStream.Length;
 
-            if (chunkNo >= indexStream.Length / 8 - 1)
+            if (chunkNo >= (indexStream.Length / 8) - 1)
             {
                 return null;
             }
@@ -1453,7 +1453,7 @@ public class EddnLookupService(
 
             using var dataStream = _fileSystem.File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
 
-            var newSize = dataStream.Length;
+            long newSize = dataStream.Length;
             var newLastMod = dataStream is IFileSystemExtensibility dataFsExt
                           && dataFsExt.TryGetWrappedInstance<FileStream>(out var dataInnerStream)
                            ? _fileSystem.File.GetLastWriteTimeUtc(dataInnerStream.SafeFileHandle)
@@ -1477,7 +1477,7 @@ public class EddnLookupService(
                 continue;
             }
 
-            var databuf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
+            byte[] databuf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
             using var bzmemstream = new MemoryStream();
 
             try
@@ -1492,20 +1492,20 @@ public class EddnLookupService(
                 ArrayPool<byte>.Shared.Return(databuf);
             }
 
-            lock (LineCacheLock)
+            lock (_lineCacheLock)
             {
-                if (!LineCache.TryGetValue(file.FileName, out var fileEnts))
+                if (!_lineCache.TryGetValue(file.FileName, out var fileEnts))
                 {
-                    LineCache[file.FileName] = fileEnts = (dataLastMod, dataSize, []);
+                    _lineCache[file.FileName] = fileEnts = (dataLastMod, dataSize, []);
                 }
                 else if (fileEnts.LastMod != dataLastMod || fileEnts.Length != dataSize)
                 {
                     foreach (var ent in fileEnts.Entries.Values)
                     {
-                        LineCacheLRU.Remove(ent);
+                        _lineCacheLRU.Remove(ent);
                     }
 
-                    LineCache[file.FileName] = fileEnts = (dataLastMod, dataSize, []);
+                    _lineCache[file.FileName] = fileEnts = (dataLastMod, dataSize, []);
                 }
                 else if (fileEnts.Entries.TryGetValue(chunkNo, out var chunkEnts)
                          && itemNo < chunkEnts.Value.Lines.Count)
@@ -1517,7 +1517,7 @@ public class EddnLookupService(
                 using var memstream = new MemoryStream();
                 using (var bzstream = new BZip2InputStream(bzmemstream))
                 {
-                    var block = ArrayPool<byte>.Shared.Rent(65536);
+                    byte[] block = ArrayPool<byte>.Shared.Rent(65536);
 
                     try
                     {
@@ -1542,22 +1542,22 @@ public class EddnLookupService(
                     lines.Add(line);
                 }
 
-                fileEnts.Entries[chunkNo] = LineCacheLRU.AddFirst((file.FileName, chunkNo, lines, DateTime.UtcNow));
+                fileEnts.Entries[chunkNo] = _lineCacheLRU.AddFirst((file.FileName, chunkNo, lines, DateTime.UtcNow));
 
-                while (LineCacheLRU.Last is { } last
-                       && (LineCacheLRU.Count > MaxCacheSize
-                           || last.Value.LastUsed < DateTime.UtcNow - MaxCacheAge))
+                while (_lineCacheLRU.Last is { } last
+                       && (_lineCacheLRU.Count > _maxCacheSize
+                           || last.Value.LastUsed < DateTime.UtcNow - _maxCacheAge))
                 {
-                    LineCacheLRU.Remove(last);
+                    _lineCacheLRU.Remove(last);
 
-                    if (LineCache.TryGetValue(last.Value.Filename, out var lastEnts))
+                    if (_lineCache.TryGetValue(last.Value.Filename, out var lastEnts))
                     {
                         lastEnts.Entries.Remove(last.Value.ChunkNo);
                     }
 
                     if (lastEnts.Entries.Count == 0)
                     {
-                        LineCache.Remove(last.Value.Filename);
+                        _lineCache.Remove(last.Value.Filename);
                     }
                 }
 
@@ -1583,7 +1583,7 @@ public class EddnLookupService(
             string? boxelName = null
         )
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (await ctx.Set<Models.Sector>().FirstOrDefaultAsync(e => e.Name == sectorName, canceltoken) is not { } sector)
         {
@@ -1644,8 +1644,8 @@ public class EddnLookupService(
 
         if (nameOnly)
         {
-            var minId = ((long)sector.Id << 40) + (1L << 60) + boxelid;
-            var maxId = minId + range;
+            long minId = ((long)sector.Id << 40) + (1L << 60) + boxelid;
+            long maxId = minId + range;
 
             await foreach (var system in query.Where(e => e.SystemNameId >= minId && e.SystemNameId <= maxId).AsAsyncEnumerable())
             {
@@ -1657,8 +1657,8 @@ public class EddnLookupService(
 
             if (sector.SectorAddress is int sectorAddress)
             {
-                var minAddr = ((long)sectorAddress << 40) + boxelid;
-                var maxAddr = minAddr + range;
+                long minAddr = ((long)sectorAddress << 40) + boxelid;
+                long maxAddr = minAddr + range;
 
                 await foreach (var system in query.Where(e => e.ModSystemAddress >= minAddr && e.ModSystemAddress <= maxAddr && e.ModSystemAddress != e.SystemNameId).AsAsyncEnumerable())
                 {
@@ -1673,8 +1673,8 @@ public class EddnLookupService(
         {
             if (sector.SectorAddress is int sectorAddress)
             {
-                var minId = ((long)sectorAddress << 40) + boxelid;
-                var maxId = minId + range;
+                long minId = ((long)sectorAddress << 40) + boxelid;
+                long maxId = minId + range;
 
                 await foreach (var system in query.Where(e => e.ModSystemAddress >= minId && e.ModSystemAddress <= maxId).AsAsyncEnumerable())
                 {
@@ -1697,7 +1697,7 @@ public class EddnLookupService(
     /// <returns>List of sector names</returns>
     public async Task<List<string>> GetSectorsAsync(bool includeSphereSectors, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         IQueryable<Models.Sector> query = ctx.Set<Models.Sector>();
 
@@ -1720,7 +1720,7 @@ public class EddnLookupService(
             string? boxelName = null
         )
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (ctx.Set<Models.Sector>().FirstOrDefault(e => e.Name == sectorName) is not { } sector
             || sector.SectorAddress is not int sectorAddress)
@@ -1728,8 +1728,8 @@ public class EddnLookupService(
             yield break;
         }
 
-        var minAddr = (long)sectorAddress << 40;
-        var maxAddr = minAddr + (1L << 40) - 1;
+        long minAddr = (long)sectorAddress << 40;
+        long maxAddr = minAddr + (1L << 40) - 1;
 
         if (boxelName is [.., char boxelend])
         {
@@ -1740,16 +1740,14 @@ public class EddnLookupService(
 
             if (!SystemHelpers.TrySplitProcgenName(sectorName + " " + boxelName + "0", out string? secname, out int mid, out int n2, out int masscode, false)
                 || n2 != 0
-                || mid < 0
-                || mid >= 0x200000
-                || masscode < 0
-                || masscode >= 8
+                || mid is < 0 or >= 0x200000
+                || masscode is < 0 or >= 8
                 || !string.Equals(secname, sectorName))
             {
                 yield break;
             }
 
-            var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+            long boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
             minAddr += boxelid;
             maxAddr = minAddr + (1 << 16) - 1;
         }
@@ -1783,8 +1781,8 @@ public class EddnLookupService(
                 continue;
             }
 
-            var prefix = sector.Name + pgsuffix;
-            var seqnum = (int)(modsysaddr & 0xFFFF);
+            string prefix = sector.Name + pgsuffix;
+            int seqnum = (int)(modsysaddr & 0xFFFF);
 
             if (prefix != prevPrefix || seqnum != prevSeqnum)
             {
@@ -1809,7 +1807,7 @@ public class EddnLookupService(
 
             while (prevSeqnum < seqnum)
             {
-                var sysaddr = SystemHelpers.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
+                long sysaddr = SystemHelpers.ModSystemAddressToSystemAddress(boxelModSystemAddress + prevSeqnum) ?? throw new UnreachableException();
 
                 yield return new SystemGapData
                 {
@@ -1853,9 +1851,9 @@ public class EddnLookupService(
     /// <summary>Get table info</summary>
     /// <param name="canceltoken">Cancellation Token</param>
     /// <returns>Table info</returns>
-    public async Task<Dictionary<string, TableInfo>> GetTableInfo(CancellationToken canceltoken)
+    public async Task<Dictionary<string, TableInfo>> GetTableInfoAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (ctx.Database.IsMySql())
         {
@@ -1947,11 +1945,11 @@ public class EddnLookupService(
     /// <summary>Get directory usage stats</summary>
     /// <param name="canceltoken">Cancellation Token</param>
     /// <returns>Directory usage stats</returns>
-    public async Task<Dictionary<string, DumpDirectoryUsage>> GetDirectoryUsages(CancellationToken canceltoken)
+    public async Task<Dictionary<string, DumpDirectoryUsage>> GetDirectoryUsagesAsync(CancellationToken canceltoken)
     {
         var dirusages = new Dictionary<string, DumpDirectoryUsage>();
 
-        foreach (var (name, path) in Settings.DumpDirs)
+        foreach (var (name, path) in _settings.DumpDirs)
         {
             var (size, filecount) = await
                 _fileSystem
@@ -1975,12 +1973,12 @@ public class EddnLookupService(
     /// <summary>Get storage statistics</summary>
     /// <param name="canceltoken">Cancellation Token</param>
     /// <returns>Storage stats</returns>
-    public async Task<StorageStats> GetStorageStats(CancellationToken canceltoken)
+    public async Task<StorageStats> GetStorageStatsAsync(CancellationToken canceltoken)
     {
         return new StorageStats
         {
-            Tables = await GetTableInfo(canceltoken),
-            DumpUsages = await GetDirectoryUsages(canceltoken)
+            Tables = await GetTableInfoAsync(canceltoken),
+            DumpUsages = await GetDirectoryUsagesAsync(canceltoken)
         };
     }
 }

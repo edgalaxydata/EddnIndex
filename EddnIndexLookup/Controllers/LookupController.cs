@@ -1,4 +1,4 @@
-﻿using EddnIndexLookup.DTO;
+using EddnIndexLookup.DTO;
 using EddnIndexLookup.Filters;
 using EddnIndexLookup.Services;
 using Microsoft.AspNetCore.Cors;
@@ -13,7 +13,7 @@ namespace EddnIndexLookup.Controllers;
 [ApiController]
 public class LookupController(EddnLookupService service) : ControllerBase
 {
-    private readonly EddnLookupService Service = service;
+    private readonly EddnLookupService _service = service;
 
     /// <summary>Lookup systems</summary>
     /// <remarks>
@@ -56,7 +56,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] DateTimeOffset? maxDate = null
         )
     {
-        systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
+        systemAddress ??= long.TryParse(Request.Query["systemId64"], out long systemId64) ? systemId64 : null;
         systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
 
         if (Request.Method == "HEAD")
@@ -64,7 +64,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             brief = true;
         }
 
-        var systems = await Service.GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+        var systems = await _service.GetSystemsAsync(systemName, systemAddress, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         systems = [..
             systems.Select(e => e with
@@ -268,7 +268,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] DateTimeOffset? maxDate = null
         )
     {
-        systemAddress ??= long.TryParse(Request.Query["systemId64"], out var systemId64) ? systemId64 : null;
+        systemAddress ??= long.TryParse(Request.Query["systemId64"], out long systemId64) ? systemId64 : null;
         systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
 
         if (systemAddress >= (1 << 55))
@@ -282,7 +282,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             brief = true;
         }
 
-        var bodies = await Service.GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+        var bodies = await _service.GetBodiesAsync(bodyName, systemName, systemAddress, bodyId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         bodies = [..
             bodies.Select(e => e with
@@ -659,7 +659,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             brief = true;
         }
 
-        var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+        var stations = await _service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         stations = [..
             stations.Select(e => e with
@@ -843,7 +843,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             brief = true;
         }
 
-        var stations = await Service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+        var stations = await _service.GetStationsAsync(stationName, marketId, includeRejected, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         return Ok(
             stations.Select(e => OldStationData.From(e with
@@ -890,7 +890,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             brief = true;
         }
 
-        var signals = await Service.GetSignalsAsync(signalName, systemName, systemAddress, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
+        var signals = await _service.GetSignalsAsync(signalName, systemName, systemAddress, brief, limitMatches, minDate, maxDate, HttpContext.RequestAborted);
 
         return Ok(
             signals.Select(e => e with
@@ -909,9 +909,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     }
 
     private string? GetExtractUrl(string filename, int lineno)
-    {
-        return Url.Action("ExtractLine", "Lookup", new { filename, lineno }, Request.Scheme);
-    }
+        => Url.Action("ExtractLine", "Lookup", new { filename, lineno }, Request.Scheme);
 
     /// <summary>Extract EDDN event</summary>
     /// <remarks>
@@ -927,7 +925,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<EDDNEvent>> ExtractLineAsync(string filename, int lineno)
     {
-        if (await Service.ExtractLineAsync(filename, lineno, HttpContext.RequestAborted) is not { } line)
+        if (await _service.ExtractLineAsync(filename, lineno, HttpContext.RequestAborted) is not { } line)
         {
             return NotFound();
         }
@@ -959,7 +957,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
     [ProducesResponseType<List<string>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<List<string>>> GetSectorNamesAsync([FromQuery] bool includeSphereSectors)
-        => await Service.GetSectorsAsync(includeSphereSectors, HttpContext.RequestAborted);
+        => await _service.GetSectorsAsync(includeSphereSectors, HttpContext.RequestAborted);
 
     /// <summary>Get systems in a sector</summary>
     /// <remarks>
@@ -983,7 +981,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] bool includeRejected = false
         )
     {
-        await foreach (var entry in Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted))
+        await foreach (var entry in _service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted))
         {
             yield return entry;
         }
@@ -1011,7 +1009,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] bool includeRejected = false
         )
     {
-        await foreach (var entry in Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName))
+        await foreach (var entry in _service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName))
         {
             yield return entry;
         }
@@ -1041,7 +1039,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [FromQuery] bool includeRejected = false
         )
     {
-        await foreach (var entry in Service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName))
+        await foreach (var entry in _service.GetSectorSystemsAsync(sectorName, nameOnly, includeRejected, HttpContext.RequestAborted, boxelName))
         {
             yield return entry;
         }
@@ -1065,7 +1063,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             string sectorName
         )
     {
-        await foreach (var entry in Service.EnumerateGapSystemsAsync(sectorName, HttpContext.RequestAborted))
+        await foreach (var entry in _service.EnumerateGapSystemsAsync(sectorName, HttpContext.RequestAborted))
         {
             yield return entry;
         }
@@ -1089,7 +1087,7 @@ public class LookupController(EddnLookupService service) : ControllerBase
             [RegularExpression("^[A-Z][A-Z]-[A-Z] [a-h]([0-9]{1,3}-?)?$")] string boxelName
         )
     {
-        await foreach (var entry in Service.EnumerateGapSystemsAsync(sectorName, HttpContext.RequestAborted, boxelName))
+        await foreach (var entry in _service.EnumerateGapSystemsAsync(sectorName, HttpContext.RequestAborted, boxelName))
         {
             yield return entry;
         }

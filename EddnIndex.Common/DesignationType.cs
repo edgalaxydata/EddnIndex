@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common;
+namespace EddnIndex.Common;
 
 public enum DesignationType
 {
@@ -23,5 +23,6 @@ public enum DesignationType
     Moon3Barycentre,
     Moon3Body,
     Moon3Ring,
-    Moon3Comet
+    Moon3Comet,
+    Max = 31
 }

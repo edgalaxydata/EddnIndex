@@ -1,7 +1,6 @@
-﻿namespace EddnIndexUpdate
+﻿namespace EddnIndexUpdate;
+
+public class BadDataException(string? message, object? extradata) : Exception(message)
 {
-    public class BadDataException(string? message, object? extradata) : Exception(message)
-    {
-        public object? ExtraData { get; } = extradata;
-    }
+    public object? ExtraData { get; } = extradata;
 }

@@ -38,7 +38,7 @@ for (int i = 0; i < args.Length; i++)
                 value = optarg;
                 i++;
                 break;
-            case (string opt, _, _) when (opt.StartsWith("--no-", StringComparison.OrdinalIgnoreCase)):
+            case (string opt, _, _) when opt.StartsWith("--no-", StringComparison.OrdinalIgnoreCase):
                 key = opt[5..];
                 value = "false";
                 break;
@@ -48,7 +48,7 @@ for (int i = 0; i < args.Length; i++)
                 break;
         }
 
-        if (mapopts.TryGetValue(key, out var mapkey))
+        if (mapopts.TryGetValue(key, out string? mapkey))
         {
             key = mapkey;
         }

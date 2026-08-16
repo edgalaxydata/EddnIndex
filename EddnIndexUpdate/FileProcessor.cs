@@ -24,8 +24,8 @@ public partial class FileProcessor(
         IFileSystem fileSystem
     )
 {
-    private readonly IDbContextFactory<Models.EDDNContext> ContextFactory = contextFactory;
-    private readonly ILogger Logger = logger;
+    private readonly IDbContextFactory<Models.EDDNContext> _contextFactory = contextFactory;
+    private readonly ILogger _logger = logger;
     private readonly IFileSystem _fileSystem = fileSystem;
     protected readonly FileProcessorSettings Settings = options.Value;
 
@@ -56,15 +56,15 @@ public partial class FileProcessor(
 
     private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 
-    private static readonly int Version = 2;
-    private static readonly int MaxLength = 4194304;
+    private static readonly int _version = 2;
+    private static readonly int _maxLength = 4194304;
 
-    private bool InitComplete = false;
+    private bool _initComplete = false;
 
     [DoesNotReturn]
     private void Fail(string? message, object? extraData = null)
     {
-        Logger.LogAssertFailure(message, JsonConvert.SerializeObject(extraData));
+        _logger.LogAssertFailure(message, JsonConvert.SerializeObject(extraData));
 
         if (Debugger.IsAttached)
         {
@@ -84,7 +84,7 @@ public partial class FileProcessor(
 
     protected async Task InitAsync(CancellationToken canceltoken)
     {
-        if (InitComplete) return;
+        if (_initComplete) return;
 
         await Init_OverridesAsync(canceltoken);
 
@@ -92,11 +92,11 @@ public partial class FileProcessor(
 
         await Init_BodiesAsync(canceltoken);
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         if (Files.Count == 0)
         {
-            Logger.LogLoadingFileInfo();
+            _logger.LogLoadingFileInfo();
 
             await foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -106,7 +106,7 @@ public partial class FileProcessor(
 
         if (FileDataErrors.Count == 0)
         {
-            Logger.LogLoadingFileErrors();
+            _logger.LogLoadingFileErrors();
 
             await foreach (var error in ctx.Set<Models.FileLineDataError>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -126,7 +126,7 @@ public partial class FileProcessor(
 
         if (Software.Count == 0)
         {
-            Logger.LogLoadingSoftwareVersions();
+            _logger.LogLoadingSoftwareVersions();
 
             await foreach (var sw in ctx.Set<Models.SoftwareInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -136,7 +136,7 @@ public partial class FileProcessor(
 
         if (GameVersions.Count == 0)
         {
-            Logger.LogLoadingGameVersions();
+            _logger.LogLoadingGameVersions();
 
             await foreach (var gv in ctx.Set<Models.GameVersionInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -146,7 +146,7 @@ public partial class FileProcessor(
 
         if (Signals.Count == 0)
         {
-            Logger.LogLoadingSignals();
+            _logger.LogLoadingSignals();
             await foreach (var s in ctx.Set<Models.SignalInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 Signals[(s.SignalName, s.SignalType, s.IsStation)] = s;
@@ -156,7 +156,7 @@ public partial class FileProcessor(
 
         if (SchemaEvents.Count == 0)
         {
-            Logger.LogLoadingSchemaEvents();
+            _logger.LogLoadingSchemaEvents();
             await foreach (var s in ctx.Set<Models.SchemaEventInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 SchemaEvents[(s.Schema, s.EventType)] = s;
@@ -165,7 +165,7 @@ public partial class FileProcessor(
 
         if (BodySignals.Count == 0)
         {
-            Logger.LogLoadingBodySignals();
+            _logger.LogLoadingBodySignals();
 
             await foreach (var s in ctx.Set<Models.BodySignalInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -175,7 +175,7 @@ public partial class FileProcessor(
 
         if (Stations.Count == 0)
         {
-            Logger.LogLoadingStations();
+            _logger.LogLoadingStations();
 
             await foreach (var s in ctx.Set<Models.StationInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -190,7 +190,7 @@ public partial class FileProcessor(
 
         if (SignalInfoSetCounts.Count == 0)
         {
-            Logger.LogLoadingSignalCounts();
+            _logger.LogLoadingSignalCounts();
 
             await foreach (var s in ctx.Set<Models.SignalInfoSet>().Select(e => new { e.Id, e.SignalCount }).AsAsyncEnumerable().WithCancellation(canceltoken))
             {
@@ -198,7 +198,7 @@ public partial class FileProcessor(
             }
         }
 
-        InitComplete = true;
+        _initComplete = true;
     }
 
     protected async Task<Models.SoftwareInfo> GetOrAddSoftwareAsync(
@@ -212,7 +212,7 @@ public partial class FileProcessor(
             return software;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
         software = new Models.SoftwareInfo
         {
             SoftwareName = softwareName,
@@ -240,7 +240,7 @@ public partial class FileProcessor(
             return version;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
         version = new Models.GameVersionInfo
         {
             GameBuild = gamebuild,
@@ -296,7 +296,7 @@ public partial class FileProcessor(
             return stn;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await _contextFactory.CreateDbContextAsync();
 
         var station = new Models.StationInfo
         {
@@ -322,7 +322,7 @@ public partial class FileProcessor(
             return signal;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await _contextFactory.CreateDbContextAsync();
         signal = new Models.SignalInfo
         {
             SignalName = name,
@@ -345,7 +345,7 @@ public partial class FileProcessor(
             return schemaEvent;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
         schemaEvent = new Models.SchemaEventInfo
         {
             Schema = schema,
@@ -365,7 +365,7 @@ public partial class FileProcessor(
         )
     {
         var signalIds = signals.Select(e => e.Id).Order().ToList();
-        var signalIdsJson =
+        string signalIdsJson =
             JsonConvert.SerializeObject(
                 signalIds
                     .GroupBy(e => e)
@@ -377,11 +377,11 @@ public partial class FileProcessor(
             return signalSet;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await _contextFactory.CreateDbContextAsync();
 
-        var firstSigId = signalIds[0];
-        var lastSigId = signalIds[^1];
-        var signalCount = signalIds.Count;
+        int firstSigId = signalIds[0];
+        int lastSigId = signalIds[^1];
+        int signalCount = signalIds.Count;
 
         signalSet =
             ctx.Set<Models.SignalInfoSet>()
@@ -438,7 +438,7 @@ public partial class FileProcessor(
             return signal;
         }
 
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await _contextFactory.CreateDbContextAsync();
         signal = new Models.BodySignalInfo
         {
             SignalType = type,
@@ -456,7 +456,7 @@ public partial class FileProcessor(
 
     public async Task ProcessDirectoriesAsync(IEnumerable<string> dirnames, CancellationToken canceltoken)
     {
-        foreach (var filename in dirnames
+        foreach (string? filename in dirnames
                                     .SelectMany<string, string>(f => [
                                         .. _fileSystem.Directory.EnumerateFiles(f, "*.jsonl.bz2", SearchOption.AllDirectories),
                                         .. _fileSystem.Directory.EnumerateFiles(f, "*.jsonl", SearchOption.AllDirectories)
@@ -471,12 +471,12 @@ public partial class FileProcessor(
             await ProcessFileAsync(filename, canceltoken);
         }
 
-        Logger.LogProcessingComplete();
+        _logger.LogProcessingComplete();
     }
 
     protected async Task FillCacheForFileAsync(int fileid, CancellationToken canceltoken = default)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         await foreach (var line in ctx.Set<Models.FileLineInfo>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
@@ -512,7 +512,7 @@ public partial class FileProcessor(
         {
             SignalInfoCache[(line.FileId, line.LineNo)] = line;
 
-            if (SignalInfoSetCounts.TryGetValue(line.SignalSetId, out var count))
+            if (SignalInfoSetCounts.TryGetValue(line.SignalSetId, out int count))
             {
                 SignalInfoCounts[(line.FileId, line.LineNo)] = count;
             }
@@ -531,7 +531,7 @@ public partial class FileProcessor(
 
     protected async Task WriteIndexedFileAsync(string filepath, string indexFilename, int? lineCount, bool force, CancellationToken canceltoken)
     {
-        Logger.LogWritingIndexedFile(indexFilename);
+        _logger.LogWritingIndexedFile(indexFilename);
 
         if (_fileSystem.File.Exists(indexFilename)
             && _fileSystem.File.Exists(indexFilename + ".index")
@@ -544,7 +544,7 @@ public partial class FileProcessor(
         {
             using var indexStream = _fileSystem.File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
             indexStream.Seek(indexStream.Length - 16, SeekOrigin.Begin);
-            var ixlineno = (indexStream.Position / 8) * 1024;
+            long ixlineno = long.CreateTruncating(indexStream.Position / 8) * 1024;
             long startPos = 0;
             long endPos = 0;
             Span<byte> ixStartEndData = stackalloc byte[16];
@@ -557,7 +557,7 @@ public partial class FileProcessor(
                 using var ixbzStream = _fileSystem.File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using (var ixmemStream = new MemoryStream())
                 {
-                    var buf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
+                    byte[] buf = ArrayPool<byte>.Shared.Rent((int)(endPos - startPos));
                     ixbzStream.Seek(startPos, SeekOrigin.Begin);
                     ixbzStream.ReadExactly(buf.AsSpan(0, (int)(endPos - startPos)));
                     ixmemStream.Write(buf.AsSpan(0, (int)(endPos - startPos)));
@@ -669,14 +669,14 @@ public partial class FileProcessor(
         }
 
         var fileinfo = _fileSystem.FileInfo.New(filepath);
-        var filelen = fileinfo.Length;
+        long filelen = fileinfo.Length;
 
         await ProcessFileAsync(filepath, filelen, canceltoken);
     }
 
     protected async Task<Models.FileInfo> GetOrAddFileAsync(string filepath, CancellationToken canceltoken)
     {
-        var filename = _fileSystem.Path.GetFileName(filepath);
+        string filename = _fileSystem.Path.GetFileName(filepath);
 
         if (!filename.EndsWith(".bz2"))
         {
@@ -687,12 +687,12 @@ public partial class FileProcessor(
 
         if (_fileSystem.Path.GetDirectoryName(filepath) is string filedir && _fileSystem.Path.GetFileName(filedir) is string lastdir)
         {
-            if (lastdir == "beta" || lastdir == "beta-data")
+            if (lastdir is "beta" or "beta-data")
             {
                 filename = "beta/" + filename;
                 test = true;
             }
-            else if (lastdir == "dev" || lastdir == "dev-data")
+            else if (lastdir is "dev" or "dev-data")
             {
                 filename = "dev/" + filename;
                 test = true;
@@ -706,20 +706,18 @@ public partial class FileProcessor(
                 || daystr.Length != 2
                 || monthstr.Length != 2
                 || yearstr.Length != 4
-                || !int.TryParse(daystr, out var day)
-                || day < 1
-                || day > 31
-                || !int.TryParse(monthstr, out var month)
-                || month < 1
-                || month > 12
-                || !int.TryParse(yearstr, out var year)
+                || !int.TryParse(daystr, out int day)
+                || day is < 1 or > 31
+                || !int.TryParse(monthstr, out int month)
+                || month is < 1 or > 12
+                || !int.TryParse(yearstr, out int year)
                 || year < 2014)
             {
                 throw new ArgumentException("Bad filename", nameof(filepath));
             }
 
             var date = new DateOnly(year, month, day);
-            var prefix = string.Join('-', parts);
+            string prefix = string.Join('-', parts);
             prefix = prefix.Split('/')[^1];
             string? eventType = null;
 
@@ -741,7 +739,7 @@ public partial class FileProcessor(
 
             try
             {
-                await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+                await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
                 file = new Models.FileInfo
                 {
@@ -758,7 +756,7 @@ public partial class FileProcessor(
             }
             catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
             {
-                using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+                using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
                 file = ctx.Set<Models.FileInfo>().First(e => e.FileName == filename);
             }
 
@@ -781,7 +779,7 @@ public partial class FileProcessor(
             && file.UncompressedSize != null
             && file.LineCount != null
             && file.ErrorCount == errors.Count
-            && file.ProcessedVersion == Version
+            && file.ProcessedVersion == _version
             && Settings.Reprocess != true)
         {
             return;
@@ -800,15 +798,15 @@ public partial class FileProcessor(
             );
         }
 
-        Logger.LogProcessingFile(context.File.FileName);
-        Logger.LogProcessingFileState(
+        _logger.LogProcessingFile(context.File.FileName);
+        _logger.LogProcessingFileState(
             context.File.CompressedSize,
             context.File.UncompressedSize,
             context.File.LineCount,
             context.File.ErrorCount,
             context.File.ProcessedVersion,
             context.FileLength,
-            Version
+            _version
         );
 
         await FillCacheForFileAsync(context.File.Id, canceltoken);
@@ -855,7 +853,7 @@ public partial class FileProcessor(
             fileSchemaEvent = await GetOrAddSchemaEventAsync(context.File.PrimarySchema, context.File.EventType, canceltoken);
         }
 
-        await using (var ctx = await ContextFactory.CreateDbContextAsync(canceltoken))
+        await using (var ctx = await _contextFactory.CreateDbContextAsync(canceltoken))
         {
             var fileEntry = ctx.Attach(context.File);
             fileEntry.Property(e => e.LineCount).CurrentValue = context.LineCount;
@@ -868,7 +866,7 @@ public partial class FileProcessor(
             fileEntry.Property(e => e.SignalCount).CurrentValue = context.SignalCount;
             fileEntry.Property(e => e.BodySignalCount).CurrentValue = context.BodySignalCount;
             fileEntry.Property(e => e.ErrorCount).CurrentValue = context.ErrorCount;
-            fileEntry.Property(e => e.ProcessedVersion).CurrentValue = Version;
+            fileEntry.Property(e => e.ProcessedVersion).CurrentValue = _version;
             fileEntry.Property(e => e.PrimarySchemaEventId).CurrentValue = fileSchemaEvent?.Id;
 
             await ctx.SaveChangesAsync(canceltoken);
@@ -905,7 +903,7 @@ public partial class FileProcessor(
         BodySignalInfoCounts.Clear();
     }
 
-    protected async Task FillFileLineDataEntries(FileLineData data, CancellationToken canceltoken)
+    protected async Task FillFileLineDataEntriesAsync(FileLineData data, CancellationToken canceltoken)
     {
         data.Software = await GetOrAddSoftwareAsync(data.SoftwareName ?? "", data.SoftwareVersion ?? "", canceltoken);
         data.GameVersionInfo = await GetOrAddGameVersionAsync(data.GameBuild, data.GameVersion, data.IsOdyssey, data.IsHorizons, canceltoken);
@@ -1000,7 +998,7 @@ public partial class FileProcessor(
         )
     {
         if (LineInfoCache.TryGetValue((context.File.Id, context.LineCount), out var lineInfo)
-            && lineInfo.ProcessedVersion == Version
+            && lineInfo.ProcessedVersion == _version
             && lineInfo.SchemaEventId != null
             && lineInfo.HasStation is bool hasStation
             && lineInfo.HasBody is bool hasBody
@@ -1027,7 +1025,7 @@ public partial class FileProcessor(
 
         data.Clear(context.File, context.LineCount, int.CreateSaturating(line.Length));
 
-        if (line.Length < 2 || line.Length >= MaxLength)
+        if (line.Length < 2 || line.Length >= _maxLength)
         {
             data.IsBad = true;
             data.Errors.Add(line.Length < 2 ? $"Line too short ({line.Length}c)" : $"Line too long ({line.Length}c)");
@@ -1039,7 +1037,7 @@ public partial class FileProcessor(
             {
                 if (!TryProcessLine(line, data))
                 {
-                    Logger.LogIncompleteMessage(context.FilePath, context.LineCount);
+                    _logger.LogIncompleteMessage(context.FilePath, context.LineCount);
 
                     if (Settings.BreakOnBadData != false && Debugger.IsAttached)
                     {
@@ -1059,9 +1057,9 @@ public partial class FileProcessor(
                 {
                     context.ErrorCount++;
 
-                    foreach (var error in data.Errors)
+                    foreach (string error in data.Errors)
                     {
-                        Logger.LogBadData(null, context.FilePath, context.LineCount, error);
+                        _logger.LogBadData(null, context.FilePath, context.LineCount, error);
                     }
 
                     if (Settings.BreakOnBadData != false && Debugger.IsAttached)
@@ -1075,7 +1073,7 @@ public partial class FileProcessor(
                     }
                 }
 
-                await FillFileLineDataEntries(data, canceltoken);
+                await FillFileLineDataEntriesAsync(data, canceltoken);
             }
             catch (System.Text.Json.JsonException ex)
             {
@@ -1102,7 +1100,7 @@ public partial class FileProcessor(
                 && data.NavRouteSystems.Count == 0
                 && data.EventType != "NavRoute")
             {
-                Logger.LogNoDataAvailable(context.FilePath, context.LineCount);
+                _logger.LogNoDataAvailable(context.FilePath, context.LineCount);
                 data.IsBad = true;
                 data.Errors.Add("No data available");
 
@@ -1140,7 +1138,7 @@ public partial class FileProcessor(
             LineLength = data.LineLength,
             GatewayTimestamp = data.GatewayTimestamp,
             Timestamp = data.Timestamp,
-            ProcessedVersion = Version,
+            ProcessedVersion = _version,
             GameVersion = data.GameVersionInfo,
             Software = data.Software,
             System = data.System,
@@ -1205,8 +1203,8 @@ public partial class FileProcessor(
                 LineNo = data.LineNo,
                 GatewayTimestamp = data.GatewayTimestamp,
                 Station = data.Station,
-                LatitudeError = data.Latitude == data.Station.Latitude ? null : (short)Math.Round((data.Latitude - data.Station.Latitude) * 1000000 ?? 0),
-                LongitudeError = data.Longitude == data.Station.Longitude ? null : (short)Math.Round((data.Longitude - data.Station.Longitude) * 1000000 ?? 0)
+                LatitudeError = data.Latitude == data.Station.Latitude ? null : (short)Math.Round(((data.Latitude - data.Station.Latitude) * 1000000) ?? 0),
+                LongitudeError = data.Longitude == data.Station.Longitude ? null : (short)Math.Round(((data.Longitude - data.Station.Longitude) * 1000000) ?? 0)
             };
         }
 
@@ -1254,7 +1252,7 @@ public partial class FileProcessor(
 
     private void HandleBadData(string filepath, int lineCount, Exception ex)
     {
-        Logger.LogBadData(ex, filepath, lineCount, ex.Message);
+        _logger.LogBadData(ex, filepath, lineCount, ex.Message);
 
         if (Settings.BreakOnBadData != false && Debugger.IsAttached)
         {
@@ -1292,7 +1290,7 @@ public partial class FileProcessor(
 
     protected async Task SaveUpdatesAsync(FileProcessingContext context, CancellationToken canceltoken)
     {
-        await using (var ctx = await ContextFactory.CreateDbContextAsync(canceltoken))
+        await using (var ctx = await _contextFactory.CreateDbContextAsync(canceltoken))
         {
             ctx.AddRange(SystemCache.Values.Where(e => e.Id <= 0));
             await ctx.SaveChangesAsync(canceltoken);
@@ -1332,7 +1330,7 @@ public partial class FileProcessor(
 
     private async Task SaveBodiesAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var set in BodyCache.Values)
         {
@@ -1364,7 +1362,7 @@ public partial class FileProcessor(
 
     private async Task SaveSignalsAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var ent in SignalInfoSetCache.Values)
         {
@@ -1401,9 +1399,76 @@ public partial class FileProcessor(
         await ctx.SaveChangesAsync(canceltoken);
     }
 
+    private void AddOrUpdateLine(
+            Models.EDDNContext ctx,
+            Models.FileLineInfo ent,
+            Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> softwareUpdates,
+            Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> gameVersionUpdates,
+            Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> systemUpdates,
+            Dictionary<int, (Models.SchemaEventInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> schemaEventUpdates,
+            Dictionary<int, (Models.Sector Sector, DateTime? FirstSeen, DateTime? LastSeen)> sectorUpdates
+        )
+    {
+        Assert(ent.Software?.Id != 0);
+        Assert(ent.GameVersion?.Id != 0);
+        Assert(ent.System?.Id != 0);
+        Assert(ent.SchemaEvent?.Id != 0);
+
+        var software = ent.Software;
+        var gameVersion = ent.GameVersion;
+        var system = ent.System;
+        var gatewayTimestamp = ent.GatewayTimestamp;
+        var schemaEvent = ent.SchemaEvent;
+        var sector = ent.System?.SectorId is int sectorId
+                   ? SectorsById.GetValueOrDefault(sectorId)
+                   : ent.System?.SectorAddress is int sectorAddr
+                   ? SectorsByAddr.GetValueOrDefault(sectorAddr)
+                   : null;
+
+        ent = ent with
+        {
+            SoftwareId = software?.Id,
+            GameVersionId = gameVersion?.Id,
+            SystemId = system?.Id,
+            SchemaEventId = schemaEvent?.Id,
+            GameVersion = null,
+            Software = null,
+            System = null,
+            SchemaEvent = null
+        };
+
+        AddOrUpdateInfo(softwareUpdates, software, gatewayTimestamp);
+        AddOrUpdateInfo(gameVersionUpdates, gameVersion, gatewayTimestamp);
+        AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
+        AddOrUpdateInfo(schemaEventUpdates, schemaEvent, gatewayTimestamp);
+        AddOrUpdateInfo(sectorUpdates, sector, gatewayTimestamp);
+
+        if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+        {
+            var entry = ctx.Attach(lineInfo);
+            entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+            entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
+            entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
+            entry.Property(e => e.SchemaEventId).CurrentValue = ent.SchemaEventId;
+            entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
+            entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+            entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
+            entry.Property(e => e.HasBody).CurrentValue = ent.HasBody;
+            entry.Property(e => e.HasStation).CurrentValue = ent.HasStation;
+            entry.Property(e => e.SignalCount).CurrentValue = ent.SignalCount;
+            entry.Property(e => e.BodySignalCount).CurrentValue = ent.BodySignalCount;
+            entry.Property(e => e.NavRouteSystemCount).CurrentValue = ent.NavRouteSystemCount;
+        }
+        else
+        {
+            ctx.Add(ent);
+            LineInfoCache[(ent.FileId, ent.LineNo)] = ent;
+        }
+    }
+
     private async Task SaveLinesAsync(Dictionary<int, Models.FileLineInfo> newLines, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var softwareUpdates = new Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
         var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
@@ -1411,63 +1476,9 @@ public partial class FileProcessor(
         var schemaEventUpdates = new Dictionary<int, (Models.SchemaEventInfo, DateTime? FirstSeen, DateTime? LastSeen)>();
         var sectorUpdates = new Dictionary<int, (Models.Sector Sector, DateTime? FirstSeen, DateTime? LastSeen)>();
 
-        foreach (var _ent in newLines.Values)
+        foreach (var ent in newLines.Values)
         {
-            Assert(_ent.Software?.Id != 0);
-            Assert(_ent.GameVersion?.Id != 0);
-            Assert(_ent.System?.Id != 0);
-            Assert(_ent.SchemaEvent?.Id != 0);
-
-            var software = _ent.Software;
-            var gameVersion = _ent.GameVersion;
-            var system = _ent.System;
-            var gatewayTimestamp = _ent.GatewayTimestamp;
-            var schemaEvent = _ent.SchemaEvent;
-            var sector = _ent.System?.SectorId is int sectorId
-                       ? SectorsById.GetValueOrDefault(sectorId)
-                       : _ent.System?.SectorAddress is int sectorAddr
-                       ? SectorsByAddr.GetValueOrDefault(sectorAddr)
-                       : null;
-
-            var ent = _ent with
-            {
-                SoftwareId = software?.Id,
-                GameVersionId = gameVersion?.Id,
-                SystemId = system?.Id,
-                SchemaEventId = schemaEvent?.Id,
-                GameVersion = null,
-                Software = null,
-                System = null,
-                SchemaEvent = null
-            };
-
-            AddOrUpdateInfo(softwareUpdates, software, gatewayTimestamp);
-            AddOrUpdateInfo(gameVersionUpdates, gameVersion, gatewayTimestamp);
-            AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
-            AddOrUpdateInfo(schemaEventUpdates, schemaEvent, gatewayTimestamp);
-            AddOrUpdateInfo(sectorUpdates, sector, gatewayTimestamp);
-
-            if (LineInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-            {
-                var entry = ctx.Attach(lineInfo);
-                entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                entry.Property(e => e.GameVersionId).CurrentValue = ent.GameVersionId;
-                entry.Property(e => e.SoftwareId).CurrentValue = ent.SoftwareId;
-                entry.Property(e => e.SchemaEventId).CurrentValue = ent.SchemaEventId;
-                entry.Property(e => e.ProcessedVersion).CurrentValue = ent.ProcessedVersion;
-                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                entry.Property(e => e.Timestamp).CurrentValue = ent.Timestamp;
-                entry.Property(e => e.HasBody).CurrentValue = ent.HasBody;
-                entry.Property(e => e.HasStation).CurrentValue = ent.HasStation;
-                entry.Property(e => e.SignalCount).CurrentValue = ent.SignalCount;
-                entry.Property(e => e.BodySignalCount).CurrentValue = ent.BodySignalCount;
-                entry.Property(e => e.NavRouteSystemCount).CurrentValue = ent.NavRouteSystemCount;
-            }
-            else
-            {
-                ctx.Add(ent);
-                LineInfoCache[(ent.FileId, ent.LineNo)] = ent;
-            }
+            AddOrUpdateLine(ctx, ent, softwareUpdates, gameVersionUpdates, systemUpdates, schemaEventUpdates, sectorUpdates);
         }
 
         foreach (var (info, firstSeen, lastSeen) in gameVersionUpdates.Values)
@@ -1503,7 +1514,7 @@ public partial class FileProcessor(
 
     private async Task SaveErrorsAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineDataError> newDataErrors, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var ent in newDataErrors.Values)
         {
@@ -1531,39 +1542,48 @@ public partial class FileProcessor(
         await ctx.SaveChangesAsync(canceltoken);
     }
 
+    private void AddOrUpdateBodyLine(
+            Models.EDDNContext ctx,
+            Models.FileLineBody ent,
+            Dictionary<long, (Models.BodyInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> bodyUpdates
+        )
+    {
+        Assert(ent.Body != null);
+        Assert(ent.Body.Id != 0);
+
+        var body = ent.Body;
+        var gatewayTimestamp = ent.GatewayTimestamp;
+
+        ent = ent with
+        {
+            BodyId = ent.Body.Id,
+            Body = null
+        };
+
+        AddOrUpdateInfo(bodyUpdates, body, gatewayTimestamp);
+
+        if (BodyInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+        {
+            var entry = ctx.Attach(lineInfo);
+            entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
+            entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+        }
+        else
+        {
+            ctx.Add(ent);
+            BodyInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+        }
+    }
+
     private async Task SaveBodyLinesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBody> newBodyLines, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var bodyUpdates = new Dictionary<long, (Models.BodyInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
-        foreach (var _ent in newBodyLines.Values)
+        foreach (var ent in newBodyLines.Values)
         {
-            Assert(_ent.Body != null);
-            Assert(_ent.Body.Id != 0);
-
-            var body = _ent.Body;
-            var gatewayTimestamp = _ent.GatewayTimestamp;
-
-            var ent = _ent with
-            {
-                BodyId = _ent.Body.Id,
-                Body = null
-            };
-
-            AddOrUpdateInfo(bodyUpdates, body, gatewayTimestamp);
-
-            if (BodyInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-            {
-                var entry = ctx.Attach(lineInfo);
-                entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
-                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-            }
-            else
-            {
-                ctx.Add(ent);
-                BodyInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-            }
+            AddOrUpdateBodyLine(ctx, ent, bodyUpdates);
         }
 
         foreach (var (info, firstSeen, lastSeen) in bodyUpdates.Values)
@@ -1576,39 +1596,48 @@ public partial class FileProcessor(
         await ctx.SaveChangesAsync(canceltoken);
     }
 
+    private void AddOrUpdateStationLine(
+            Models.EDDNContext ctx,
+            Models.FileLineStation ent,
+            Dictionary<int, (Models.StationInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> stationUpdates
+        )
+    {
+        Assert(ent.Station != null);
+        Assert(ent.Station.Id != 0);
+
+        var station = ent.Station;
+        var gatewayTimestamp = ent.GatewayTimestamp;
+
+        ent = ent with
+        {
+            StationId = ent.Station.Id,
+            Station = null
+        };
+
+        AddOrUpdateInfo(stationUpdates, station, gatewayTimestamp);
+
+        if (StationInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+        {
+            var entry = ctx.Attach(lineInfo);
+            entry.Property(e => e.StationId).CurrentValue = ent.StationId;
+            entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+        }
+        else
+        {
+            ctx.Add(ent);
+            StationInfoCache[(ent.FileId, ent.LineNo)] = ent;
+        }
+    }
+
     private async Task SaveStationLinesAsync(Dictionary<int, Models.FileLineStation> newStationLines, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var stationUpdates = new Dictionary<int, (Models.StationInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
-        foreach (var _ent in newStationLines.Values)
+        foreach (var ent in newStationLines.Values)
         {
-            Assert(_ent.Station != null);
-            Assert(_ent.Station.Id != 0);
-
-            var station = _ent.Station;
-            var gatewayTimestamp = _ent.GatewayTimestamp;
-
-            var ent = _ent with
-            {
-                StationId = _ent.Station.Id,
-                Station = null
-            };
-
-            AddOrUpdateInfo(stationUpdates, station, gatewayTimestamp);
-
-            if (StationInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-            {
-                var entry = ctx.Attach(lineInfo);
-                entry.Property(e => e.StationId).CurrentValue = ent.StationId;
-                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-            }
-            else
-            {
-                ctx.Add(ent);
-                StationInfoCache[(ent.FileId, ent.LineNo)] = ent;
-            }
+            AddOrUpdateStationLine(ctx, ent, stationUpdates);
         }
 
         foreach (var (info, firstSeen, lastSeen) in stationUpdates.Values)
@@ -1621,39 +1650,48 @@ public partial class FileProcessor(
         await ctx.SaveChangesAsync(canceltoken);
     }
 
+    private void AddOrUpdateNavRouteEntry(
+            Models.EDDNContext ctx,
+            Models.FileLineNavRoute ent,
+            Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> systemUpdates
+        )
+    {
+        Assert(ent.System != null);
+        Assert(ent.System.Id != 0);
+
+        var system = ent.System;
+        var gatewayTimestamp = ent.GatewayTimestamp;
+
+        ent = ent with
+        {
+            SystemId = ent.System.Id,
+            System = null
+        };
+
+        AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
+
+        if (NavRouteCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+        {
+            var entry = ctx.Attach(lineInfo);
+            entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+            entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+        }
+        else
+        {
+            ctx.Add(ent);
+            NavRouteCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+        }
+    }
+
     private async Task SaveNavRouteEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> newNavRouteEntries, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
-        foreach (var _ent in newNavRouteEntries.Values)
+        foreach (var ent in newNavRouteEntries.Values)
         {
-            Assert(_ent.System != null);
-            Assert(_ent.System.Id != 0);
-
-            var system = _ent.System;
-            var gatewayTimestamp = _ent.GatewayTimestamp;
-
-            var ent = _ent with
-            {
-                SystemId = _ent.System.Id,
-                System = null
-            };
-
-            AddOrUpdateInfo(systemUpdates, system, gatewayTimestamp);
-
-            if (NavRouteCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-            {
-                var entry = ctx.Attach(lineInfo);
-                entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-            }
-            else
-            {
-                ctx.Add(ent);
-                NavRouteCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-            }
+            AddOrUpdateNavRouteEntry(ctx, ent, systemUpdates);
         }
 
         foreach (var (info, firstSeen, lastSeen) in systemUpdates.Values)
@@ -1666,51 +1704,61 @@ public partial class FileProcessor(
         await ctx.SaveChangesAsync(canceltoken);
     }
 
+    private void AddOrUpdateSignalEntry(
+            Models.EDDNContext ctx,
+            Models.FileLineSignal ent,
+            Dictionary<int, (Models.SignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> signalUpdates,
+            Dictionary<int, (Models.SignalInfoSetItem Info, DateTime? FirstSeen, DateTime? LastSeen)> signalItemUpdates
+        )
+    {
+        Assert(ent.SignalInfoSet != null);
+        Assert(ent.SignalInfoSet.Id != 0);
+
+        var siginfoset = ent.SignalInfoSet;
+        var gatewayTimestamp = ent.GatewayTimestamp;
+
+        ent = ent with
+        {
+            SignalSetId = ent.SignalInfoSet.Id,
+            SystemId = ent.System?.Id,
+            System = null,
+            SignalInfoSet = null
+        };
+
+        foreach (var signalItem in siginfoset.SignalSetItems)
+        {
+            AddOrUpdateInfo(signalItemUpdates, signalItem, gatewayTimestamp);
+
+            if (SignalsById.TryGetValue(signalItem.SignalInfoId, out var signal))
+            {
+                AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
+            }
+        }
+
+        if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
+        {
+            var entry = ctx.Attach(lineInfo);
+            entry.Property(e => e.SignalSetId).CurrentValue = ent.SignalSetId;
+            entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
+            entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+        }
+        else
+        {
+            ctx.Add(ent);
+            SignalInfoCache[(ent.FileId, ent.LineNo)] = ent;
+        }
+    }
+
     private async Task SaveSignalEntriesAsync(Dictionary<int, Models.FileLineSignal> newSignalEntries, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var signalUpdates = new Dictionary<int, (Models.SignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
         var signalItemUpdates = new Dictionary<int, (Models.SignalInfoSetItem Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
-        foreach (var _ent in newSignalEntries.Values)
+        foreach (var ent in newSignalEntries.Values)
         {
-            Assert(_ent.SignalInfoSet != null);
-            Assert(_ent.SignalInfoSet.Id != 0);
-
-            var siginfoset = _ent.SignalInfoSet;
-            var gatewayTimestamp = _ent.GatewayTimestamp;
-
-            var ent = _ent with
-            {
-                SignalSetId = _ent.SignalInfoSet.Id,
-                SystemId = _ent.System?.Id,
-                System = null,
-                SignalInfoSet = null
-            };
-
-            foreach (var signalItem in siginfoset.SignalSetItems)
-            {
-                AddOrUpdateInfo(signalItemUpdates, signalItem, gatewayTimestamp);
-
-                if (SignalsById.TryGetValue(signalItem.SignalInfoId, out var signal))
-                {
-                    AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
-                }
-            }
-
-            if (SignalInfoCache.TryGetValue((ent.FileId, ent.LineNo), out var lineInfo))
-            {
-                var entry = ctx.Attach(lineInfo);
-                entry.Property(e => e.SignalSetId).CurrentValue = ent.SignalSetId;
-                entry.Property(e => e.SystemId).CurrentValue = ent.SystemId;
-                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-            }
-            else
-            {
-                ctx.Add(ent);
-                SignalInfoCache[(ent.FileId, ent.LineNo)] = ent;
-            }
+            AddOrUpdateSignalEntry(ctx, ent, signalUpdates, signalItemUpdates);
         }
 
         foreach (var (info, firstSeen, lastSeen) in signalUpdates.Values)
@@ -1720,47 +1768,63 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
+        foreach (var (info, firstSeen, lastSeen) in signalItemUpdates.Values)
+        {
+            var entry = ctx.Attach(info);
+            entry.Property(e => e.FirstSeen).CurrentValue = firstSeen;
+            entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
+        }
+
         await ctx.SaveChangesAsync(canceltoken);
+    }
+
+    private void AddOrUpdateBodySignalEntry(
+            Models.EDDNContext ctx,
+            Models.FileLineBodySignal ent,
+            Dictionary<int, (Models.BodySignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)> signalUpdates
+        )
+    {
+        Assert(ent.Signal != null);
+        Assert(ent.Signal.Id != 0);
+
+        var signal = ent.Signal;
+        var gatewayTimestamp = ent.GatewayTimestamp;
+
+        ent = ent with
+        {
+            BodySignalId = ent.Signal.Id,
+            BodyId = ent.Body?.Id,
+            Signal = null,
+            Body = null
+        };
+
+        AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
+
+        if (BodySignalInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
+        {
+            var entry = ctx.Attach(lineInfo);
+            entry.Property(e => e.BodySignalId).CurrentValue = ent.BodySignalId;
+            entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
+            entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
+            entry.Property(e => e.Latitude).CurrentValue = ent.Latitude;
+            entry.Property(e => e.Longitude).CurrentValue = ent.Longitude;
+        }
+        else
+        {
+            ctx.Add(ent);
+            BodySignalInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
+        }
     }
 
     private async Task SaveBodySignalEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> newBodySignalEntries, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
+        await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
         var signalUpdates = new Dictionary<int, (Models.BodySignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
-        foreach (var _ent in newBodySignalEntries.Values)
+        foreach (var ent in newBodySignalEntries.Values)
         {
-            Assert(_ent.Signal != null);
-            Assert(_ent.Signal.Id != 0);
-
-            var signal = _ent.Signal;
-            var gatewayTimestamp = _ent.GatewayTimestamp;
-
-            var ent = _ent with
-            {
-                BodySignalId = _ent.Signal.Id,
-                BodyId = _ent.Body?.Id,
-                Signal = null,
-                Body = null
-            };
-
-            AddOrUpdateInfo(signalUpdates, signal, gatewayTimestamp);
-
-            if (BodySignalInfoCache.TryGetValue((ent.FileId, ent.LineNo, ent.EntryNum), out var lineInfo))
-            {
-                var entry = ctx.Attach(lineInfo);
-                entry.Property(e => e.BodySignalId).CurrentValue = ent.BodySignalId;
-                entry.Property(e => e.BodyId).CurrentValue = ent.BodyId;
-                entry.Property(e => e.GatewayTimestamp).CurrentValue = ent.GatewayTimestamp;
-                entry.Property(e => e.Latitude).CurrentValue = ent.Latitude;
-                entry.Property(e => e.Longitude).CurrentValue = ent.Longitude;
-            }
-            else
-            {
-                ctx.Add(ent);
-                BodySignalInfoCache[(ent.FileId, ent.LineNo, ent.EntryNum)] = ent;
-            }
+            AddOrUpdateBodySignalEntry(ctx, ent, signalUpdates);
         }
 
         foreach (var (info, firstSeen, lastSeen) in signalUpdates.Values)

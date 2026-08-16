@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
 {
@@ -23,13 +23,13 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
 
     public int? SectorAddress
     {
-        get => EDDNContext.UseComputedFields ? (SystemNameId >= 0 && SystemNameId < (1L << 60) ? (int)(SystemNameId >> 40) : null) : field;
+        get => EDDNContext.UseComputedFields ? (SystemNameId is >= 0 and < (1L << 60) ? (int)(SystemNameId >> 40) : null) : field;
         private set;
     }
 
     public string? PGSuffix
     {
-        get => EDDNContext.UseComputedFields ? (SystemHelpers.GetPGSuffix(SystemNameId)) : field;
+        get => EDDNContext.UseComputedFields ? SystemHelpers.GetPGSuffix(SystemNameId) : field;
         private set;
     }
 
@@ -47,19 +47,19 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
 
     public long? SystemAddress
     {
-        get => EDDNContext.UseComputedFields ? (SystemHelpers.ModSystemAddressToSystemAddress(ModSystemAddress)) : field;
+        get => EDDNContext.UseComputedFields ? SystemHelpers.ModSystemAddressToSystemAddress(ModSystemAddress) : field;
         private set;
     }
 
     public string? SysAddr_PGSuffix
     {
-        get => EDDNContext.UseComputedFields ? (SystemHelpers.GetPGSuffix(ModSystemAddress)) : field;
+        get => EDDNContext.UseComputedFields ? SystemHelpers.GetPGSuffix(ModSystemAddress) : field;
         private set;
     }
 
     public string? NameSysAddr_PGSuffix
     {
-        get => EDDNContext.UseComputedFields ? (SystemHelpers.GetPGSuffix(NameModSystemAddress)) : field;
+        get => EDDNContext.UseComputedFields ? SystemHelpers.GetPGSuffix(NameModSystemAddress) : field;
         private set;
     }
 
@@ -80,15 +80,13 @@ public record class SystemInfo : IHasFirstLastSeen, IHasId<int>
         if (other is null) return false;
         if (ReferenceEquals(other, this)) return true;
 
-        return this.SystemNameId == other.SystemNameId
-            && this.ModSystemAddress == other.ModSystemAddress
-            && this.X == other.X
-            && this.Y == other.Y
-            && this.Z == other.Z;
+        return SystemNameId == other.SystemNameId
+            && ModSystemAddress == other.ModSystemAddress
+            && X == other.X
+            && Y == other.Y
+            && Z == other.Z;
     }
 
     public override int GetHashCode()
-    {
-        return HashCode.Combine(SystemNameId, ModSystemAddress, X, Y, Z);
-    }
+        => HashCode.Combine(SystemNameId, ModSystemAddress, X, Y, Z);
 }

@@ -1,4 +1,4 @@
-﻿namespace EddnIndex.Common.Models;
+namespace EddnIndex.Common.Models;
 
 public record class Sector : IHasId<int>, IHasFirstLastSeen
 {
@@ -18,7 +18,7 @@ public record class Sector : IHasId<int>, IHasFirstLastSeen
     public DateTime? FirstSeen { get; set; }
     public DateTime? LastSeen { get; set; }
 
-    public virtual bool Equals(Sector? other) => other?.Name == this.Name;
+    public virtual bool Equals(Sector? other) => other?.Name == Name;
 
     public override int GetHashCode() => Name.GetHashCode();
 }
