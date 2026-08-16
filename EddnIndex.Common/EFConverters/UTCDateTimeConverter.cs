@@ -33,7 +33,7 @@ public class UTCDateTimeConverter(int precision)
             return null;
         }
 
-        long tick = long.CreateTruncating(value.Ticks / mult) * mult;
+        long tick = value.Ticks - (value.Ticks % mult);
         return new DateTime(tick, DateTimeKind.Unspecified);
     }
 

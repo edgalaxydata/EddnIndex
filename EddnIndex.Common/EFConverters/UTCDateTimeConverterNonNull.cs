@@ -28,7 +28,7 @@ public class UTCDateTimeConverterNonNull(int precision)
 
     private static DateTime TruncateDateTime(DateTime value, int mult)
     {
-        long tick = long.CreateTruncating(value.Ticks / mult) * mult;
+        long tick = value.Ticks - (value.Ticks % mult);
         return new DateTime(tick, DateTimeKind.Unspecified);
     }
 

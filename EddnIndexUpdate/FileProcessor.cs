@@ -544,7 +544,7 @@ public partial class FileProcessor(
         {
             using var indexStream = _fileSystem.File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
             indexStream.Seek(indexStream.Length - 16, SeekOrigin.Begin);
-            long ixlineno = long.CreateTruncating(indexStream.Position / 8) * 1024;
+            long ixlineno = (indexStream.Position >> 3) * 1024;
             long startPos = 0;
             long endPos = 0;
             Span<byte> ixStartEndData = stackalloc byte[16];
