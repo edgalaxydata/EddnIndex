@@ -1,3 +1,8 @@
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Diagnostics;
+using System.IO.Abstractions;
+using System.Runtime.CompilerServices;
 using EddnIndex.Common;
 using EddnIndexLookup.DTO;
 using EddnIndexLookup.Options;
@@ -6,11 +11,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
-using System.Buffers;
-using System.Buffers.Binary;
-using System.Diagnostics;
-using System.IO.Abstractions;
-using System.Runtime.CompilerServices;
 using Testably.Abstractions.Helpers;
 using Models = EddnIndex.Common.Models;
 using Sectors = EddnIndex.Common.Sectors;
@@ -1271,14 +1271,14 @@ public class EddnLookupService(
                .Where(e => signalIds.Contains(e.Id))
                .Select(e => new SignalData
                {
-                    Id = e.Id,
-                    SignalName = e.SignalName,
-                    SignalType = e.SignalType,
-                    IsStation = e.IsStation,
-                    FirstSeen = e.FirstSeen,
-                    LastSeen = e.LastSeen,
-                    ValidFrom = e.ValidFrom,
-                    ValidTo = e.ValidTo,
+                   Id = e.Id,
+                   SignalName = e.SignalName,
+                   SignalType = e.SignalType,
+                   IsStation = e.IsStation,
+                   FirstSeen = e.FirstSeen,
+                   LastSeen = e.LastSeen,
+                   ValidFrom = e.ValidFrom,
+                   ValidTo = e.ValidTo,
                })
                .OrderByDescending(e => e.LastSeen)
                .ToDictionaryAsync(e => e.Id, cancellationToken: canceltoken);

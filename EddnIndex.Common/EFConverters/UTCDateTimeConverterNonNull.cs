@@ -1,5 +1,5 @@
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace EddnIndex.Common.EFConverters;
 

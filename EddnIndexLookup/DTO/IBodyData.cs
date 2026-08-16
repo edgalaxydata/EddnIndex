@@ -1,5 +1,5 @@
-﻿using EddnIndex.Common.Models;
 using System.ComponentModel.DataAnnotations;
+using EddnIndex.Common.Models;
 
 namespace EddnIndexLookup.DTO;
 

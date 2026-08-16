@@ -1,12 +1,12 @@
-using EddnIndexLookup.Services;
+using System.IO.Abstractions;
 using System.Reflection;
-using EddnIndexLookup.Options;
-using Scalar.AspNetCore;
+using EddnIndex.Common;
+using EddnIndex.Common.Models;
 using EddnIndexLookup.Conventions;
 using EddnIndexLookup.Filters;
-using System.IO.Abstractions;
-using EddnIndex.Common.Models;
-using EddnIndex.Common;
+using EddnIndexLookup.Options;
+using EddnIndexLookup.Services;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 

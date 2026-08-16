@@ -1,17 +1,17 @@
-﻿using EddnIndex.Common;
-using EddnIndexUpdate.Options;
-using Ionic.BZip2;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using EddnIndex.Common;
+using EddnIndexUpdate.Options;
+using Ionic.BZip2;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
@@ -721,9 +721,9 @@ public partial class FileProcessor(
             prefix = prefix.Split('/')[^1];
             string? eventType = null;
 
-            if (!SchemasByFilePrefix.TryGetValue(prefix, out var primarySchema)
+            if (!_schemasByFilePrefix.TryGetValue(prefix, out var primarySchema)
                 && prefix.Split(".") is [string s, string t]
-                && SchemasByFilePrefix.TryGetValue(s, out primarySchema))
+                && _schemasByFilePrefix.TryGetValue(s, out primarySchema))
             {
                 eventType = t;
             }

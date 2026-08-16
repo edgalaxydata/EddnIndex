@@ -1,4 +1,3 @@
-using EddnIndex.Common.Models;
 using System.Runtime.Serialization;
 
 namespace EddnIndexLookup.DTO;
@@ -12,7 +11,7 @@ public record class SignalData : IMatchedItem
     /// Possibly localized name of signal
     /// </summary>
     public required string SignalName { get; init; }
-    
+
     /// <summary>
     /// Type of signal
     /// </summary>

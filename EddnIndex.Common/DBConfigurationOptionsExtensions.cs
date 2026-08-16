@@ -1,6 +1,6 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.Data.Common;
 
 namespace EddnIndex.Common;
 

@@ -1,7 +1,7 @@
-﻿using EddnIndex.Common;
-using System.Buffers;
+﻿using System.Buffers;
 using System.Text;
 using System.Text.Json;
+using EddnIndex.Common;
 
 namespace EddnIndexUpdate;
 

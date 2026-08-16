@@ -1,19 +1,19 @@
-﻿using Csv;
+﻿using System.Text;
+using Csv;
+using EddnIndex.Common;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System.Text;
-using EddnIndex.Common;
 using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private readonly Dictionary<string, List<Models.BodyNameOverride>> BodyNameOverrides = [];
-    private readonly Dictionary<string, List<Models.SystemNameOverride>> SystemNameOverrides = [];
-    private readonly Dictionary<string, Models.GameVersionDate> GameVersionDates = [];
-    private readonly Dictionary<string, Models.FilePrefixSchema> SchemasByFilePrefix = [];
+    private readonly Dictionary<string, List<Models.BodyNameOverride>> _bodyNameOverrides = [];
+    private readonly Dictionary<string, List<Models.SystemNameOverride>> _systemNameOverrides = [];
+    private readonly Dictionary<string, Models.GameVersionDate> _gameVersionDates = [];
+    private readonly Dictionary<string, Models.FilePrefixSchema> _schemasByFilePrefix = [];
 
     private string BodyOverridesFile => _fileSystem.Path.IsPathRooted(Settings.BodyOverridesFile)
                                       ? Settings.BodyOverridesFile
@@ -35,22 +35,22 @@ public partial class FileProcessor
     {
         await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
-        if (SchemasByFilePrefix.Count == 0)
+        if (_schemasByFilePrefix.Count == 0)
         {
             _logger.LogLoadingMessageTypes();
 
             await foreach (var schema in ctx.Set<Models.FilePrefixSchema>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                SchemasByFilePrefix[schema.FilenamePrefix] = schema;
+                _schemasByFilePrefix[schema.FilenamePrefix] = schema;
             }
 
             if (_fileSystem.File.Exists(MessageTypesFile))
             {
                 _logger.LogProcessingMessageTypesFile();
 
-                await foreach (var line in _fileSystem.File.ReadLinesAsync(MessageTypesFile, canceltoken))
+                await foreach (string line in _fileSystem.File.ReadLinesAsync(MessageTypesFile, canceltoken))
                 {
-                    if (line.Trim().Split('\t') is [string schema, string prefix] && !SchemasByFilePrefix.ContainsKey(prefix))
+                    if (line.Trim().Split('\t') is [string schema, string prefix] && !_schemasByFilePrefix.ContainsKey(prefix))
                     {
                         string? eventType = null;
 
@@ -69,7 +69,7 @@ public partial class FileProcessor
 
                         ctx.Add(info);
 
-                        SchemasByFilePrefix[prefix] = info;
+                        _schemasByFilePrefix[prefix] = info;
                     }
                 }
 
@@ -78,13 +78,13 @@ public partial class FileProcessor
             }
         }
 
-        if (GameVersionDates.Count == 0)
+        if (_gameVersionDates.Count == 0)
         {
             _logger.LogLoadingGameVersionDates();
 
             await foreach (var ent in ctx.Set<Models.GameVersionDate>().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                GameVersionDates[ent.Version] = ent;
+                _gameVersionDates[ent.Version] = ent;
             }
 
             if (!_fileSystem.File.Exists(GameVersionDatesFile))
@@ -96,13 +96,13 @@ public partial class FileProcessor
 
             if (_fileSystem.File.Exists(GameVersionDatesFile))
             {
-                await foreach (var line in _fileSystem.File.ReadLinesAsync(GameVersionDatesFile, canceltoken))
+                await foreach (string line in _fileSystem.File.ReadLinesAsync(GameVersionDatesFile, canceltoken))
                 {
                     if (JsonConvert.DeserializeObject<Models.GameVersionDate>(line) is { } ent)
                     {
-                        if (!GameVersionDates.TryGetValue(ent.Version, out var curver))
+                        if (!_gameVersionDates.TryGetValue(ent.Version, out var curver))
                         {
-                            GameVersionDates[ent.Version] = ent;
+                            _gameVersionDates[ent.Version] = ent;
                             ctx.Add(ent);
                         }
                         else
@@ -118,15 +118,15 @@ public partial class FileProcessor
             ctx.ChangeTracker.Clear();
         }
 
-        if (SystemNameOverrides.Count == 0)
+        if (_systemNameOverrides.Count == 0)
         {
             _logger.LogLoadingSystemNameOverrides();
 
             await foreach (var ent in ctx.Set<Models.SystemNameOverride>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
+                if (!_systemNameOverrides.TryGetValue(ent.Name, out var overrides))
                 {
-                    SystemNameOverrides[ent.Name] = overrides = [];
+                    _systemNameOverrides[ent.Name] = overrides = [];
                 }
 
                 overrides.Add(ent);
@@ -148,9 +148,9 @@ public partial class FileProcessor
                                         .OfType<Models.SystemNameOverride>()
                                         .WithCancellation(canceltoken))
                 {
-                    if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
+                    if (!_systemNameOverrides.TryGetValue(ent.Name, out var overrides))
                     {
-                        SystemNameOverrides[ent.Name] = overrides = [];
+                        _systemNameOverrides[ent.Name] = overrides = [];
                     }
 
                     if (!overrides.Any(e => e.SystemAddress == ent.SystemAddress
@@ -170,7 +170,7 @@ public partial class FileProcessor
             ctx.ChangeTracker.Clear();
         }
 
-        if (BodyNameOverrides.Count == 0)
+        if (_bodyNameOverrides.Count == 0)
         {
             _logger.LogLoadingBodyNameOverrides();
 
@@ -178,9 +178,9 @@ public partial class FileProcessor
 
             await foreach (var ent in ctx.Set<Models.BodyNameOverride>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
+                if (!_bodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                 {
-                    BodyNameOverrides[ent.BodyName] = overrides = [];
+                    _bodyNameOverrides[ent.BodyName] = overrides = [];
                 }
 
                 if (!bysysaddr.TryGetValue(ent.SystemAddress, out var sysov))
@@ -203,24 +203,24 @@ public partial class FileProcessor
                 await foreach (var ent in _fileSystem
                                         .File
                                         .ReadLinesAsync(BodyOverridesFile, canceltoken)
-                                        .Select(e => JsonConvert.DeserializeObject<Models.BodyNameOverride>(e))
+                                        .Select(JsonConvert.DeserializeObject<Models.BodyNameOverride>)
                                         .OfType<Models.BodyNameOverride>()
                                         .Select(e => e with
                                         {
                                             ValidFrom = string.IsNullOrWhiteSpace(e.SinceVersion)
-                                                     || !GameVersionDates.TryGetValue(e.SinceVersion, out var ver)
+                                                     || !_gameVersionDates.TryGetValue(e.SinceVersion, out var ver)
                                                       ? new DateTime(2014, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                                                       : ver.UpdateTime,
-                                            ValidTo   = string.IsNullOrWhiteSpace(e.UntilVersion)
-                                                     || !GameVersionDates.TryGetValue(e.UntilVersion, out ver)
-                                                      ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
-                                                      : ver.UpdateTime
+                                            ValidTo = string.IsNullOrWhiteSpace(e.UntilVersion)
+                                                   || !_gameVersionDates.TryGetValue(e.UntilVersion, out ver)
+                                                    ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
+                                                    : ver.UpdateTime
                                         })
                                         .WithCancellation(canceltoken))
                 {
-                    if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
+                    if (!_bodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                     {
-                        BodyNameOverrides[ent.BodyName] = overrides = [];
+                        _bodyNameOverrides[ent.BodyName] = overrides = [];
                     }
 
                     if (!bysysaddr.TryGetValue(ent.SystemAddress, out var sysov))
@@ -243,10 +243,10 @@ public partial class FileProcessor
                 }
             }
 
-            foreach (var (name, sysov) in BodyNameOverrides
+            foreach (var (name, sysov) in _bodyNameOverrides
                                               .Keys
                                               .SelectMany(e =>
-                                                    SystemNameOverrides
+                                                    _systemNameOverrides
                                                         .GetValueOrDefault(e)
                                                        ?.Select(o => (Name: e, Override: o))
                                                       ?? []
@@ -270,7 +270,7 @@ public partial class FileProcessor
                     ValidTo = sysov.ValidTo
                 };
 
-                BodyNameOverrides[name].Add(ent);
+                _bodyNameOverrides[name].Add(ent);
             }
 
             await ctx.SaveChangesAsync(canceltoken);
@@ -329,22 +329,22 @@ public partial class FileProcessor
 
         await foreach (var line in CsvReader.ReadFromStreamAsync(stream).WithCancellation(canceltoken))
         {
-            var sysName = GetCsvField(line, fields.SystemName);
-            var bodyDesig = GetCsvField(line, fields.BodyDesignation);
-            var bodyName = GetCsvField(line, fields.BodyName);
+            string? sysName = GetCsvField(line, fields.SystemName);
+            string? bodyDesig = GetCsvField(line, fields.BodyDesignation);
+            string? bodyName = GetCsvField(line, fields.BodyName);
 
-            if (long.TryParse(GetCsvField(line, fields.SystemAddress), out var sysaddr)
-                && int.TryParse(GetCsvField(line, fields.BodyID), out var bodyId)
+            if (long.TryParse(GetCsvField(line, fields.SystemAddress), out long sysaddr)
+                && int.TryParse(GetCsvField(line, fields.BodyID), out int bodyId)
                 && sysName != null
                 && bodyDesig != null
                 && bodyName != null
                 && (bodyName == sysName || bodyDesig != bodyName))
             {
-                var sinceVersion = GetCsvField(line, fields.SinceVersion);
-                var untilVersion = GetCsvField(line, fields.UntilVersion);
-                var isStar = GetCsvField(line, fields.IsStar);
-                var argOfPeriapsis = decimal.TryParse(GetCsvField(line, fields.ArgOfPeriapsis), out var dv) ? dv : (decimal?)null;
-                var inclination = decimal.TryParse(GetCsvField(line, fields.Inclination), out dv) ? dv : (decimal?)null;
+                string? sinceVersion = GetCsvField(line, fields.SinceVersion);
+                string? untilVersion = GetCsvField(line, fields.UntilVersion);
+                string? isStar = GetCsvField(line, fields.IsStar);
+                decimal? argOfPeriapsis = decimal.TryParse(GetCsvField(line, fields.ArgOfPeriapsis), out decimal dv) ? dv : (decimal?)null;
+                decimal? inclination = decimal.TryParse(GetCsvField(line, fields.Inclination), out dv) ? dv : (decimal?)null;
 
                 if (!Enum.TryParse<BodyType>(GetCsvField(line, fields.BodyType), out var bodyType))
                 {
@@ -392,39 +392,39 @@ public partial class FileProcessor
         if (!string.IsNullOrWhiteSpace(overridesJsonSettings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var systemsJson = await client.GetStringAsync(overridesJsonSettings.URI, canceltoken);
+            string systemsJson = await client.GetStringAsync(overridesJsonSettings.URI, canceltoken);
             ProcessSystemOverridesJson(sysOverrides, systemsJson);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesJsonSettings.Filename))
         {
-            var systemsJson = await _fileSystem.File.ReadAllTextAsync(overridesJsonSettings.Filename, canceltoken);
+            string systemsJson = await _fileSystem.File.ReadAllTextAsync(overridesJsonSettings.Filename, canceltoken);
             ProcessSystemOverridesJson(sysOverrides, systemsJson);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesCsvSettings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var systemsCsv = await client.GetStringAsync(overridesCsvSettings.URI, canceltoken);
+            string systemsCsv = await client.GetStringAsync(overridesCsvSettings.URI, canceltoken);
             ProcessSystemOverridesCsv(sysOverrides, systemsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesCsvSettings.Filename))
         {
-            var systemsCsv = await _fileSystem.File.ReadAllTextAsync(overridesCsvSettings.Filename, canceltoken);
+            string systemsCsv = await _fileSystem.File.ReadAllTextAsync(overridesCsvSettings.Filename, canceltoken);
             ProcessSystemOverridesCsv(sysOverrides, systemsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(renamesCsvSettings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var renamesCsv = await client.GetStringAsync(renamesCsvSettings.URI, canceltoken);
+            string renamesCsv = await client.GetStringAsync(renamesCsvSettings.URI, canceltoken);
             ProcessSystemRenamesCsv(sysOverrides, renamesCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(renamesCsvSettings.Filename))
         {
-            var renamesCsv = await _fileSystem.File.ReadAllTextAsync(renamesCsvSettings.Filename, canceltoken);
+            string renamesCsv = await _fileSystem.File.ReadAllTextAsync(renamesCsvSettings.Filename, canceltoken);
             ProcessSystemRenamesCsv(sysOverrides, renamesCsv);
         }
 
@@ -455,7 +455,7 @@ public partial class FileProcessor
         {
             if (GetCsvField(line, fields.PreviousSystemName) is string prevname
                 && GetCsvField(line, fields.SystemName) is string sysname
-                && long.TryParse(GetCsvField(line, fields.SystemAddress), out var sysaddr)
+                && long.TryParse(GetCsvField(line, fields.SystemAddress), out long sysaddr)
                 && DateTime.TryParse(GetCsvField(line, fields.RenameDate), out var date))
             {
                 date = date.AddHours(10);
@@ -514,15 +514,15 @@ public partial class FileProcessor
         foreach (var line in CsvReader.ReadFromText(systemsCsv))
         {
             if (GetCsvField(line, fields.SystemName) is string systemName
-                && long.TryParse(GetCsvField(line, fields.SystemAddress), out var systemAddress))
+                && long.TryParse(GetCsvField(line, fields.SystemAddress), out long systemAddress))
             {
                 decimal? x = null;
                 decimal? y = null;
                 decimal? z = null;
 
-                if (decimal.TryParse(GetCsvField(line, fields.X), out var vx)
-                    && decimal.TryParse(GetCsvField(line, fields.Y), out var vy)
-                    && decimal.TryParse(GetCsvField(line, fields.Z), out var vz))
+                if (decimal.TryParse(GetCsvField(line, fields.X), out decimal vx)
+                    && decimal.TryParse(GetCsvField(line, fields.Y), out decimal vy)
+                    && decimal.TryParse(GetCsvField(line, fields.Z), out decimal vz))
                 {
                     (x, y, z) = (vx, vy, vz);
                 }
@@ -601,13 +601,13 @@ public partial class FileProcessor
         if (!string.IsNullOrWhiteSpace(settings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var versionsCsv = await client.GetStringAsync(settings.URI, canceltoken);
+            string versionsCsv = await client.GetStringAsync(settings.URI, canceltoken);
             ProcessGameVersionsCsv(versions, versionsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(settings.Filename))
         {
-            var versionsCsv = await _fileSystem.File.ReadAllTextAsync(settings.Filename, canceltoken);
+            string versionsCsv = await _fileSystem.File.ReadAllTextAsync(settings.Filename, canceltoken);
             ProcessGameVersionsCsv(versions, versionsCsv);
         }
 
@@ -639,15 +639,15 @@ public partial class FileProcessor
 
                 var updateStart = DateTime.TryParse(GetCsvField(line, fields.UpdateStartTime), out var dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : (DateTime?)null;
                 var updateEnd = DateTime.TryParse(GetCsvField(line, fields.UpdateEndTime), out dt) ? DateTime.SpecifyKind(dt, DateTimeKind.Utc) : (DateTime?)null;
-                var alphaBetaFlag = GetCsvField(line, fields.IsAlphaOrBeta);
+                string? alphaBetaFlag = GetCsvField(line, fields.IsAlphaOrBeta);
 
-                var isAlphaOrBeta = (bool.TryParse(alphaBetaFlag, out var alphaBetaBool) && alphaBetaBool)
-                                 || (int.TryParse(alphaBetaFlag, out var alphaBetaInt) && alphaBetaInt != 0)
-                                 || alphaBetaFlag?.ToLowerInvariant() == "y";
+                bool isAlphaOrBeta = (bool.TryParse(alphaBetaFlag, out bool alphaBetaBool) && alphaBetaBool)
+                                  || (int.TryParse(alphaBetaFlag, out int alphaBetaInt) && alphaBetaInt != 0)
+                                  || alphaBetaFlag?.ToLowerInvariant() == "y";
 
                 var seasonVersions = new List<(string? Season, string? Version)>();
 
-                foreach (var hdr in line.Headers.Where(e => e.StartsWith(fields.VersionPrefix)))
+                foreach (string? hdr in line.Headers.Where(e => e.StartsWith(fields.VersionPrefix)))
                 {
                     if (hdr.Split('_') is [_, string season]
                         && GetCsvField(line, hdr) is string version)

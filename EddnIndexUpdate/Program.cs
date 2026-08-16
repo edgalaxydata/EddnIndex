@@ -1,4 +1,6 @@
-﻿using EddnIndex.Common;
+﻿using System.Diagnostics;
+using System.IO.Abstractions;
+using EddnIndex.Common;
 using EddnIndex.Common.Models;
 using EddnIndexUpdate;
 using EddnIndexUpdate.Options;
@@ -6,8 +8,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.IO.Abstractions;
 
 var cmdlineargs = new Dictionary<string, string?>();
 var dirnames = new List<string>();

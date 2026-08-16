@@ -1,9 +1,9 @@
+using System.Reflection;
 using EddnIndex.Common;
 using EddnIndex.Common.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using System.Reflection;
 
 string? providerName = null;
 

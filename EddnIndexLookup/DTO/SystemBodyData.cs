@@ -1,6 +1,6 @@
-﻿using EddnIndex.Common.Models;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.Serialization;
+using EddnIndex.Common.Models;
 
 namespace EddnIndexLookup.DTO;
 

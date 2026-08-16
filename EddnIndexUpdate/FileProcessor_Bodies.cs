@@ -1,8 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using EddnIndex.Common;
+using Microsoft.EntityFrameworkCore;
+using Newtonsoft.Json;
 using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
@@ -334,7 +334,7 @@ public partial class FileProcessor
     {
         long? systemNameId = null;
 
-        if (!BodyNameOverrides.ContainsKey(name)
+        if (!_bodyNameOverrides.ContainsKey(name)
             && await TryGetBodyDesignationAsync(name.AsMemory(), systemName.AsMemory(), bodyId, bodyType, argOfPeriapsis, inclination, canceltoken) is { } desig)
         {
             systemNameId = system.SystemNameId;
@@ -356,7 +356,7 @@ public partial class FileProcessor
             return (bodyName.Id, systemNameId);
         }
 
-        if (!BodyNameOverrides.ContainsKey(name))
+        if (!_bodyNameOverrides.ContainsKey(name))
         {
             for (var spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
             {
@@ -488,9 +488,9 @@ public partial class FileProcessor
                                        ))
                                        .Where(e => e is
                                        {
-                                            SMADiff: > -0.001m and < 0.001m,
-                                            AOPDiff: > -0.001m and < 0.001m,
-                                            IncDiff: > -0.001m and < 0.001m
+                                           SMADiff: > -0.001m and < 0.001m,
+                                           AOPDiff: > -0.001m and < 0.001m,
+                                           IncDiff: > -0.001m and < 0.001m
                                        }))
         {
 
@@ -606,7 +606,7 @@ public partial class FileProcessor
         else if (sysNameId == null
                  && system.ModSystemAddress == system.NameModSystemAddress
                  && name != null
-                 && BodyNameOverrides.TryGetValue(name, out var overrides))
+                 && _bodyNameOverrides.TryGetValue(name, out var overrides))
         {
             overrides = [..
                 overrides

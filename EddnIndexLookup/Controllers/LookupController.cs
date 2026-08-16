@@ -1,9 +1,9 @@
+using System.ComponentModel.DataAnnotations;
 using EddnIndexLookup.DTO;
 using EddnIndexLookup.Filters;
 using EddnIndexLookup.Services;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 
 namespace EddnIndexLookup.Controllers;
 

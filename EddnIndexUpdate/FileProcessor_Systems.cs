@@ -1,9 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using EddnIndex.Common;
-using Models = EddnIndex.Common.Models;
 using EddnIndex.Common.Sectors;
+using Microsoft.EntityFrameworkCore;
+using Models = EddnIndex.Common.Models;
 
 namespace EddnIndexUpdate;
 
@@ -300,7 +300,7 @@ public partial class FileProcessor
         DateTime? validFrom = null;
         DateTime? validTo = null;
 
-        if (name != null && SystemNameOverrides.TryGetValue(name, out var overrides))
+        if (name != null && _systemNameOverrides.TryGetValue(name, out var overrides))
         {
             if (overrides.Count > 1
                 && x != null
