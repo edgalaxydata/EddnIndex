@@ -441,6 +441,8 @@ public partial class FileProcessor(
         {
             await ProcessFileAsync(filename);
         }
+
+        Logger.LogProcessingComplete();
     }
 
     protected void FillCacheForFile(int fileid)

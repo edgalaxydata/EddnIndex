@@ -101,4 +101,7 @@ internal static partial class FileProcessorMessages
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Loading sectors")]
     public static partial void LogLoadingSectors(this ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Processing complete")]
+    public static partial void LogProcessingComplete(this ILogger logger);
 }
