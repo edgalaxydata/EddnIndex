@@ -82,23 +82,23 @@ public partial class FileProcessor(
         }
     }
 
-    protected async Task InitAsync()
+    protected async Task InitAsync(CancellationToken canceltoken)
     {
         if (InitComplete) return;
 
-        await Init_OverridesAsync();
+        await Init_OverridesAsync(canceltoken);
 
-        Init_Systems();
+        await Init_SystemsAsync(canceltoken);
 
-        Init_Bodies();
+        await Init_BodiesAsync(canceltoken);
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         if (Files.Count == 0)
         {
             Logger.LogLoadingFileInfo();
 
-            foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking())
+            await foreach (var file in ctx.Set<Models.FileInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 Files[file.FileName] = file;
             }
@@ -108,7 +108,7 @@ public partial class FileProcessor(
         {
             Logger.LogLoadingFileErrors();
 
-            foreach (var error in ctx.Set<Models.FileLineDataError>().AsNoTracking())
+            await foreach (var error in ctx.Set<Models.FileLineDataError>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 if (!FileDataErrors.TryGetValue(error.FileId, out var errors))
                 {
@@ -128,7 +128,7 @@ public partial class FileProcessor(
         {
             Logger.LogLoadingSoftwareVersions();
 
-            foreach (var sw in ctx.Set<Models.SoftwareInfo>().AsNoTracking())
+            await foreach (var sw in ctx.Set<Models.SoftwareInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 Software[(sw.SoftwareName, sw.SoftwareVersion)] = sw;
             }
@@ -138,7 +138,7 @@ public partial class FileProcessor(
         {
             Logger.LogLoadingGameVersions();
 
-            foreach (var gv in ctx.Set<Models.GameVersionInfo>().AsNoTracking())
+            await foreach (var gv in ctx.Set<Models.GameVersionInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 GameVersions[(gv.GameVersion, gv.GameBuild, gv.IsOdyssey, gv.IsHorizons)] = gv;
             }
@@ -147,7 +147,7 @@ public partial class FileProcessor(
         if (Signals.Count == 0)
         {
             Logger.LogLoadingSignals();
-            foreach (var s in ctx.Set<Models.SignalInfo>().AsNoTracking())
+            await foreach (var s in ctx.Set<Models.SignalInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 Signals[(s.SignalName, s.SignalType, s.IsStation)] = s;
                 SignalsById[s.Id] = s;
@@ -157,7 +157,7 @@ public partial class FileProcessor(
         if (SchemaEvents.Count == 0)
         {
             Logger.LogLoadingSchemaEvents();
-            foreach (var s in ctx.Set<Models.SchemaEventInfo>().AsNoTracking())
+            await foreach (var s in ctx.Set<Models.SchemaEventInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 SchemaEvents[(s.Schema, s.EventType)] = s;
             }
@@ -167,7 +167,7 @@ public partial class FileProcessor(
         {
             Logger.LogLoadingBodySignals();
 
-            foreach (var s in ctx.Set<Models.BodySignalInfo>().AsNoTracking())
+            await foreach (var s in ctx.Set<Models.BodySignalInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 BodySignals[(s.SignalType, s.SignalCount, s.Category, s.SubCategory, s.Region, s.EntryID)] = s;
             }
@@ -177,7 +177,7 @@ public partial class FileProcessor(
         {
             Logger.LogLoadingStations();
 
-            foreach (var s in ctx.Set<Models.StationInfo>().AsNoTracking())
+            await foreach (var s in ctx.Set<Models.StationInfo>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 if (!Stations.TryGetValue((s.StationName, s.MarketId, s.StationType, s.SystemName, s.SystemAddress, s.BodyName), out var stnlist))
                 {
@@ -192,7 +192,7 @@ public partial class FileProcessor(
         {
             Logger.LogLoadingSignalCounts();
 
-            foreach (var s in ctx.Set<Models.SignalInfoSet>().Select(e => new { e.Id, e.SignalCount }))
+            await foreach (var s in ctx.Set<Models.SignalInfoSet>().Select(e => new { e.Id, e.SignalCount }).AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 SignalInfoSetCounts[s.Id] = s.SignalCount;
             }
@@ -201,14 +201,18 @@ public partial class FileProcessor(
         InitComplete = true;
     }
 
-    protected Models.SoftwareInfo GetOrAddSoftware(string softwareName, string softwareVersion)
+    protected async Task<Models.SoftwareInfo> GetOrAddSoftwareAsync(
+            string softwareName,
+            string softwareVersion,
+            CancellationToken canceltoken
+        )
     {
         if (Software.TryGetValue((softwareName, softwareVersion), out var software))
         {
             return software;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
         software = new Models.SoftwareInfo
         {
             SoftwareName = softwareName,
@@ -216,21 +220,27 @@ public partial class FileProcessor(
         };
 
         ctx.Add(software);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
 
         Software[(softwareName, softwareVersion)] = software;
 
         return software;
     }
 
-    protected Models.GameVersionInfo GetOrAddGameVersion(string? gamebuild, string? gameversion, bool? isOdyssey, bool? isHorizons)
+    protected async Task<Models.GameVersionInfo> GetOrAddGameVersionAsync(
+            string? gamebuild,
+            string? gameversion,
+            bool? isOdyssey,
+            bool? isHorizons,
+            CancellationToken canceltoken
+        )
     {
         if (GameVersions.TryGetValue((gameversion, gamebuild, isOdyssey, isHorizons), out var version))
         {
             return version;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
         version = new Models.GameVersionInfo
         {
             GameBuild = gamebuild,
@@ -240,14 +250,23 @@ public partial class FileProcessor(
         };
 
         ctx.Add(version);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
 
         GameVersions[(gameversion, gamebuild, isOdyssey, isHorizons)] = version;
 
         return version;
     }
 
-    protected Models.StationInfo GetOrAddStation(string? stationName, long? marketId, string? stationType, string? systemName, long? systemAddress, string? bodyName, decimal? latitude, decimal? longitude)
+    protected async Task<Models.StationInfo> GetOrAddStationAsync(
+            string? stationName,
+            long? marketId,
+            string? stationType,
+            string? systemName,
+            long? systemAddress,
+            string? bodyName,
+            decimal? latitude,
+            decimal? longitude
+        )
     {
         if (stationType == "FleetCarrier" || (marketId >= 3700_000_000 && marketId < 3789_600_000))
         {
@@ -277,7 +296,7 @@ public partial class FileProcessor(
             return stn;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
 
         var station = new Models.StationInfo
         {
@@ -291,19 +310,19 @@ public partial class FileProcessor(
             Longitude = longitude
         };
         ctx.Add(station);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync();
         stnlist.Add(station);
         return station;
     }
 
-    protected Models.SignalInfo GetOrAddSignal(string name, string? type, bool? isStation)
+    protected async Task<Models.SignalInfo> GetOrAddSignalAsync(string name, string? type, bool? isStation)
     {
         if (Signals.TryGetValue((name, type, isStation), out var signal))
         {
             return signal;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
         signal = new Models.SignalInfo
         {
             SignalName = name,
@@ -312,21 +331,21 @@ public partial class FileProcessor(
         };
 
         ctx.Add(signal);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync();
 
         Signals[(name, type, isStation)] = signal;
         SignalsById[signal.Id] = signal;
         return signal;
     }
 
-    protected Models.SchemaEventInfo GetOrAddSchemaEvent(string schema, string? eventType)
+    protected async Task<Models.SchemaEventInfo> GetOrAddSchemaEventAsync(string schema, string? eventType, CancellationToken canceltoken)
     {
         if (SchemaEvents.TryGetValue((schema, eventType), out var schemaEvent))
         {
             return schemaEvent;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
         schemaEvent = new Models.SchemaEventInfo
         {
             Schema = schema,
@@ -334,13 +353,16 @@ public partial class FileProcessor(
         };
 
         ctx.Add(schemaEvent);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
 
         SchemaEvents[(schema, eventType)] = schemaEvent;
         return schemaEvent;
     }
 
-    protected Models.SignalInfoSet GetOrAddSignalInfoSet(ICollection<Models.SignalInfo> signals, Models.SystemInfo? system)
+    protected async Task<Models.SignalInfoSet> GetOrAddSignalInfoSetAsync(
+            ICollection<Models.SignalInfo> signals,
+            Models.SystemInfo? system
+        )
     {
         var signalIds = signals.Select(e => e.Id).Order().ToList();
         var signalIdsJson =
@@ -355,7 +377,7 @@ public partial class FileProcessor(
             return signalSet;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
 
         var firstSigId = signalIds[0];
         var lastSigId = signalIds[^1];
@@ -402,14 +424,21 @@ public partial class FileProcessor(
         return signalSet;
     }
 
-    protected Models.BodySignalInfo GetOrAddBodySignal(string type, int? count, string? category = null, string? subcategory = null, string? region = null, long? entryId = null)
+    protected async Task<Models.BodySignalInfo> GetOrAddBodySignalAsync(
+            string type,
+            int? count,
+            string? category = null,
+            string? subcategory = null,
+            string? region = null,
+            long? entryId = null
+        )
     {
         if (BodySignals.TryGetValue((type, count, category, subcategory, region, entryId), out var signal))
         {
             return signal;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync();
         signal = new Models.BodySignalInfo
         {
             SignalType = type,
@@ -420,12 +449,12 @@ public partial class FileProcessor(
             EntryID = entryId
         };
         ctx.Add(signal);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync();
         BodySignals[(type, count, category, subcategory, region, entryId)] = signal;
         return signal;
     }
 
-    public async Task ProcessDirectoriesAsync(IEnumerable<string> dirnames)
+    public async Task ProcessDirectoriesAsync(IEnumerable<string> dirnames, CancellationToken canceltoken)
     {
         foreach (var filename in dirnames
                                     .SelectMany<string, string>(f => [
@@ -439,22 +468,22 @@ public partial class FileProcessor(
                                     .ThenBy(e => e.Parts[^1])
                                     .Select(e => e.Name))
         {
-            await ProcessFileAsync(filename);
+            await ProcessFileAsync(filename, canceltoken);
         }
 
         Logger.LogProcessingComplete();
     }
 
-    protected void FillCacheForFile(int fileid)
+    protected async Task FillCacheForFileAsync(int fileid, CancellationToken canceltoken = default)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        foreach (var line in ctx.Set<Models.FileLineInfo>().Where(e => e.FileId == fileid).AsNoTracking())
+        await foreach (var line in ctx.Set<Models.FileLineInfo>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
             LineInfoCache[(line.FileId, line.LineNo)] = line;
         }
 
-        foreach (var line in ctx.Set<Models.FileLineBody>().Where(e => e.FileId == fileid).AsNoTracking())
+        await foreach (var line in ctx.Set<Models.FileLineBody>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
             BodyInfoCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
         }
@@ -464,12 +493,12 @@ public partial class FileProcessor(
             BodyInfoCounts[grp.Key] = grp.Count();
         }
 
-        foreach (var line in ctx.Set<Models.FileLineStation>().Where(e => e.FileId == fileid).AsNoTracking())
+        await foreach (var line in ctx.Set<Models.FileLineStation>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
             StationInfoCache[(line.FileId, line.LineNo)] = line;
         }
 
-        foreach (var line in ctx.Set<Models.FileLineNavRoute>().Where(e => e.FileId == fileid).AsNoTracking())
+        await foreach (var line in ctx.Set<Models.FileLineNavRoute>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
             NavRouteCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
         }
@@ -479,7 +508,7 @@ public partial class FileProcessor(
             NavRouteCounts[grp.Key] = grp.Count();
         }
 
-        foreach (var line in ctx.Set<Models.FileLineSignal>().Where(e => e.FileId == fileid).AsNoTracking())
+        await foreach (var line in ctx.Set<Models.FileLineSignal>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
             SignalInfoCache[(line.FileId, line.LineNo)] = line;
 
@@ -489,7 +518,7 @@ public partial class FileProcessor(
             }
         }
 
-        foreach (var line in ctx.Set<Models.FileLineBodySignal>().Where(e => e.FileId == fileid).AsNoTracking())
+        await foreach (var line in ctx.Set<Models.FileLineBodySignal>().Where(e => e.FileId == fileid).AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
         {
             BodySignalInfoCache[(line.FileId, line.LineNo, line.EntryNum)] = line;
         }
@@ -500,7 +529,7 @@ public partial class FileProcessor(
         }
     }
 
-    protected void WriteIndexedFile(string filepath, string indexFilename, int? lineCount, bool force)
+    protected async Task WriteIndexedFileAsync(string filepath, string indexFilename, int? lineCount, bool force, CancellationToken canceltoken)
     {
         Logger.LogWritingIndexedFile(indexFilename);
 
@@ -630,9 +659,9 @@ public partial class FileProcessor(
         _fileSystem.File.Move(indexFilename + ".index.tmp", indexFilename + ".index", true);
     }
 
-    public async Task ProcessFileAsync(string filepath)
+    public async Task ProcessFileAsync(string filepath, CancellationToken canceltoken)
     {
-        await InitAsync();
+        await InitAsync(canceltoken);
 
         if (!_fileSystem.File.Exists(filepath))
         {
@@ -642,10 +671,10 @@ public partial class FileProcessor(
         var fileinfo = _fileSystem.FileInfo.New(filepath);
         var filelen = fileinfo.Length;
 
-        await ProcessFileAsync(filepath, filelen);
+        await ProcessFileAsync(filepath, filelen, canceltoken);
     }
 
-    protected async Task<Models.FileInfo> GetOrAddFileAsync(string filepath)
+    protected async Task<Models.FileInfo> GetOrAddFileAsync(string filepath, CancellationToken canceltoken)
     {
         var filename = _fileSystem.Path.GetFileName(filepath);
 
@@ -707,12 +736,12 @@ public partial class FileProcessor(
 
             if (primarySchema?.PrimarySchema != null)
             {
-                primarySchemaEvent = GetOrAddSchemaEvent(primarySchema.PrimarySchema, primarySchema.EventType ?? eventType);
+                primarySchemaEvent = await GetOrAddSchemaEventAsync(primarySchema.PrimarySchema, primarySchema.EventType ?? eventType, canceltoken);
             }
 
             try
             {
-                using var ctx = ContextFactory.CreateDbContext();
+                await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
                 file = new Models.FileInfo
                 {
@@ -725,11 +754,11 @@ public partial class FileProcessor(
                 };
 
                 ctx.Add(file);
-                ctx.SaveChanges();
+                await ctx.SaveChangesAsync(canceltoken);
             }
             catch (DbUpdateException ex) when (ex.IsUniqueConstraintViolation())
             {
-                using var ctx = ContextFactory.CreateDbContext();
+                using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
                 file = ctx.Set<Models.FileInfo>().First(e => e.FileName == filename);
             }
 
@@ -739,9 +768,9 @@ public partial class FileProcessor(
         return file;
     }
 
-    protected async Task ProcessFileAsync(string filepath, long filelen)
+    protected async Task ProcessFileAsync(string filepath, long filelen, CancellationToken canceltoken)
     {
-        var file = await GetOrAddFileAsync(filepath);
+        var file = await GetOrAddFileAsync(filepath, canceltoken);
 
         if (!FileDataErrors.TryGetValue(file.Id, out var errors))
         {
@@ -762,11 +791,12 @@ public partial class FileProcessor(
 
         if (Settings.IndexedDir != null)
         {
-            WriteIndexedFile(
+            await WriteIndexedFileAsync(
                 context.FilePath,
                 _fileSystem.Path.Join(Settings.IndexedDir, context.IndexedFilename),
                 context.File.LineCount,
-                context.FileLength > context.File.UncompressedSize
+                context.FileLength > context.File.UncompressedSize,
+                canceltoken
             );
         }
 
@@ -781,7 +811,7 @@ public partial class FileProcessor(
             Version
         );
 
-        FillCacheForFile(context.File.Id);
+        await FillCacheForFileAsync(context.File.Id, canceltoken);
 
         Stream stream = _fileSystem.File.Open(context.FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
@@ -792,7 +822,7 @@ public partial class FileProcessor(
 
         using var reader = new EventReader(stream);
 
-        var data = new FileLineData();
+        var data = new FileLineData { File = file };
 
         while (reader.TryReadLine(out var line))
         {
@@ -803,7 +833,7 @@ public partial class FileProcessor(
                 Console.Error.Write(".");
                 Console.Error.Flush();
 
-                await SaveUpdatesAsync(context);
+                await SaveUpdatesAsync(context, canceltoken);
 
                 if ((context.LineCount % 64000) == 0)
                 {
@@ -811,21 +841,21 @@ public partial class FileProcessor(
                 }
             }
 
-            ProcessLine(line, context, ref data);
+            await ProcessLineAsync(line, context, data, canceltoken);
         }
 
         Console.Error.WriteLine($" {context.LineCount}");
 
-        await SaveUpdatesAsync(context);
+        await SaveUpdatesAsync(context, canceltoken);
 
         Models.SchemaEventInfo? fileSchemaEvent = null;
 
         if (context.File.PrimarySchema != null)
         {
-            fileSchemaEvent = GetOrAddSchemaEvent(context.File.PrimarySchema, context.File.EventType);
+            fileSchemaEvent = await GetOrAddSchemaEventAsync(context.File.PrimarySchema, context.File.EventType, canceltoken);
         }
 
-        using (var ctx = ContextFactory.CreateDbContext())
+        await using (var ctx = await ContextFactory.CreateDbContextAsync(canceltoken))
         {
             var fileEntry = ctx.Attach(context.File);
             fileEntry.Property(e => e.LineCount).CurrentValue = context.LineCount;
@@ -841,16 +871,17 @@ public partial class FileProcessor(
             fileEntry.Property(e => e.ProcessedVersion).CurrentValue = Version;
             fileEntry.Property(e => e.PrimarySchemaEventId).CurrentValue = fileSchemaEvent?.Id;
 
-            ctx.SaveChanges();
+            await ctx.SaveChangesAsync(canceltoken);
         }
 
         if (Settings.IndexedDir != null && !context.FilePath.EndsWith(".bz2") && reader.Position > context.FileLength)
         {
-            WriteIndexedFile(
+            await WriteIndexedFileAsync(
                 context.FilePath,
                 _fileSystem.Path.Join(Settings.IndexedDir, context.IndexedFilename),
                 null,
-                true
+                true,
+                canceltoken
             );
         }
 
@@ -874,10 +905,98 @@ public partial class FileProcessor(
         BodySignalInfoCounts.Clear();
     }
 
-    protected void ProcessLine(
+    protected async Task FillFileLineDataEntries(FileLineData data, CancellationToken canceltoken)
+    {
+        data.Software = await GetOrAddSoftwareAsync(data.SoftwareName ?? "", data.SoftwareVersion ?? "", canceltoken);
+        data.GameVersionInfo = await GetOrAddGameVersionAsync(data.GameBuild, data.GameVersion, data.IsOdyssey, data.IsHorizons, canceltoken);
+
+        if (data.Schema != null)
+        {
+            data.SchemaEvent = await GetOrAddSchemaEventAsync(data.Schema, data.EventType, canceltoken);
+        }
+
+        if (data.SystemName != null)
+        {
+            var system = await GetOrAddSystemAsync(data.SystemName, data.SystemAddress, data.X, data.Y, data.Z, canceltoken);
+            data.System = system;
+
+            if (data.BodyName != null)
+            {
+                var (body, smaerror, incerror, aoperror) = await GetOrAddBodyAsync(
+                    data.BodyName,
+                    data.SystemName,
+                    data.BodyId,
+                    data.BodyType,
+                    data.ParentsJson,
+                    data.ArgOfPeriapsis,
+                    data.Inclination,
+                    data.SemiMajorAxis,
+                    data.Timestamp,
+                    data.GameVersion,
+                    system,
+                    canceltoken
+                );
+
+                data.Body = body;
+                data.SemiMajorAxisError = smaerror;
+                data.InclinationError = incerror;
+                data.ArgOfPeriapsisError = aoperror;
+            }
+
+            foreach (var (itemnum, (name, innerRad, outerRad)) in data.RingData)
+            {
+                data.SubBodies[itemnum] = await GetOrAddBodyAsync(
+                    name,
+                    data.SystemName,
+                    null,
+                    null,
+                    null,
+                    0,
+                    0,
+                    (innerRad + outerRad) / 2,
+                    data.Timestamp,
+                    data.GameVersion,
+                    system,
+                    canceltoken
+                );
+            }
+        }
+
+        foreach (var (entryNum, (codexName, count, codexCategory, codexSubCategory, codexRegion, codexEntryId)) in data.BodySignalInfo)
+        {
+            data.BodySignals[entryNum] = await GetOrAddBodySignalAsync(codexName, count, codexCategory, codexSubCategory, codexRegion, codexEntryId);
+        }
+
+        if (data.StationName != null || data.MarketId != null)
+        {
+            data.Station = await GetOrAddStationAsync(
+                data.StationName,
+                data.MarketId,
+                data.StationType,
+                data.SystemName,
+                data.SystemAddress,
+                data.BodyName,
+                data.Latitude,
+                data.Longitude
+            );
+        }
+
+        foreach (var (entryNum, (systemName, systemAddress, x, y, z)) in data.NavRouteSystemInfo)
+        {
+            data.NavRouteSystems[entryNum] = await GetOrAddSystemAsync(systemName, systemAddress, x, y, z, canceltoken);
+        }
+
+        foreach (var (entryNum, (name, type, isStation)) in data.SignalInfo)
+        {
+            data.Signals[entryNum] = await GetOrAddSignalAsync(name, type, isStation);
+        }
+    }
+
+    protected async Task ProcessLineAsync(
             ReadOnlySequence<byte> line,
             FileProcessingContext context,
-            ref FileLineData data
+            FileLineData data,
+            CancellationToken canceltoken
         )
     {
         if (LineInfoCache.TryGetValue((context.File.Id, context.LineCount), out var lineInfo)
@@ -918,7 +1037,7 @@ public partial class FileProcessor(
         {
             try
             {
-                if (!TryProcessLine(line, ref data))
+                if (!TryProcessLine(line, data))
                 {
                     Logger.LogIncompleteMessage(context.FilePath, context.LineCount);
 
@@ -955,6 +1074,8 @@ public partial class FileProcessor(
                         Environment.Exit(1);
                     }
                 }
+
+                await FillFileLineDataEntries(data, canceltoken);
             }
             catch (System.Text.Json.JsonException ex)
             {
@@ -997,7 +1118,7 @@ public partial class FileProcessor(
             }
         }
 
-        FillLines(data, context);
+        await FillLinesAsync(data, context);
 
         context.SystemLineCount += data.System != null ? 1 : 0;
         context.BodyLineCount += data.Body != null ? 1 : 0;
@@ -1007,7 +1128,7 @@ public partial class FileProcessor(
         context.BodySignalCount += data.BodySignals.Count;
     }
 
-    protected void FillLines(
+    protected async Task FillLinesAsync(
             FileLineData data,
             FileProcessingContext context
         )
@@ -1091,7 +1212,7 @@ public partial class FileProcessor(
 
         if (data.Signals.Count != 0)
         {
-            var signalSet = GetOrAddSignalInfoSet(data.Signals.Values, data.System);
+            var signalSet = await GetOrAddSignalInfoSetAsync(data.Signals.Values, data.System);
 
             context.NewSignalEntries[data.LineNo] = new Models.FileLineSignal
             {
@@ -1169,49 +1290,49 @@ public partial class FileProcessor(
         }
     }
 
-    protected async Task SaveUpdatesAsync(FileProcessingContext context)
+    protected async Task SaveUpdatesAsync(FileProcessingContext context, CancellationToken canceltoken)
     {
-        await using (var ctx = await ContextFactory.CreateDbContextAsync())
+        await using (var ctx = await ContextFactory.CreateDbContextAsync(canceltoken))
         {
             ctx.AddRange(SystemCache.Values.Where(e => e.Id <= 0));
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(canceltoken);
         }
 
-        await SaveBodiesAsync();
-        await SaveSignalsAsync();
+        await SaveBodiesAsync(canceltoken);
+        await SaveSignalsAsync(canceltoken);
 
-        await SaveLinesAsync(context.NewLines);
+        await SaveLinesAsync(context.NewLines, canceltoken);
 
         context.NewLines.Clear();
 
-        await SaveErrorsAsync(context.NewDataErrors);
+        await SaveErrorsAsync(context.NewDataErrors, canceltoken);
 
         context.NewDataErrors.Clear();
 
-        await SaveBodyLinesAsync(context.NewBodyLines);
+        await SaveBodyLinesAsync(context.NewBodyLines, canceltoken);
 
         context.NewBodyLines.Clear();
 
-        await SaveStationLinesAsync(context.NewStationLines);
+        await SaveStationLinesAsync(context.NewStationLines, canceltoken);
 
         context.NewStationLines.Clear();
 
-        await SaveNavRouteEntriesAsync(context.NewNavRouteEntries);
+        await SaveNavRouteEntriesAsync(context.NewNavRouteEntries, canceltoken);
 
         context.NewNavRouteEntries.Clear();
 
-        await SaveSignalEntriesAsync(context.NewSignalEntries);
+        await SaveSignalEntriesAsync(context.NewSignalEntries, canceltoken);
 
         context.NewSignalEntries.Clear();
 
-        await SaveBodySignalEntriesAsync(context.NewBodySignalEntries);
+        await SaveBodySignalEntriesAsync(context.NewBodySignalEntries, canceltoken);
 
         context.NewBodySignalEntries.Clear();
     }
 
-    private async Task SaveBodiesAsync()
+    private async Task SaveBodiesAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var set in BodyCache.Values)
         {
@@ -1238,12 +1359,12 @@ public partial class FileProcessor(
             }
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveSignalsAsync()
+    private async Task SaveSignalsAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var ent in SignalInfoSetCache.Values)
         {
@@ -1277,12 +1398,12 @@ public partial class FileProcessor(
             }
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveLinesAsync(Dictionary<int, Models.FileLineInfo> newLines)
+    private async Task SaveLinesAsync(Dictionary<int, Models.FileLineInfo> newLines, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var softwareUpdates = new Dictionary<int, (Models.SoftwareInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
         var gameVersionUpdates = new Dictionary<int, (Models.GameVersionInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
@@ -1377,12 +1498,12 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveErrorsAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineDataError> newDataErrors)
+    private async Task SaveErrorsAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineDataError> newDataErrors, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         foreach (var ent in newDataErrors.Values)
         {
@@ -1407,12 +1528,12 @@ public partial class FileProcessor(
             }
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveBodyLinesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBody> newBodyLines)
+    private async Task SaveBodyLinesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBody> newBodyLines, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var bodyUpdates = new Dictionary<long, (Models.BodyInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
@@ -1452,12 +1573,12 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveStationLinesAsync(Dictionary<int, Models.FileLineStation> newStationLines)
+    private async Task SaveStationLinesAsync(Dictionary<int, Models.FileLineStation> newStationLines, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var stationUpdates = new Dictionary<int, (Models.StationInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
@@ -1497,12 +1618,12 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveNavRouteEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> newNavRouteEntries)
+    private async Task SaveNavRouteEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineNavRoute> newNavRouteEntries, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var systemUpdates = new Dictionary<int, (Models.SystemInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
@@ -1542,12 +1663,12 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveSignalEntriesAsync(Dictionary<int, Models.FileLineSignal> newSignalEntries)
+    private async Task SaveSignalEntriesAsync(Dictionary<int, Models.FileLineSignal> newSignalEntries, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var signalUpdates = new Dictionary<int, (Models.SignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
         var signalItemUpdates = new Dictionary<int, (Models.SignalInfoSetItem Info, DateTime? FirstSeen, DateTime? LastSeen)>();
@@ -1599,12 +1720,12 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 
-    private async Task SaveBodySignalEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> newBodySignalEntries)
+    private async Task SaveBodySignalEntriesAsync(Dictionary<(int LineNo, int EntryNum), Models.FileLineBodySignal> newBodySignalEntries, CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var signalUpdates = new Dictionary<int, (Models.BodySignalInfo Info, DateTime? FirstSeen, DateTime? LastSeen)>();
 
@@ -1649,6 +1770,6 @@ public partial class FileProcessor(
             entry.Property(e => e.LastSeen).CurrentValue = lastSeen;
         }
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(canceltoken);
     }
 }

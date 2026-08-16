@@ -18,9 +18,9 @@ public partial class FileProcessor
     private readonly Dictionary<int, Models.Sector> SectorsById = [];
     private readonly Dictionary<int, Models.Sector> SectorsByAddr = [];
 
-    private void Init_Systems()
+    private async Task Init_SystemsAsync(CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         if (Sectors.Count == 0 || SectorsById.Count == 0)
         {
@@ -127,7 +127,7 @@ public partial class FileProcessor
                 }
             }
 
-            ctx.SaveChanges();
+            await ctx.SaveChangesAsync(canceltoken);
 
             foreach (var sector in Sectors.Values)
             {
@@ -150,11 +150,11 @@ public partial class FileProcessor
         }
     }
 
-    private Models.Sector GetOrAddSector(string name)
+    private async Task<Models.Sector> GetOrAddSectorAsync(string name, CancellationToken canceltoken)
     {
         if (Sectors.TryGetValue(name, out var sector)) return sector;
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         sector = new Models.Sector
         {
@@ -177,13 +177,13 @@ public partial class FileProcessor
         }
 
         ctx.Add(sector);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
         Sectors[name] = sector;
         return sector;
     }
 
     [return: NotNullIfNotNull(nameof(name))]
-    private long? GetOrAddSystemName(string? name)
+    private async Task<long?> GetOrAddSystemNameAsync(string? name, CancellationToken canceltoken)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
 
@@ -199,7 +199,7 @@ public partial class FileProcessor
             var checkSuffix = SystemHelpers.GetPGSuffix(boxelid);
             Assert(name.EndsWith(checkSuffix), extraData: new { name, checkSuffix });
 
-            var sector = GetOrAddSector(sectorName);
+            var sector = await GetOrAddSectorAsync(sectorName, canceltoken);
 
             if (sector.SectorAddress is int sectoraddr && sectoraddr >= 0 && sectoraddr < 0x100000)
             {
@@ -214,10 +214,10 @@ public partial class FileProcessor
             return -systemname.Id;
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
         systemname = new Models.SystemName { Name = name };
         ctx.Add(systemname);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
 
         SystemNames[name] = systemname;
         SystemNamesById[systemname.Id] = systemname;
@@ -268,7 +268,14 @@ public partial class FileProcessor
         return Math.Round(val * 32) / 32;
     }
 
-    private Models.SystemInfo GetOrAddSystem(string? name, long? systemAddress, decimal? x, decimal? y, decimal? z)
+    private async Task<Models.SystemInfo> GetOrAddSystemAsync(
+            string? name,
+            long? systemAddress,
+            decimal? x,
+            decimal? y,
+            decimal? z,
+            CancellationToken canceltoken
+        )
     {
         x = RoundCoords(x);
         y = RoundCoords(y);
@@ -284,7 +291,7 @@ public partial class FileProcessor
             return system;
         }
 
-        var nameid = GetOrAddSystemName(name);
+        var nameid = await GetOrAddSystemNameAsync(name, canceltoken);
         var modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
         var revsysaddr = SystemHelpers.ModSystemAddressToSystemAddress(modsysaddr);
         Assert(systemAddress == revsysaddr, extraData: new { modsysaddr, systemAddress, revsysaddr });
@@ -339,16 +346,19 @@ public partial class FileProcessor
 
         systemAddress ??= namesysaddr;
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
-        system =
+        system = await
             ctx.Set<Models.SystemInfo>()
                .AsNoTracking()
-               .FirstOrDefault(e => e.SystemNameId == nameid
-                                 && e.ModSystemAddress == modsysaddr
-                                 && e.X == x
-                                 && e.Y == y
-                                 && e.Z == z);
+               .FirstOrDefaultAsync(
+                    e => e.SystemNameId == nameid
+                      && e.ModSystemAddress == modsysaddr
+                      && e.X == x
+                      && e.Y == y
+                      && e.Z == z,
+                    canceltoken
+               );
 
         if (system != null)
         {

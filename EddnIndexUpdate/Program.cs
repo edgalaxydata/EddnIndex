@@ -85,16 +85,30 @@ builder.Logging.AddDebug();
 using var host = builder.Build();
 var svcprov = host.Services;
 
-var processor = svcprov.GetRequiredService<FileProcessor>();
+await host.StartAsync();
 
-if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
+try
 {
-    while (!Debugger.IsAttached)
+    var processor = svcprov.GetRequiredService<FileProcessor>();
+    var lifetime = svcprov.GetRequiredService<IHostApplicationLifetime>();
+    var canceltoken = lifetime.ApplicationStopping;
+
+    if (builder.Configuration.GetValue<bool?>("WaitForDebugger") == true)
     {
-        Thread.Sleep(500);
+        while (!Debugger.IsAttached)
+        {
+            Thread.Sleep(500);
+        }
+
+        Debugger.Break();
     }
 
-    Debugger.Break();
+    await processor.ProcessDirectoriesAsync(dirnames, canceltoken);
 }
-
-await processor.ProcessDirectoriesAsync(dirnames);
+catch (OperationCanceledException)
+{
+}
+finally
+{
+    await host.StopAsync();
+}

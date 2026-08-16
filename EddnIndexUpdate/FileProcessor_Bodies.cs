@@ -16,15 +16,15 @@ public partial class FileProcessor
     private readonly Dictionary<string, Models.BodyDesignation> BodyDesignations = [];
     private readonly Dictionary<(int? BodyID, string? BodyType, string? ParentJson), Models.ParentSet> ParentSets = [];
 
-    private void Init_Bodies()
+    private async Task Init_BodiesAsync(CancellationToken canceltoken)
     {
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         if (BodyNames.Count == 0)
         {
             Logger.LogLoadingBodyNames();
 
-            foreach (var bodyname in ctx.Set<Models.BodyName>().AsNoTracking())
+            await foreach (var bodyname in ctx.Set<Models.BodyName>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 BodyNames[bodyname.Name] = bodyname;
             }
@@ -34,7 +34,7 @@ public partial class FileProcessor
         {
             Logger.LogLoadingBodyDesignations();
 
-            foreach (var desig in ctx.Set<Models.BodyDesignation>().AsNoTracking())
+            await foreach (var desig in ctx.Set<Models.BodyDesignation>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 BodyDesignations[desig.Designation] = desig;
             }
@@ -44,7 +44,7 @@ public partial class FileProcessor
         {
             Logger.LogLoadingParentSets();
 
-            foreach (var ps in ctx.Set<Models.ParentSet>().AsNoTracking())
+            await foreach (var ps in ctx.Set<Models.ParentSet>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 ParentSets[(ps.BodyID, ps.BodyType, ps.ParentJson)] = ps;
             }
@@ -285,44 +285,43 @@ public partial class FileProcessor
         return true;
     }
 
-    private bool TryGetBodyDesignation(
-            ReadOnlySpan<char> suffix,
-            ReadOnlySpan<char> sysname,
+    private async Task<Models.BodyDesignation?> TryGetBodyDesignationAsync(
+            ReadOnlyMemory<char> suffix,
+            ReadOnlyMemory<char> sysname,
             int? bodyId,
             string? bodyType,
             decimal? argOfPeriapsis,
             decimal? inclination,
-            [NotNullWhen(true)] out Models.BodyDesignation? desig
+            CancellationToken canceltoken
         )
     {
-        desig = null;
 
-        if (suffix.Length < sysname.Length) return false;
-        if (!suffix.StartsWith(sysname)) return false;
+        if (suffix.Length < sysname.Length) return null;
+        if (!suffix.Span.StartsWith(sysname.Span)) return null;
 
         suffix = suffix[sysname.Length..];
 
         var desigLookup = BodyDesignations.GetAlternateLookup<ReadOnlySpan<char>>();
 
-        if (desigLookup.TryGetValue(suffix, out desig)) return true;
+        if (desigLookup.TryGetValue(suffix.Span, out var desig)) return desig;
 
-        if (TryFillBodyDesignation(suffix, bodyId, bodyType, argOfPeriapsis, inclination, out desig))
+        if (TryFillBodyDesignation(suffix.Span, bodyId, bodyType, argOfPeriapsis, inclination, out desig))
         {
             desig = desig with { DesignationId = desig.GetDesignationId() };
 
-            using var ctx = ContextFactory.CreateDbContext();
+            await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
             ctx.Add(desig);
-            ctx.SaveChanges();
+            await ctx.SaveChangesAsync(canceltoken);
 
             BodyDesignations[desig.Designation] = desig;
 
-            return true;
+            return desig;
         }
 
-        return false;
+        return null;
     }
 
-    private int GetOrAddBodyName(
+    private async Task<(int BodyNameId, long? SystemNameId)> GetOrAddBodyNameAsync(
             string name,
             string systemName,
             Models.SystemInfo system,
@@ -330,16 +329,16 @@ public partial class FileProcessor
             string? bodyType,
             decimal? argOfPeriapsis,
             decimal? inclination,
-            out long? systemNameId
+            CancellationToken canceltoken
         )
     {
-        systemNameId = null;
+        long? systemNameId = null;
 
         if (!BodyNameOverrides.ContainsKey(name)
-            && TryGetBodyDesignation(name, systemName, bodyId, bodyType, argOfPeriapsis, inclination, out var desig))
+            && await TryGetBodyDesignationAsync(name.AsMemory(), systemName.AsMemory(), bodyId, bodyType, argOfPeriapsis, inclination, canceltoken) is { } desig)
         {
             systemNameId = system.SystemNameId;
-            return desig.DesignationId ?? -desig.Id;
+            return (desig.DesignationId ?? -desig.Id, systemNameId);
         }
 
         if (name.StartsWith(systemName) && (name.Contains("Comet") || name.Contains("Belt Cluster")))
@@ -354,26 +353,26 @@ public partial class FileProcessor
 
         if (BodyNames.TryGetValue(name, out var bodyName))
         {
-            return bodyName.Id;
+            return (bodyName.Id, systemNameId);
         }
 
         if (!BodyNameOverrides.ContainsKey(name))
         {
             for (var spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
             {
-                var sysNameSpan = name.AsSpan(0, spacePos);
+                var sysNameSpan = name.AsMemory(0, spacePos);
 
-                if (SystemHelpers.TrySplitProcgenName(sysNameSpan, out var sectorName, out _, out _, out _)
+                if (SystemHelpers.TrySplitProcgenName(sysNameSpan.Span, out var sectorName, out _, out _, out _)
                     && Sectors.ContainsKey(sectorName)
-                    && TryGetBodyDesignation(name, sysNameSpan, bodyId, bodyType, argOfPeriapsis, inclination, out desig))
+                    && await TryGetBodyDesignationAsync(name.AsMemory(), sysNameSpan, bodyId, bodyType, argOfPeriapsis, inclination, canceltoken) is { } desig2)
                 {
-                    systemNameId = GetOrAddSystemName(new string(sysNameSpan));
-                    return desig.DesignationId ?? -desig.Id;
+                    systemNameId = await GetOrAddSystemNameAsync(new string(sysNameSpan.Span), canceltoken);
+                    return (desig2.DesignationId ?? -desig2.Id, systemNameId);
                 }
             }
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         bodyName = new Models.BodyName
         {
@@ -381,14 +380,14 @@ public partial class FileProcessor
         };
 
         ctx.Add(bodyName);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
 
         BodyNames[name] = bodyName;
 
-        return bodyName.Id;
+        return (bodyName.Id, systemNameId);
     }
 
-    private int? GetOrAddParentSet(int? bodyId, string? bodyType, string? parentJson)
+    private async Task<int?> GetOrAddParentSetAsync(int? bodyId, string? bodyType, string? parentJson, CancellationToken canceltoken)
     {
         if (bodyId == null && bodyType == null && parentJson == null) return null;
 
@@ -418,11 +417,11 @@ public partial class FileProcessor
 
             if (JsonConvert.DeserializeObject<Dictionary<string, int>>(parentEntry)?.ToList() is [(string parentType, int parentBodyId)])
             {
-                parentSetId = GetOrAddParentSet(parentBodyId, parentType, parentParentJson);
+                parentSetId = await GetOrAddParentSetAsync(parentBodyId, parentType, parentParentJson, canceltoken);
             }
         }
 
-        using var ctx = ContextFactory.CreateDbContext();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         var set = new Models.ParentSet
         {
@@ -433,7 +432,7 @@ public partial class FileProcessor
         };
 
         ctx.Add(set);
-        ctx.SaveChanges();
+        await ctx.SaveChangesAsync(canceltoken);
 
         ParentSets[(bodyId, bodyType, parentJson)] = set;
 
@@ -533,7 +532,7 @@ public partial class FileProcessor
         return body != null;
     }
 
-    private (Models.BodyInfo body, short? smaerror, short? aoperror, short? incerror) GetOrAddBody(
+    private async Task<(Models.BodyInfo body, short? smaerror, short? aoperror, short? incerror)> GetOrAddBodyAsync(
             string name,
             string systemName,
             int? bodyId,
@@ -544,7 +543,8 @@ public partial class FileProcessor
             decimal? semiMajorAxis,
             DateTime? timestamp,
             string? gameVersion,
-            Models.SystemInfo system
+            Models.SystemInfo system,
+            CancellationToken canceltoken
         )
     {
         if (argOfPeriapsis == null || inclination == null || semiMajorAxis == null || semiMajorAxis <= 0)
@@ -564,12 +564,12 @@ public partial class FileProcessor
             return (body, smaerror, aoperror, incerror);
         }
 
-        var bodyNameId = GetOrAddBodyName(name, systemName, system, bodyId, bodyType, argOfPeriapsis, inclination, out var sysNameId);
-        var parentSetId = GetOrAddParentSet(bodyId, bodyType, parentJson);
+        var (bodyNameId, sysNameId) = await GetOrAddBodyNameAsync(name, systemName, system, bodyId, bodyType, argOfPeriapsis, inclination, canceltoken);
+        var parentSetId = await GetOrAddParentSetAsync(bodyId, bodyType, parentJson, canceltoken);
 
         if (system.Id != 0 && bodyList.Count == 0)
         {
-            using var ctx = ContextFactory.CreateDbContext();
+            await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
             bodyList.AddRange(
                 ctx.Set<Models.BodyInfo>()
@@ -646,7 +646,8 @@ public partial class FileProcessor
                 Logger.LogMultipleBodyDesignationOverridesMatched(systemName, bodyId, bodyType, timestamp, overrides.Count);
             }
 
-            if (overrides is [{ } ovr] && TryGetBodyDesignation(ovr.BodyDesignation, systemName, bodyId, bodyType, argOfPeriapsis, inclination, out var desig))
+            if (overrides is [{ } ovr]
+                && await TryGetBodyDesignationAsync(ovr.BodyDesignation.AsMemory(), systemName.AsMemory(), bodyId, bodyType, argOfPeriapsis, inclination, canceltoken) is { } desig)
             {
                 bodyDesigId = desig.Id;
             }

@@ -7,7 +7,7 @@ namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private bool TryProcessLineHeader(ref Utf8JsonReader reader, ref FileLineData data)
+    private bool TryProcessLineHeader(ref Utf8JsonReader reader, FileLineData data)
     {
         string? softwareName = null;
         string? softwareVersion = null;
@@ -78,12 +78,13 @@ public partial class FileProcessor
 
         //Assert(softwareName != null && softwareVersion != null);
 
-        data.Software = GetOrAddSoftware(softwareName ?? "", softwareVersion ?? "");
+        data.SoftwareName = softwareName;
+        data.SoftwareVersion = softwareVersion;
 
         return true;
     }
 
-    private bool TryProcessNavRoute(ref Utf8JsonReader reader, ref FileLineData data)
+    private bool TryProcessNavRoute(ref Utf8JsonReader reader, FileLineData data)
     {
         long? systemAddress = null;
         string? systemName = null;
@@ -109,7 +110,7 @@ public partial class FileProcessor
             {
                 Assert(systemName != null);
 
-                data.NavRouteSystems[itemnum] = GetOrAddSystem(systemName, systemAddress, x, y, z);
+                data.NavRouteSystemInfo[itemnum] = (systemName, systemAddress, x, y, z);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 4)
@@ -152,7 +153,7 @@ public partial class FileProcessor
         return true;
     }
 
-    private bool TryProcessSignals(ref Utf8JsonReader reader, ref FileLineData data)
+    private bool TryProcessSignals(ref Utf8JsonReader reader, FileLineData data)
     {
         string? name = null;
         string? type = null;
@@ -172,7 +173,7 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3 && name != null)
             {
-                data.Signals[itemnum] = GetOrAddSignal(name, type, isStation);
+                data.SignalInfo[itemnum] = (name, type, isStation);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -202,7 +203,7 @@ public partial class FileProcessor
         return true;
     }
 
-    private bool TryProcessBodySignals(ref Utf8JsonReader reader, ref FileLineData data)
+    private bool TryProcessBodySignals(ref Utf8JsonReader reader, FileLineData data)
     {
         string? type = null;
         int? count = null;
@@ -220,7 +221,7 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.EndObject && reader.CurrentDepth == 3 && type != null)
             {
-                data.BodySignals[itemnum] = GetOrAddBodySignal(type, count);
+                data.BodySignalInfo[itemnum] = (type, count, null, null, null, null);
             }
 
             if (reader.TokenType == JsonTokenType.PropertyName)
@@ -247,7 +248,7 @@ public partial class FileProcessor
         return true;
     }
 
-    private bool TryProcessRings(ref Utf8JsonReader reader, ref FileLineData data)
+    private bool TryProcessRings(ref Utf8JsonReader reader, FileLineData data)
     {
         string? ringName = null;
         decimal? innerRadius = null;
@@ -295,30 +296,13 @@ public partial class FileProcessor
         return true;
     }
 
-    private bool TryProcessLineMessage(ref Utf8JsonReader reader, ReadOnlySequence<byte> json, ref FileLineData data)
+    private bool TryProcessLineMessage(ref Utf8JsonReader reader, ReadOnlySequence<byte> json, FileLineData data)
     {
-        string? bodyName = null;
-        string? bodyType = null;
-        int? bodyId = null;
-        long? systemAddress = null;
-        long? marketId = null;
-        string? systemName = null;
-        string? stationName = null;
-        string? stationType = null;
-        string? parentsJson = null;
         string? codexName = null;
         string? codexCategory = null;
         string? codexSubCategory = null;
         string? codexRegion = null;
         long? codexEntryId = null;
-        decimal? x = null;
-        decimal? y = null;
-        decimal? z = null;
-        decimal? argOfPeriapsis = null;
-        decimal? inclination = null;
-        decimal? semiMajorAxis = null;
-        decimal? latitude = null;
-        decimal? longitude = null;
 
         while (reader.Read())
         {
@@ -340,62 +324,62 @@ public partial class FileProcessor
                 switch ((propname, reader.TokenType))
                 {
                     case ("Body" or "BodyName", JsonTokenType.String):
-                        bodyName = reader.GetString();
+                        data.BodyName = reader.GetString();
                         break;
                     case ("Body" or "BodyID", JsonTokenType.Number) when (reader.TryGetInt32(out int bid)):
-                        bodyId = bid;
+                        data.BodyId = bid;
                         break;
                     case ("BodyType", JsonTokenType.String):
-                        bodyType = reader.GetString();
+                        data.BodyType = reader.GetString();
                         break;
                     case ("Parents", JsonTokenType.StartArray):
                         var pos = reader.TokenStartIndex;
                         reader.Skip();
                         var span = json.Slice(pos, reader.TokenStartIndex + 1 - pos);
-                        parentsJson = Encoding.UTF8.GetString(span);
+                        data.ParentsJson = Encoding.UTF8.GetString(span);
                         break;
                     case ("Periapsis", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                        argOfPeriapsis = dv;
+                        data.ArgOfPeriapsis = dv;
                         break;
                     case ("OrbitalInclination", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                        inclination = dv;
+                        data.Inclination = dv;
                         break;
                     case ("SemiMajorAxis", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                        semiMajorAxis = dv;
+                        data.SemiMajorAxis = dv;
                         break;
                     case ("StarType", JsonTokenType.String):
-                        bodyType ??= "Star";
+                        data.BodyType ??= "Star";
                         break;
                     case ("PlanetClass", JsonTokenType.String):
-                        bodyType ??= "Planet";
+                        data.BodyType ??= "Planet";
                         break;
                     case ("SystemAddress", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
-                        systemAddress = dv;
+                        data.SystemAddress = dv;
                         break;
                     case ("StarSystem" or "System" or "SystemName" or "systemName", JsonTokenType.String):
-                        systemName = reader.GetString();
+                        data.SystemName = reader.GetString();
                         break;
                     case ("MarketID" or "marketId", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
-                        marketId = dv;
+                        data.MarketId = dv;
                         break;
                     case ("StationName" or "stationName", JsonTokenType.String):
-                        stationName = reader.GetString();
+                        data.StationName = reader.GetString();
                         break;
                     case ("CarrierID", JsonTokenType.String):
-                        stationName = reader.GetString();
-                        stationType ??= "FleetCarrier";
+                        data.StationName = reader.GetString();
+                        data.StationType ??= "FleetCarrier";
                         break;
                     case ("Name", JsonTokenType.String) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/approachsettlement/1") == true):
-                        stationName = reader.GetString();
+                        data.StationName = reader.GetString();
                         break;
                     case ("StationType", JsonTokenType.String):
-                        stationType = reader.GetString();
+                        data.StationType = reader.GetString();
                         break;
                     case ("Latitude", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                        latitude = Math.Round(dv, 6);
+                        data.Latitude = Math.Round(dv, 6);
                         break;
                     case ("Longitude", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
-                        longitude = Math.Round(dv, 6);
+                        data.Longitude = Math.Round(dv, 6);
                         break;
                     case ("Name", JsonTokenType.String) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/codexentry/1") == true):
                         codexName = reader.GetString();
@@ -424,21 +408,21 @@ public partial class FileProcessor
                         Assert(reader.TryGetDecimal(out var zv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.EndArray);
-                        x = xv;
-                        y = yv;
-                        z = zv;
+                        data.X = xv;
+                        data.Y = yv;
+                        data.Z = zv;
                         break;
                     case ("signals", JsonTokenType.StartArray) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == true):
-                        Assert(TryProcessSignals(ref reader, ref data));
+                        Assert(TryProcessSignals(ref reader, data));
                         break;
                     case ("Signals", JsonTokenType.StartArray) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == false):
-                        Assert(TryProcessBodySignals(ref reader, ref data));
+                        Assert(TryProcessBodySignals(ref reader, data));
                         break;
                     case ("Route", JsonTokenType.StartArray):
-                        Assert(TryProcessNavRoute(ref reader, ref data));
+                        Assert(TryProcessNavRoute(ref reader, data));
                         break;
                     case ("Rings", JsonTokenType.StartArray):
-                        Assert(TryProcessRings(ref reader, ref data));
+                        Assert(TryProcessRings(ref reader, data));
                         break;
                     case ("odyssey", JsonTokenType.True or JsonTokenType.False):
                         data.IsOdyssey = reader.GetBoolean();
@@ -456,14 +440,11 @@ public partial class FileProcessor
             }
         }
 
-        if (systemName != null)
+        if (data.SystemName != null)
         {
-            var system = GetOrAddSystem(systemName, systemAddress, x, y, z);
-            data.System = system;
-
-            if (bodyName != null)
+            if (data.BodyName != null)
             {
-                bodyType ??= bodyName.Split(' ') switch
+                data.BodyType ??= data.BodyName.Split(' ') switch
                 {
                     [.. _, _, "A" or "B" or "C" or "D", "Belt"] => BodyType.StellarRing.ToString(),
                     [.. _, _, "A" or "B" or "C" or "D", "Ring"] => BodyType.PlanetaryRing.ToString(),
@@ -472,31 +453,20 @@ public partial class FileProcessor
                     _ => null
                 };
 
-                if (bodyType == null && stationType == "SurfaceStation")
+                if (data.BodyType == null && data.StationType == "SurfaceStation")
                 {
-                    bodyType = "Planet";
+                    data.BodyType = "Planet";
                 }
-
-                var (body, smaerror, incerror, aoperror) = GetOrAddBody(bodyName, systemName, bodyId, bodyType, parentsJson, argOfPeriapsis, inclination, semiMajorAxis, data.Timestamp, data.GameVersion, system);
-                data.Body = body;
-                data.SemiMajorAxisError = smaerror;
-                data.InclinationError = incerror;
-                data.ArgOfPeriapsisError = aoperror;
-            }
-
-            foreach (var (itemnum, (name, innerRad, outerRad)) in data.RingData)
-            {
-                data.SubBodies[itemnum] = GetOrAddBody(name, systemName, null, null, null, 0, 0, (innerRad + outerRad) / 2, data.Timestamp, data.GameVersion, system);
             }
         }
         else
         {
-            if (bodyName != null)
+            if (data.BodyName != null)
             {
                 Fail("Body Name without System Name");
             }
 
-            if (stationName != null
+            if (data.StationName != null
                 && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials_capi/1") != true
                 && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fcmaterials/1") != true
                 && data.Schema?.StartsWith("https://eddn.edcd.io/schemas/dockingdenied/1") != true
@@ -507,24 +477,15 @@ public partial class FileProcessor
             }
         }
 
-        if (codexName != null && data.BodySignals.Count == 0)
+        if (codexName != null && data.BodySignalInfo.Count == 0)
         {
-            data.BodySignals[0] = GetOrAddBodySignal(codexName, 0, codexCategory, codexSubCategory, codexRegion, codexEntryId);
-            data.Latitude = latitude;
-            data.Longitude = longitude;
-        }
-
-        if (stationName != null || marketId != null)
-        {
-            data.Station = GetOrAddStation(stationName, marketId, stationType, systemName, systemAddress, bodyName, latitude, longitude);
-            data.Latitude = latitude;
-            data.Longitude = longitude;
+            data.BodySignalInfo[0] = (codexName, 0, codexCategory, codexSubCategory, codexRegion, codexEntryId);
         }
 
         return true;
     }
 
-    private bool TryProcessLine(ReadOnlySequence<byte> line, ref FileLineData data)
+    private bool TryProcessLine(ReadOnlySequence<byte> line, FileLineData data)
     {
         var reader = new Utf8JsonReader(line);
         bool gotSchema = false;
@@ -551,11 +512,11 @@ public partial class FileProcessor
                         gotSchema = true;
                         break;
                     case ("header", JsonTokenType.StartObject):
-                        Assert(TryProcessLineHeader(ref reader, ref data));
+                        Assert(TryProcessLineHeader(ref reader, data));
                         gotHeader = true;
                         break;
                     case ("message", JsonTokenType.StartObject):
-                        Assert(TryProcessLineMessage(ref reader, line, ref data));
+                        Assert(TryProcessLineMessage(ref reader, line, data));
                         gotMessage = true;
                         break;
                     default:
@@ -563,13 +524,6 @@ public partial class FileProcessor
                 }
             }
         }
-
-        if (data.Schema != null)
-        {
-            data.SchemaEvent = GetOrAddSchemaEvent(data.Schema, data.EventType);
-        }
-
-        data.GameVersionInfo = GetOrAddGameVersion(data.GameBuild, data.GameVersion, data.IsOdyssey, data.IsHorizons);
 
         return gotSchema && gotMessage && gotHeader;
     }

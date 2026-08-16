@@ -31,15 +31,15 @@ public partial class FileProcessor
                                      ? Settings.MessageTypesFile
                                      : _fileSystem.Path.Join(Settings.BaseDir, Settings.MessageTypesFile);
 
-    private async Task Init_OverridesAsync()
+    private async Task Init_OverridesAsync(CancellationToken canceltoken)
     {
-        await using var ctx = await ContextFactory.CreateDbContextAsync();
+        await using var ctx = await ContextFactory.CreateDbContextAsync(canceltoken);
 
         if (SchemasByFilePrefix.Count == 0)
         {
             Logger.LogLoadingMessageTypes();
 
-            foreach (var schema in ctx.Set<Models.FilePrefixSchema>().AsNoTracking())
+            await foreach (var schema in ctx.Set<Models.FilePrefixSchema>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 SchemasByFilePrefix[schema.FilenamePrefix] = schema;
             }
@@ -48,7 +48,7 @@ public partial class FileProcessor
             {
                 Logger.LogProcessingMessageTypesFile();
 
-                await foreach (var line in _fileSystem.File.ReadLinesAsync(MessageTypesFile))
+                await foreach (var line in _fileSystem.File.ReadLinesAsync(MessageTypesFile, canceltoken))
                 {
                     if (line.Trim().Split('\t') is [string schema, string prefix] && !SchemasByFilePrefix.ContainsKey(prefix))
                     {
@@ -73,7 +73,7 @@ public partial class FileProcessor
                     }
                 }
 
-                await ctx.SaveChangesAsync();
+                await ctx.SaveChangesAsync(canceltoken);
                 ctx.ChangeTracker.Clear();
             }
         }
@@ -82,7 +82,7 @@ public partial class FileProcessor
         {
             Logger.LogLoadingGameVersionDates();
 
-            foreach (var ent in ctx.Set<Models.GameVersionDate>())
+            await foreach (var ent in ctx.Set<Models.GameVersionDate>().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 GameVersionDates[ent.Version] = ent;
             }
@@ -91,12 +91,12 @@ public partial class FileProcessor
             {
                 Logger.LogRetrievingGameVersionDates();
 
-                await DownloadGameVersionsAsync(GameVersionDatesFile);
+                await DownloadGameVersionsAsync(GameVersionDatesFile, canceltoken);
             }
 
             if (_fileSystem.File.Exists(GameVersionDatesFile))
             {
-                await foreach (var line in _fileSystem.File.ReadLinesAsync(GameVersionDatesFile))
+                await foreach (var line in _fileSystem.File.ReadLinesAsync(GameVersionDatesFile, canceltoken))
                 {
                     if (JsonConvert.DeserializeObject<Models.GameVersionDate>(line) is { } ent)
                     {
@@ -114,7 +114,7 @@ public partial class FileProcessor
                 }
             }
 
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(canceltoken);
             ctx.ChangeTracker.Clear();
         }
 
@@ -122,7 +122,7 @@ public partial class FileProcessor
         {
             Logger.LogLoadingSystemNameOverrides();
 
-            foreach (var ent in ctx.Set<Models.SystemNameOverride>().AsNoTracking())
+            await foreach (var ent in ctx.Set<Models.SystemNameOverride>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
                 {
@@ -136,16 +136,17 @@ public partial class FileProcessor
             {
                 Logger.LogRetrievingSystemNameOverrides();
 
-                await DownloadSystemNameOverridesAsync(SystemOverridesFile);
+                await DownloadSystemNameOverridesAsync(SystemOverridesFile, canceltoken);
             }
 
             if (_fileSystem.File.Exists(SystemOverridesFile))
             {
-                foreach (var ent in _fileSystem
+                await foreach (var ent in _fileSystem
                                         .File
-                                        .ReadLines(SystemOverridesFile)
+                                        .ReadLinesAsync(SystemOverridesFile, canceltoken)
                                         .Select(JsonConvert.DeserializeObject<Models.SystemNameOverride>)
-                                        .OfType<Models.SystemNameOverride>())
+                                        .OfType<Models.SystemNameOverride>()
+                                        .WithCancellation(canceltoken))
                 {
                     if (!SystemNameOverrides.TryGetValue(ent.Name, out var overrides))
                     {
@@ -165,7 +166,7 @@ public partial class FileProcessor
                 }
             }
 
-            await ctx.SaveChangesAsync();
+            await ctx.SaveChangesAsync(canceltoken);
             ctx.ChangeTracker.Clear();
         }
 
@@ -175,7 +176,7 @@ public partial class FileProcessor
 
             var bysysaddr = new Dictionary<long, List<Models.BodyNameOverride>>();
 
-            foreach (var ent in ctx.Set<Models.BodyNameOverride>().AsNoTracking())
+            await foreach (var ent in ctx.Set<Models.BodyNameOverride>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
                 if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                 {
@@ -194,14 +195,14 @@ public partial class FileProcessor
             if (!_fileSystem.File.Exists(BodyOverridesFile))
             {
                 Logger.LogRetrievingBodyOverrides();
-                await DownloadBodyNameOverridesAsync(BodyOverridesFile);
+                await DownloadBodyNameOverridesAsync(BodyOverridesFile, canceltoken);
             }
 
             if (_fileSystem.File.Exists(BodyOverridesFile))
             {
-                foreach (var ent in _fileSystem
+                await foreach (var ent in _fileSystem
                                         .File
-                                        .ReadLines(BodyOverridesFile)
+                                        .ReadLinesAsync(BodyOverridesFile, canceltoken)
                                         .Select(e => JsonConvert.DeserializeObject<Models.BodyNameOverride>(e))
                                         .OfType<Models.BodyNameOverride>()
                                         .Select(e => e with
@@ -214,7 +215,8 @@ public partial class FileProcessor
                                                      || !GameVersionDates.TryGetValue(e.UntilVersion, out ver)
                                                       ? DateTime.SpecifyKind(DateTime.MaxValue, DateTimeKind.Utc)
                                                       : ver.UpdateTime
-                                        }))
+                                        })
+                                        .WithCancellation(canceltoken))
                 {
                     if (!BodyNameOverrides.TryGetValue(ent.BodyName, out var overrides))
                     {
@@ -271,7 +273,7 @@ public partial class FileProcessor
                 BodyNameOverrides[name].Add(ent);
             }
 
-            ctx.SaveChanges();
+            await ctx.SaveChangesAsync(canceltoken);
             ctx.ChangeTracker.Clear();
         }
     }
@@ -283,7 +285,7 @@ public partial class FileProcessor
         return line[name];
     }
 
-    private async Task DownloadBodyNameOverridesAsync(string filename)
+    private async Task DownloadBodyNameOverridesAsync(string filename, CancellationToken canceltoken)
     {
         var settings = Settings.BodyOverridesCsv;
 
@@ -292,14 +294,14 @@ public partial class FileProcessor
         if (!string.IsNullOrWhiteSpace(settings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            using var stream = await client.GetStreamAsync(settings.URI);
-            await ProcessBodyNameOverridesCsvAsync(byName, stream);
+            using var stream = await client.GetStreamAsync(settings.URI, canceltoken);
+            await ProcessBodyNameOverridesCsvAsync(byName, stream, canceltoken);
         }
 
         if (!string.IsNullOrWhiteSpace(settings.Filename))
         {
             using var stream = _fileSystem.File.Open(settings.Filename, FileMode.Open, FileAccess.Read, FileShare.Read);
-            await ProcessBodyNameOverridesCsvAsync(byName, stream);
+            await ProcessBodyNameOverridesCsvAsync(byName, stream, canceltoken);
         }
 
         if (byName.Count != 0)
@@ -312,7 +314,7 @@ public partial class FileProcessor
                 {
                     foreach (var ent in overrides)
                     {
-                        await writer.WriteLineAsync(JsonConvert.SerializeObject(ent, Formatting.None));
+                        await writer.WriteLineAsync(JsonConvert.SerializeObject(ent, Formatting.None).AsMemory(), canceltoken);
                     }
                 }
             }
@@ -321,11 +323,11 @@ public partial class FileProcessor
         }
     }
 
-    private async Task ProcessBodyNameOverridesCsvAsync(Dictionary<string, List<Models.BodyNameOverride>> byName, Stream stream)
+    private async Task ProcessBodyNameOverridesCsvAsync(Dictionary<string, List<Models.BodyNameOverride>> byName, Stream stream, CancellationToken canceltoken)
     {
         var fields = Settings.BodyOverridesCsv.Fields;
 
-        await foreach (var line in CsvReader.ReadFromStreamAsync(stream))
+        await foreach (var line in CsvReader.ReadFromStreamAsync(stream).WithCancellation(canceltoken))
         {
             var sysName = GetCsvField(line, fields.SystemName);
             var bodyDesig = GetCsvField(line, fields.BodyDesignation);
@@ -380,7 +382,7 @@ public partial class FileProcessor
         }
     }
 
-    private async Task DownloadSystemNameOverridesAsync(string filename)
+    private async Task DownloadSystemNameOverridesAsync(string filename, CancellationToken canceltoken)
     {
         var sysOverrides = new Dictionary<long, List<Models.SystemNameOverride>>();
         var overridesJsonSettings = Settings.SystemOverridesJson;
@@ -390,39 +392,39 @@ public partial class FileProcessor
         if (!string.IsNullOrWhiteSpace(overridesJsonSettings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var systemsJson = await client.GetStringAsync(overridesJsonSettings.URI);
+            var systemsJson = await client.GetStringAsync(overridesJsonSettings.URI, canceltoken);
             ProcessSystemOverridesJson(sysOverrides, systemsJson);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesJsonSettings.Filename))
         {
-            var systemsJson = await _fileSystem.File.ReadAllTextAsync(overridesJsonSettings.Filename);
+            var systemsJson = await _fileSystem.File.ReadAllTextAsync(overridesJsonSettings.Filename, canceltoken);
             ProcessSystemOverridesJson(sysOverrides, systemsJson);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesCsvSettings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var systemsCsv = await client.GetStringAsync(overridesCsvSettings.URI);
+            var systemsCsv = await client.GetStringAsync(overridesCsvSettings.URI, canceltoken);
             ProcessSystemOverridesCsv(sysOverrides, systemsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(overridesCsvSettings.Filename))
         {
-            var systemsCsv = await _fileSystem.File.ReadAllTextAsync(overridesCsvSettings.Filename);
+            var systemsCsv = await _fileSystem.File.ReadAllTextAsync(overridesCsvSettings.Filename, canceltoken);
             ProcessSystemOverridesCsv(sysOverrides, systemsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(renamesCsvSettings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var renamesCsv = await client.GetStringAsync(renamesCsvSettings.URI);
+            var renamesCsv = await client.GetStringAsync(renamesCsvSettings.URI, canceltoken);
             ProcessSystemRenamesCsv(sysOverrides, renamesCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(renamesCsvSettings.Filename))
         {
-            var renamesCsv = await _fileSystem.File.ReadAllTextAsync(renamesCsvSettings.Filename);
+            var renamesCsv = await _fileSystem.File.ReadAllTextAsync(renamesCsvSettings.Filename, canceltoken);
             ProcessSystemRenamesCsv(sysOverrides, renamesCsv);
         }
 
@@ -590,7 +592,7 @@ public partial class FileProcessor
         }
     }
 
-    private async Task DownloadGameVersionsAsync(string filename)
+    private async Task DownloadGameVersionsAsync(string filename, CancellationToken canceltoken)
     {
         var settings = Settings.GameVersionDatesCsv;
 
@@ -599,13 +601,13 @@ public partial class FileProcessor
         if (!string.IsNullOrWhiteSpace(settings.URI))
         {
             using var client = _httpClientFactory.CreateClient();
-            var versionsCsv = await client.GetStringAsync(settings.URI);
+            var versionsCsv = await client.GetStringAsync(settings.URI, canceltoken);
             ProcessGameVersionsCsv(versions, versionsCsv);
         }
 
         if (!string.IsNullOrWhiteSpace(settings.Filename))
         {
-            var versionsCsv = await _fileSystem.File.ReadAllTextAsync(settings.Filename);
+            var versionsCsv = await _fileSystem.File.ReadAllTextAsync(settings.Filename, canceltoken);
             ProcessGameVersionsCsv(versions, versionsCsv);
         }
 
