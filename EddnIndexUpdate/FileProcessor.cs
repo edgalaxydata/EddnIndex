@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -883,11 +883,11 @@ public partial class FileProcessor(
             );
         }
 
-        SystemCache.Clear();
-        SystemCacheById.Clear();
+        _systemCache.Clear();
+        _systemCacheById.Clear();
 
-        BodyCache.Clear();
-        BodyCacheById.Clear();
+        _bodyCache.Clear();
+        _bodyCacheById.Clear();
 
         SignalInfoSetCache.Clear();
         SignalInfoSetCacheById.Clear();
@@ -1292,7 +1292,7 @@ public partial class FileProcessor(
     {
         await using (var ctx = await _contextFactory.CreateDbContextAsync(canceltoken))
         {
-            ctx.AddRange(SystemCache.Values.Where(e => e.Id <= 0));
+            ctx.AddRange(_systemCache.Values.Where(e => e.Id <= 0));
             await ctx.SaveChangesAsync(canceltoken);
         }
 
@@ -1332,7 +1332,7 @@ public partial class FileProcessor(
     {
         await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
-        foreach (var set in BodyCache.Values)
+        foreach (var set in _bodyCache.Values)
         {
             foreach (var ent in set)
             {
@@ -1420,9 +1420,9 @@ public partial class FileProcessor(
         var gatewayTimestamp = ent.GatewayTimestamp;
         var schemaEvent = ent.SchemaEvent;
         var sector = ent.System?.SectorId is int sectorId
-                   ? SectorsById.GetValueOrDefault(sectorId)
+                   ? _sectorsById.GetValueOrDefault(sectorId)
                    : ent.System?.SectorAddress is int sectorAddr
-                   ? SectorsByAddr.GetValueOrDefault(sectorAddr)
+                   ? _sectorsByAddr.GetValueOrDefault(sectorAddr)
                    : null;
 
         ent = ent with

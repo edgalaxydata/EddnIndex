@@ -1,22 +1,20 @@
-﻿using System.Buffers;
+using System.Buffers;
 
 namespace EddnIndexUpdate;
 
 public class EventReader(Stream stream) : IDisposable
 {
-    private Stream? InnerStream = stream;
-    private readonly List<(byte[] Buffer, Memory<byte> Memory)> Buffers = [];
+    private Stream? _innerStream = stream;
+    private readonly List<(byte[] Buffer, Memory<byte> Memory)> _buffers = [];
 
-    private int BufferReadOffset;
-    private int BufferReadSegmentNumber;
+    private int _bufferReadOffset;
+    private int _bufferReadSegmentNumber;
     public long Position { get; private set; } = 0;
 
     private class BufferSegment : ReadOnlySequenceSegment<byte>
     {
         public BufferSegment(ReadOnlyMemory<byte> memory)
-        {
-            Memory = memory;
-        }
+            => Memory = memory;
 
         public BufferSegment Append(ReadOnlyMemory<byte> memory)
         {
@@ -32,17 +30,17 @@ public class EventReader(Stream stream) : IDisposable
 
     public bool TryReadLine(out ReadOnlySequence<byte> line)
     {
-        ObjectDisposedException.ThrowIf(InnerStream == null, this);
+        ObjectDisposedException.ThrowIf(_innerStream == null, this);
 
         var index = (SegmentNumber: -1, Offset: -1);
 
-        if (Buffers.Count != 0)
+        if (_buffers.Count != 0)
         {
-            var readpos = BufferReadOffset;
+            int readpos = _bufferReadOffset;
 
-            for (int i = BufferReadSegmentNumber; i < Buffers.Count; i++)
+            for (int i = _bufferReadSegmentNumber; i < _buffers.Count; i++)
             {
-                var pos = Buffers[i].Memory.Span[readpos..].IndexOf((byte)'\n');
+                int pos = _buffers[i].Memory.Span[readpos..].IndexOf((byte)'\n');
 
                 if (pos >= 0)
                 {
@@ -56,30 +54,30 @@ public class EventReader(Stream stream) : IDisposable
 
         while (index == (-1, -1))
         {
-            if (BufferReadSegmentNumber != 0)
+            if (_bufferReadSegmentNumber != 0)
             {
-                for (int i = 0; i < BufferReadSegmentNumber; i++)
+                for (int i = 0; i < _bufferReadSegmentNumber; i++)
                 {
-                    ArrayPool<byte>.Shared.Return(Buffers[i].Buffer);
+                    ArrayPool<byte>.Shared.Return(_buffers[i].Buffer);
                 }
 
-                Buffers.RemoveRange(0, BufferReadSegmentNumber);
-                BufferReadSegmentNumber = 0;
+                _buffers.RemoveRange(0, _bufferReadSegmentNumber);
+                _bufferReadSegmentNumber = 0;
             }
 
-            if (Buffers.Count == 0 || Buffers[^1].Memory.Length == Buffers[^1].Buffer.Length)
+            if (_buffers.Count == 0 || _buffers[^1].Memory.Length == _buffers[^1].Buffer.Length)
             {
-                Buffers.Add((ArrayPool<byte>.Shared.Rent(65536), Memory<byte>.Empty));
+                _buffers.Add((ArrayPool<byte>.Shared.Rent(65536), Memory<byte>.Empty));
             }
 
-            var lastBuffer = Buffers[^1].Buffer;
-            var bufferWritePos = Buffers[^1].Memory.Length;
+            byte[] lastBuffer = _buffers[^1].Buffer;
+            int bufferWritePos = _buffers[^1].Memory.Length;
 
             int len;
 
             try
             {
-                len = InnerStream.Read(lastBuffer, bufferWritePos, lastBuffer.Length);
+                len = _innerStream.Read(lastBuffer, bufferWritePos, lastBuffer.Length);
             }
             catch (IOException)
             {
@@ -93,39 +91,39 @@ public class EventReader(Stream stream) : IDisposable
                 return false;
             }
 
-            Buffers[^1] = (lastBuffer, lastBuffer.AsMemory(0, bufferWritePos + len));
+            _buffers[^1] = (lastBuffer, lastBuffer.AsMemory(0, bufferWritePos + len));
 
-            var readpos = Buffers.Count == BufferReadSegmentNumber + 1 ? BufferReadOffset : 0;
+            int readpos = _buffers.Count == _bufferReadSegmentNumber + 1 ? _bufferReadOffset : 0;
 
-            var pos = Buffers[^1].Memory.Span[readpos..].IndexOf((byte)'\n');
+            int pos = _buffers[^1].Memory.Span[readpos..].IndexOf((byte)'\n');
 
             if (pos >= 0)
             {
-                index = (Buffers.Count - 1, readpos + pos);
+                index = (_buffers.Count - 1, readpos + pos);
                 break;
             }
         }
 
-        var firstSegment = new BufferSegment(Buffers[BufferReadSegmentNumber].Memory);
+        var firstSegment = new BufferSegment(_buffers[_bufferReadSegmentNumber].Memory);
         var lastSegment = firstSegment;
-        var segmentNumber = BufferReadSegmentNumber;
+        int segmentNumber = _bufferReadSegmentNumber;
 
         while (segmentNumber < index.SegmentNumber)
         {
-            lastSegment = lastSegment.Append(Buffers[++segmentNumber].Memory);
+            lastSegment = lastSegment.Append(_buffers[++segmentNumber].Memory);
         }
 
-        line = new ReadOnlySequence<byte>(firstSegment, BufferReadOffset, lastSegment, index.Offset + 1);
+        line = new ReadOnlySequence<byte>(firstSegment, _bufferReadOffset, lastSegment, index.Offset + 1);
 
-        if (index.Offset + 1 == Buffers[index.SegmentNumber].Memory.Length)
+        if (index.Offset + 1 == _buffers[index.SegmentNumber].Memory.Length)
         {
-            BufferReadSegmentNumber = index.SegmentNumber + 1;
-            BufferReadOffset = 0;
+            _bufferReadSegmentNumber = index.SegmentNumber + 1;
+            _bufferReadOffset = 0;
         }
         else
         {
-            BufferReadSegmentNumber = index.SegmentNumber;
-            BufferReadOffset = index.Offset + 1;
+            _bufferReadSegmentNumber = index.SegmentNumber;
+            _bufferReadOffset = index.Offset + 1;
         }
 
         Position += line.Length;
@@ -134,15 +132,15 @@ public class EventReader(Stream stream) : IDisposable
 
     public void Dispose()
     {
-        foreach (var buffer in Buffers)
+        foreach (var buffer in _buffers)
         {
             ArrayPool<byte>.Shared.Return(buffer.Buffer);
         }
 
-        Buffers.Clear();
+        _buffers.Clear();
 
-        InnerStream?.Dispose();
-        InnerStream = null;
+        _innerStream?.Dispose();
+        _innerStream = null;
         GC.SuppressFinalize(this);
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using EddnIndex.Common;
@@ -19,16 +19,16 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 2)
             {
-                var name = reader.GetString();
+                string? name = reader.GetString();
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }
 
                 switch ((name, reader.TokenType))
                 {
-                    case ("gatewayTimestamp", JsonTokenType.String) when (reader.TryGetDateTime(out var gwts)):
+                    case ("gatewayTimestamp", JsonTokenType.String) when reader.TryGetDateTime(out var gwts):
                         data.GatewayTimestamp = gwts;
                         break;
                     case ("build", JsonTokenType.String):
@@ -115,16 +115,16 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 4)
             {
-                var propname = reader.GetString();
+                string? propname = reader.GetString();
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }
 
                 switch ((propname, reader.TokenType))
                 {
-                    case ("SystemAddress", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
+                    case ("SystemAddress", JsonTokenType.Number) when reader.TryGetInt64(out long dv):
                         systemAddress = dv;
                         break;
                     case ("StarSystem", JsonTokenType.String):
@@ -133,13 +133,13 @@ public partial class FileProcessor
                     case ("StarPos", JsonTokenType.StartArray):
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.Number);
-                        Assert(reader.TryGetDecimal(out var xv));
+                        Assert(reader.TryGetDecimal(out decimal xv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.Number);
-                        Assert(reader.TryGetDecimal(out var yv));
+                        Assert(reader.TryGetDecimal(out decimal yv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.Number);
-                        Assert(reader.TryGetDecimal(out var zv));
+                        Assert(reader.TryGetDecimal(out decimal zv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.EndArray);
                         x = xv;
@@ -178,9 +178,9 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName)
             {
-                var propname = reader.GetString();
+                string? propname = reader.GetString();
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }
@@ -226,16 +226,16 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName)
             {
-                var propname = reader.GetString();
+                string? propname = reader.GetString();
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }
 
                 switch ((propname, reader.TokenType))
                 {
-                    case ("Count", JsonTokenType.Number) when (reader.TryGetInt32(out var cnt)):
+                    case ("Count", JsonTokenType.Number) when reader.TryGetInt32(out int cnt):
                         count = cnt;
                         break;
                     case ("Type", JsonTokenType.String):
@@ -271,9 +271,9 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName)
             {
-                var propname = reader.GetString();
+                string? propname = reader.GetString();
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }
@@ -283,10 +283,10 @@ public partial class FileProcessor
                     case ("Name", JsonTokenType.String):
                         ringName = reader.GetString();
                         break;
-                    case ("InnerRadius", JsonTokenType.Number) when reader.TryGetDecimal(out var dv):
+                    case ("InnerRadius", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         innerRadius = dv;
                         break;
-                    case ("OuterRadius", JsonTokenType.Number) when reader.TryGetDecimal(out var dv):
+                    case ("OuterRadius", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         outerRadius = dv;
                         break;
                 }
@@ -310,11 +310,11 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 2)
             {
-                var propname = reader.GetString();
+                string? propname = reader.GetString();
 
                 Assert(propname != null);
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }
@@ -326,25 +326,25 @@ public partial class FileProcessor
                     case ("Body" or "BodyName", JsonTokenType.String):
                         data.BodyName = reader.GetString();
                         break;
-                    case ("Body" or "BodyID", JsonTokenType.Number) when (reader.TryGetInt32(out int bid)):
+                    case ("Body" or "BodyID", JsonTokenType.Number) when reader.TryGetInt32(out int bid):
                         data.BodyId = bid;
                         break;
                     case ("BodyType", JsonTokenType.String):
                         data.BodyType = reader.GetString();
                         break;
                     case ("Parents", JsonTokenType.StartArray):
-                        var pos = reader.TokenStartIndex;
+                        long pos = reader.TokenStartIndex;
                         reader.Skip();
                         var span = json.Slice(pos, reader.TokenStartIndex + 1 - pos);
                         data.ParentsJson = Encoding.UTF8.GetString(span);
                         break;
-                    case ("Periapsis", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
+                    case ("Periapsis", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         data.ArgOfPeriapsis = dv;
                         break;
-                    case ("OrbitalInclination", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
+                    case ("OrbitalInclination", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         data.Inclination = dv;
                         break;
-                    case ("SemiMajorAxis", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
+                    case ("SemiMajorAxis", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         data.SemiMajorAxis = dv;
                         break;
                     case ("StarType", JsonTokenType.String):
@@ -353,13 +353,13 @@ public partial class FileProcessor
                     case ("PlanetClass", JsonTokenType.String):
                         data.BodyType ??= "Planet";
                         break;
-                    case ("SystemAddress", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
+                    case ("SystemAddress", JsonTokenType.Number) when reader.TryGetInt64(out long dv):
                         data.SystemAddress = dv;
                         break;
                     case ("StarSystem" or "System" or "SystemName" or "systemName", JsonTokenType.String):
                         data.SystemName = reader.GetString();
                         break;
-                    case ("MarketID" or "marketId", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
+                    case ("MarketID" or "marketId", JsonTokenType.Number) when reader.TryGetInt64(out long dv):
                         data.MarketId = dv;
                         break;
                     case ("StationName" or "stationName", JsonTokenType.String):
@@ -369,19 +369,19 @@ public partial class FileProcessor
                         data.StationName = reader.GetString();
                         data.StationType ??= "FleetCarrier";
                         break;
-                    case ("Name", JsonTokenType.String) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/approachsettlement/1") == true):
+                    case ("Name", JsonTokenType.String) when data.Schema?.StartsWith("https://eddn.edcd.io/schemas/approachsettlement/1") == true:
                         data.StationName = reader.GetString();
                         break;
                     case ("StationType", JsonTokenType.String):
                         data.StationType = reader.GetString();
                         break;
-                    case ("Latitude", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
+                    case ("Latitude", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         data.Latitude = Math.Round(dv, 6);
                         break;
-                    case ("Longitude", JsonTokenType.Number) when (reader.TryGetDecimal(out var dv)):
+                    case ("Longitude", JsonTokenType.Number) when reader.TryGetDecimal(out decimal dv):
                         data.Longitude = Math.Round(dv, 6);
                         break;
-                    case ("Name", JsonTokenType.String) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/codexentry/1") == true):
+                    case ("Name", JsonTokenType.String) when data.Schema?.StartsWith("https://eddn.edcd.io/schemas/codexentry/1") == true:
                         codexName = reader.GetString();
                         break;
                     case ("Category", JsonTokenType.String):
@@ -393,29 +393,29 @@ public partial class FileProcessor
                     case ("Region", JsonTokenType.String):
                         codexRegion = reader.GetString();
                         break;
-                    case ("EntryID", JsonTokenType.Number) when (reader.TryGetInt64(out var dv)):
+                    case ("EntryID", JsonTokenType.Number) when reader.TryGetInt64(out long dv):
                         codexEntryId = dv;
                         break;
                     case ("StarPos", JsonTokenType.StartArray):
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.Number);
-                        Assert(reader.TryGetDecimal(out var xv));
+                        Assert(reader.TryGetDecimal(out decimal xv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.Number);
-                        Assert(reader.TryGetDecimal(out var yv));
+                        Assert(reader.TryGetDecimal(out decimal yv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.Number);
-                        Assert(reader.TryGetDecimal(out var zv));
+                        Assert(reader.TryGetDecimal(out decimal zv));
                         Assert(reader.Read());
                         Assert(reader.TokenType == JsonTokenType.EndArray);
                         data.X = xv;
                         data.Y = yv;
                         data.Z = zv;
                         break;
-                    case ("signals", JsonTokenType.StartArray) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == true):
+                    case ("signals", JsonTokenType.StartArray) when data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == true:
                         Assert(TryProcessSignals(ref reader, data));
                         break;
-                    case ("Signals", JsonTokenType.StartArray) when (data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == false):
+                    case ("Signals", JsonTokenType.StartArray) when data.Schema?.StartsWith("https://eddn.edcd.io/schemas/fsssignaldiscovered/1") == false:
                         Assert(TryProcessBodySignals(ref reader, data));
                         break;
                     case ("Route", JsonTokenType.StartArray):
@@ -433,7 +433,7 @@ public partial class FileProcessor
                     case ("event", JsonTokenType.String):
                         data.EventType = reader.GetString();
                         break;
-                    case ("timestamp", JsonTokenType.String) when (reader.TryGetDateTime(out var ts)):
+                    case ("timestamp", JsonTokenType.String) when reader.TryGetDateTime(out var ts):
                         data.Timestamp = ts;
                         break;
                 }
@@ -498,9 +498,9 @@ public partial class FileProcessor
 
             if (reader.TokenType == JsonTokenType.PropertyName && reader.CurrentDepth == 1)
             {
-                var name = reader.GetString();
+                string? name = reader.GetString();
 
-                while (reader.TokenType == JsonTokenType.PropertyName || reader.TokenType == JsonTokenType.Comment)
+                while (reader.TokenType is JsonTokenType.PropertyName or JsonTokenType.Comment)
                 {
                     Assert(reader.Read());
                 }

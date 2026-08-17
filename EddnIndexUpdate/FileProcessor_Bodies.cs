@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using EddnIndex.Common;
 using Microsoft.EntityFrameworkCore;
@@ -9,44 +9,44 @@ namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private readonly Dictionary<(string BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.BodyInfo>> BodyCache = [];
-    private readonly Dictionary<long, Models.BodyInfo> BodyCacheById = [];
+    private readonly Dictionary<(string BodyName, int? BodyID, string? BodyType, string? ParentJson, long? SystemNameId, long? ModSystemAddress, decimal? X, decimal? Y, decimal? Z), List<Models.BodyInfo>> _bodyCache = [];
+    private readonly Dictionary<long, Models.BodyInfo> _bodyCacheById = [];
 
-    private readonly Dictionary<string, Models.BodyName> BodyNames = [];
-    private readonly Dictionary<string, Models.BodyDesignation> BodyDesignations = [];
-    private readonly Dictionary<(int? BodyID, string? BodyType, string? ParentJson), Models.ParentSet> ParentSets = [];
+    private readonly Dictionary<string, Models.BodyName> _bodyNames = [];
+    private readonly Dictionary<string, Models.BodyDesignation> _bodyDesignations = [];
+    private readonly Dictionary<(int? BodyID, string? BodyType, string? ParentJson), Models.ParentSet> _parentSets = [];
 
     private async Task Init_BodiesAsync(CancellationToken canceltoken)
     {
         await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
-        if (BodyNames.Count == 0)
+        if (_bodyNames.Count == 0)
         {
             _logger.LogLoadingBodyNames();
 
             await foreach (var bodyname in ctx.Set<Models.BodyName>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                BodyNames[bodyname.Name] = bodyname;
+                _bodyNames[bodyname.Name] = bodyname;
             }
         }
 
-        if (BodyDesignations.Count == 0)
+        if (_bodyDesignations.Count == 0)
         {
             _logger.LogLoadingBodyDesignations();
 
             await foreach (var desig in ctx.Set<Models.BodyDesignation>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                BodyDesignations[desig.Designation] = desig;
+                _bodyDesignations[desig.Designation] = desig;
             }
         }
 
-        if (ParentSets.Count == 0)
+        if (_parentSets.Count == 0)
         {
             _logger.LogLoadingParentSets();
 
             await foreach (var ps in ctx.Set<Models.ParentSet>().AsNoTracking().AsAsyncEnumerable().WithCancellation(canceltoken))
             {
-                ParentSets[(ps.BodyID, ps.BodyType, ps.ParentJson)] = ps;
+                _parentSets[(ps.BodyID, ps.BodyType, ps.ParentJson)] = ps;
             }
         }
     }
@@ -60,7 +60,7 @@ public partial class FileProcessor
             [NotNullWhen(true)] out Models.BodyDesignation? desig
         )
     {
-        var suffixstr = suffix.ToString();
+        string suffixstr = suffix.ToString();
 
         desig = new Models.BodyDesignation
         {
@@ -82,12 +82,12 @@ public partial class FileProcessor
 
         if (suffix.Length == 0) return false;
 
-        var spacePos = suffix.IndexOf(' ');
+        int spacePos = suffix.IndexOf(' ');
         if (spacePos == -1) spacePos = suffix.Length;
 
         if (suffix[0] >= 'A' && suffix[0] <= 'Z' - spacePos && (suffix.Length < 6 || (!suffix[..6].SequenceEqual("Comet ") && !suffix[1..6].SequenceEqual(" Belt"))))
         {
-            var star = suffix[0];
+            char star = suffix[0];
 
             desig = desig with
             {
@@ -142,7 +142,7 @@ public partial class FileProcessor
             return false;
         }
 
-        if (suffix.Length >= 7 && suffix[..6].SequenceEqual("Comet ") && int.TryParse(suffix[6..], out var cometNum))
+        if (suffix.Length >= 7 && suffix[..6].SequenceEqual("Comet ") && int.TryParse(suffix[6..], out int cometNum))
         {
             desig = desig with
             {
@@ -165,11 +165,11 @@ public partial class FileProcessor
         {
             if (suffix.Length != 0) return false;
 
-            var pluscount = planet.Count('+');
+            int pluscount = planet.Count('+');
             Span<Range> ranges = stackalloc Range[pluscount + 1];
             planet.Split(ranges, '+', StringSplitOptions.None);
             var firstPlanet = planet[ranges[0]];
-            if (!int.TryParse(firstPlanet, out var firstPlanetNum)) return false;
+            if (!int.TryParse(firstPlanet, out int firstPlanetNum)) return false;
 
             desig = desig with
             {
@@ -256,8 +256,8 @@ public partial class FileProcessor
                 if (suffix.Length != 0) return false;
                 if (moon.Length < 3 || moon.Length % 2 != 1 || moon[1] != '+') return false;
 
-                var firstMoon = moon[0];
-                if (firstMoon < 'a' || firstMoon > 'z') return false;
+                char firstMoon = moon[0];
+                if (firstMoon is < 'a' or > 'z') return false;
 
                 desig = desig with
                 {
@@ -273,13 +273,16 @@ public partial class FileProcessor
 
                 for (int i = 1; i < (moon.Length - 1) / 2; i++)
                 {
-                    if (moon[i * 2 - 1] != '+') return false;
+                    if (moon[(i * 2) - 1] != '+') return false;
                     if (moon[i * 2] != firstMoon + i) return false;
                 }
 
                 return true;
             }
-            else if (moon.Length != 1 || moon[0] < 'a' || moon[0] > 'z') return false;
+            else if (moon is [] or [< 'a' and > 'z'] or [_, _, ..])
+            {
+                return false;
+            }
         }
 
         return true;
@@ -301,7 +304,7 @@ public partial class FileProcessor
 
         suffix = suffix[sysname.Length..];
 
-        var desigLookup = BodyDesignations.GetAlternateLookup<ReadOnlySpan<char>>();
+        var desigLookup = _bodyDesignations.GetAlternateLookup<ReadOnlySpan<char>>();
 
         if (desigLookup.TryGetValue(suffix.Span, out var desig)) return desig;
 
@@ -313,7 +316,7 @@ public partial class FileProcessor
             ctx.Add(desig);
             await ctx.SaveChangesAsync(canceltoken);
 
-            BodyDesignations[desig.Designation] = desig;
+            _bodyDesignations[desig.Designation] = desig;
 
             return desig;
         }
@@ -351,19 +354,19 @@ public partial class FileProcessor
             _logger.LogPotentialAnomalousBodyNameParsingCase(name, systemName);
         }
 
-        if (BodyNames.TryGetValue(name, out var bodyName))
+        if (_bodyNames.TryGetValue(name, out var bodyName))
         {
             return (bodyName.Id, systemNameId);
         }
 
         if (!_bodyNameOverrides.ContainsKey(name))
         {
-            for (var spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
+            for (int spacePos = name.LastIndexOf(' '); spacePos > 0; spacePos = name.LastIndexOf(' ', spacePos - 1))
             {
                 var sysNameSpan = name.AsMemory(0, spacePos);
 
-                if (SystemHelpers.TrySplitProcgenName(sysNameSpan.Span, out var sectorName, out _, out _, out _)
-                    && Sectors.ContainsKey(sectorName)
+                if (SystemHelpers.TrySplitProcgenName(sysNameSpan.Span, out string? sectorName, out _, out _, out _)
+                    && _sectors.ContainsKey(sectorName)
                     && await TryGetBodyDesignationAsync(name.AsMemory(), sysNameSpan, bodyId, bodyType, argOfPeriapsis, inclination, canceltoken) is { } desig2)
                 {
                     systemNameId = await GetOrAddSystemNameAsync(new string(sysNameSpan.Span), canceltoken);
@@ -382,7 +385,7 @@ public partial class FileProcessor
         ctx.Add(bodyName);
         await ctx.SaveChangesAsync(canceltoken);
 
-        BodyNames[name] = bodyName;
+        _bodyNames[name] = bodyName;
 
         return (bodyName.Id, systemNameId);
     }
@@ -396,7 +399,7 @@ public partial class FileProcessor
             parentJson = parentJson.Replace("}, {", "},{").Replace("\": ", "\":");
         }
 
-        if (ParentSets.TryGetValue((bodyId, bodyType, parentJson), out var parentSet))
+        if (_parentSets.TryGetValue((bodyId, bodyType, parentJson), out var parentSet))
         {
             return parentSet.Id;
         }
@@ -405,12 +408,12 @@ public partial class FileProcessor
 
         if (parentJson != null && parentJson.StartsWith('[') && parentJson.EndsWith(']'))
         {
-            var parentEntry = parentJson[1..^1];
+            string parentEntry = parentJson[1..^1];
             string? parentParentJson = null;
 
             if (parentJson.Contains("},"))
             {
-                var parentIndex = parentJson.IndexOf("},") + 2;
+                int parentIndex = parentJson.IndexOf("},") + 2;
                 parentParentJson = "[" + parentJson[parentIndex..].Trim();
                 parentEntry = parentJson[1..(parentIndex - 1)];
             }
@@ -434,22 +437,23 @@ public partial class FileProcessor
         ctx.Add(set);
         await ctx.SaveChangesAsync(canceltoken);
 
-        ParentSets[(bodyId, bodyType, parentJson)] = set;
+        _parentSets[(bodyId, bodyType, parentJson)] = set;
 
         return set.Id;
     }
 
     private static decimal DecimalRecipPow10(int scale)
     {
-        if (scale < 0 || scale > 28) throw new ArgumentOutOfRangeException(nameof(scale));
+        ArgumentOutOfRangeException.ThrowIfLessThan(scale, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(scale, 28);
         return new decimal(1, 0, 0, false, (byte)scale);
     }
 
     private static sbyte DecimalOrder(decimal dv, decimal error)
     {
-        var log10 = (int)Math.Floor(Math.Log10((double)dv) - 0.5);
+        int log10 = (int)Math.Floor(Math.Log10((double)dv) - 0.5);
 
-        return (sbyte)(dv * DecimalRecipPow10(log10) <= 1 - error / 2 ? log10 + 1 : log10);
+        return (sbyte)(dv * DecimalRecipPow10(log10) <= 1 - (error / 2) ? log10 + 1 : log10);
     }
 
     private static decimal NormalizeAngle(decimal angle)
@@ -482,7 +486,7 @@ public partial class FileProcessor
                                                 && e.Inclination.HasValue == inclination.HasValue)
                                        .Select(e => (
                                             Body: e,
-                                            SMADiff: (semiMajorAxis ?? 0) * DecimalRecipPow10(e.SemiMajorAxisScale) - (e.SemiMajorAxis ?? 0),
+                                            SMADiff: ((semiMajorAxis ?? 0) * DecimalRecipPow10(e.SemiMajorAxisScale)) - (e.SemiMajorAxis ?? 0),
                                             AOPDiff: NormalizeAngle((argOfPeriapsis ?? 0) - (e.ArgOfPeriapsis ?? 0)),
                                             IncDiff: NormalizeAngle((inclination ?? 0) - (e.Inclination ?? 0))
                                        ))
@@ -554,18 +558,18 @@ public partial class FileProcessor
             semiMajorAxis = null;
         }
 
-        if (!BodyCache.TryGetValue((name, bodyId, bodyType, parentJson, system.SystemNameId, system.ModSystemAddress, system.X, system.Y, system.Z), out var bodyList))
+        if (!_bodyCache.TryGetValue((name, bodyId, bodyType, parentJson, system.SystemNameId, system.ModSystemAddress, system.X, system.Y, system.Z), out var bodyList))
         {
-            BodyCache[(name, bodyId, bodyType, parentJson, system.SystemNameId, system.ModSystemAddress, system.X, system.Y, system.Z)] = bodyList = [];
+            _bodyCache[(name, bodyId, bodyType, parentJson, system.SystemNameId, system.ModSystemAddress, system.X, system.Y, system.Z)] = bodyList = [];
         }
 
-        if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out var body, out var smaerror, out var incerror, out var aoperror))
+        if (TryGetMatchingBody(bodyList, argOfPeriapsis, inclination, semiMajorAxis, out var body, out short? smaerror, out short? incerror, out short? aoperror))
         {
             return (body, smaerror, aoperror, incerror);
         }
 
         var (bodyNameId, sysNameId) = await GetOrAddBodyNameAsync(name, systemName, system, bodyId, bodyType, argOfPeriapsis, inclination, canceltoken);
-        var parentSetId = await GetOrAddParentSetAsync(bodyId, bodyType, parentJson, canceltoken);
+        int? parentSetId = await GetOrAddParentSetAsync(bodyId, bodyType, parentJson, canceltoken);
 
         if (system.Id != 0 && bodyList.Count == 0)
         {
@@ -582,9 +586,9 @@ public partial class FileProcessor
                    .AsEnumerable()
                    .Select(e =>
                    {
-                       if (!BodyCacheById.TryGetValue(e.Id, out var byid))
+                       if (!_bodyCacheById.TryGetValue(e.Id, out var byid))
                        {
-                           BodyCacheById[e.Id] = byid = e;
+                           _bodyCacheById[e.Id] = byid = e;
                        }
 
                        return byid;
@@ -653,8 +657,8 @@ public partial class FileProcessor
             }
         }
 
-        var smascale = (sbyte)(semiMajorAxis == null || semiMajorAxis < 10 ? 0 : Math.Floor(Math.Log10((double)semiMajorAxis) - 0.5));
-        var sma = semiMajorAxis * DecimalRecipPow10(smascale);
+        sbyte smascale = (sbyte)(semiMajorAxis is null or < 10 ? 0 : Math.Floor(Math.Log10((double)semiMajorAxis) - 0.5));
+        decimal? sma = semiMajorAxis * DecimalRecipPow10(smascale);
 
         if (sma > 10)
         {

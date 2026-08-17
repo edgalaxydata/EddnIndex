@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using EddnIndex.Common;
 using EddnIndex.Common.Sectors;
@@ -9,37 +9,37 @@ namespace EddnIndexUpdate;
 
 public partial class FileProcessor
 {
-    private readonly Dictionary<(string? SystemName, long? SystemAddress, decimal? X, decimal? Y, decimal? Z), Models.SystemInfo> SystemCache = [];
-    private readonly Dictionary<int, Models.SystemInfo> SystemCacheById = [];
+    private readonly Dictionary<(string? SystemName, long? SystemAddress, decimal? X, decimal? Y, decimal? Z), Models.SystemInfo> _systemCache = [];
+    private readonly Dictionary<int, Models.SystemInfo> _systemCacheById = [];
 
-    private readonly Dictionary<string, Models.SystemName> SystemNames = [];
-    private readonly Dictionary<int, Models.SystemName> SystemNamesById = [];
-    private readonly Dictionary<string, Models.Sector> Sectors = [];
-    private readonly Dictionary<int, Models.Sector> SectorsById = [];
-    private readonly Dictionary<int, Models.Sector> SectorsByAddr = [];
+    private readonly Dictionary<string, Models.SystemName> _systemNames = [];
+    private readonly Dictionary<int, Models.SystemName> _systemNamesById = [];
+    private readonly Dictionary<string, Models.Sector> _sectors = [];
+    private readonly Dictionary<int, Models.Sector> _sectorsById = [];
+    private readonly Dictionary<int, Models.Sector> _sectorsByAddr = [];
 
     private async Task Init_SystemsAsync(CancellationToken canceltoken)
     {
         await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
-        if (Sectors.Count == 0 || SectorsById.Count == 0)
+        if (_sectors.Count == 0 || _sectorsById.Count == 0)
         {
             _logger.LogLoadingSectors();
 
             foreach (var sector in ctx.Set<Models.Sector>().AsNoTracking())
             {
-                Sectors[sector.Name] = sector;
+                _sectors[sector.Name] = sector;
             }
 
             foreach (var hagrp in HandAuthoredSectors.Sectors.GroupBy(e => (e.Name, e.X0, e.Y0, e.Z0, e.ValidFrom, e.ValidTo)))
             {
                 var (name, x0, y0, z0, validFrom, validTo) = hagrp.Key;
-                var sizeX = hagrp.Max(e => e.X + e.Radius) - x0;
-                var sizeY = hagrp.Max(e => e.Y + e.Radius) - y0;
-                var sizeZ = hagrp.Max(e => e.Z + e.Radius) - z0;
-                var haSectorPriority = (int)hagrp.Min(e => e.Id);
+                decimal sizeX = hagrp.Max(e => e.X + e.Radius) - x0;
+                decimal sizeY = hagrp.Max(e => e.Y + e.Radius) - y0;
+                decimal sizeZ = hagrp.Max(e => e.Z + e.Radius) - z0;
+                int haSectorPriority = (int)hagrp.Min(e => e.Id);
 
-                if (!Sectors.ContainsKey(name))
+                if (!_sectors.ContainsKey(name))
                 {
                     var sector = new Models.Sector
                     {
@@ -58,7 +58,7 @@ public partial class FileProcessor
 
                     ctx.Add(sector);
 
-                    Sectors[sector.Name] = sector;
+                    _sectors[sector.Name] = sector;
                 }
             }
 
@@ -84,9 +84,9 @@ public partial class FileProcessor
                         {
                             for (int z0 = 0; z0 <= r; z0++)
                             {
-                                var x = x0 * xm + xo + 39;
-                                var y = y0 * ym + yo + 32;
-                                var z = z0 * zm + zo + 39;
+                                int x = (x0 * xm) + xo + 39;
+                                int y = (y0 * ym) + yo + 32;
+                                int z = (z0 * zm) + zo + 39;
 
                                 if (swapxz)
                                 {
@@ -95,17 +95,17 @@ public partial class FileProcessor
 
                                 if (!gotSectors.Contains((x, y, z)))
                                 {
-                                    var sectorAddress = x + y * 128 + z * 8192;
-                                    var sectorName = PGSectors.GetSectorName(sectorAddress);
+                                    int sectorAddress = x + (y << 7) + (z << 13);
+                                    string sectorName = PGSectors.GetSectorName(sectorAddress);
 
-                                    if (!Sectors.ContainsKey(sectorName))
+                                    if (!_sectors.ContainsKey(sectorName))
                                     {
                                         var sector = new Models.Sector
                                         {
                                             Name = sectorName,
-                                            X0 = x * 1280 - 49985,
-                                            Y0 = y * 1280 - 40985,
-                                            Z0 = z * 1280 - 24105,
+                                            X0 = (x * 1280) - 49985,
+                                            Y0 = (y * 1280) - 40985,
+                                            Z0 = (z * 1280) - 24105,
                                             IsHASector = false,
                                             SectorAddress = sectorAddress,
                                             SizeX = 1280,
@@ -116,7 +116,7 @@ public partial class FileProcessor
                                         };
 
                                         ctx.Add(sector);
-                                        Sectors[sectorName] = sector;
+                                        _sectors[sectorName] = sector;
                                     }
 
                                     gotSectors.Add((x, y, z));
@@ -129,30 +129,30 @@ public partial class FileProcessor
 
             await ctx.SaveChangesAsync(canceltoken);
 
-            foreach (var sector in Sectors.Values)
+            foreach (var sector in _sectors.Values)
             {
-                SectorsById[sector.Id] = sector;
+                _sectorsById[sector.Id] = sector;
 
                 if (sector.SectorAddress is int sectorAddr)
                 {
-                    SectorsByAddr[sectorAddr] = sector;
+                    _sectorsByAddr[sectorAddr] = sector;
                 }
             }
         }
 
-        if (SystemNames.Count == 0 || SystemNamesById.Count == 0)
+        if (_systemNames.Count == 0 || _systemNamesById.Count == 0)
         {
             foreach (var sysname in ctx.Set<Models.SystemName>().AsNoTracking())
             {
-                SystemNames[sysname.Name] = sysname;
-                SystemNamesById[sysname.Id] = sysname;
+                _systemNames[sysname.Name] = sysname;
+                _systemNamesById[sysname.Id] = sysname;
             }
         }
     }
 
     private async Task<Models.Sector> GetOrAddSectorAsync(string name, CancellationToken canceltoken)
     {
-        if (Sectors.TryGetValue(name, out var sector)) return sector;
+        if (_sectors.TryGetValue(name, out var sector)) return sector;
 
         await using var ctx = await _contextFactory.CreateDbContextAsync(canceltoken);
 
@@ -169,16 +169,16 @@ public partial class FileProcessor
                 SizeX = 1280,
                 SizeY = 1280,
                 SizeZ = 1280,
-                X0 = (sectorid & 0x7F) * 1280 - 49985,
-                Y0 = ((sectorid >> 7) & 0x3F) * 1280 - 40985,
-                Z0 = ((sectorid >> 13) & 0x7F) * 1280 - 24105,
+                X0 = ((sectorid & 0x7F) * 1280) - 49985,
+                Y0 = (((sectorid >> 7) & 0x3F) * 1280) - 40985,
+                Z0 = (((sectorid >> 13) & 0x7F) * 1280) - 24105,
                 IsHASector = false
             };
         }
 
         ctx.Add(sector);
         await ctx.SaveChangesAsync(canceltoken);
-        Sectors[name] = sector;
+        _sectors[name] = sector;
         return sector;
     }
 
@@ -187,29 +187,26 @@ public partial class FileProcessor
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
 
-        if (SystemHelpers.TrySplitProcgenName(name, out var sectorName, out var mid, out var n2, out var masscode)
-            && n2 >= 0
-            && n2 < 65536
-            && mid >= 0
-            && mid < 0x200000
-            && masscode >= 0
-            && masscode < 8)
+        if (SystemHelpers.TrySplitProcgenName(name, out string? sectorName, out int mid, out int n2, out int masscode)
+            && n2 is >= 0 and < 65536
+            && mid is >= 0 and < 0x200000
+            && masscode is >= 0 and < 8)
         {
-            var boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
-            var checkSuffix = SystemHelpers.GetPGSuffix(boxelid);
+            long boxelid = (long)n2 | ((long)mid << 16) | ((long)masscode << 37);
+            string checkSuffix = SystemHelpers.GetPGSuffix(boxelid);
             Assert(name.EndsWith(checkSuffix), extraData: new { name, checkSuffix });
 
             var sector = await GetOrAddSectorAsync(sectorName, canceltoken);
 
             if (sector.SectorAddress is int sectoraddr && sectoraddr >= 0 && sectoraddr < 0x100000)
             {
-                return (long)sectoraddr << 40 | boxelid;
+                return ((long)sectoraddr << 40) | boxelid;
             }
 
-            return ((long)sector.Id + 0x100000) << 40 | boxelid;
+            return (((long)sector.Id + 0x100000) << 40) | boxelid;
         }
 
-        if (SystemNames.TryGetValue(name, out var systemname))
+        if (_systemNames.TryGetValue(name, out var systemname))
         {
             return -systemname.Id;
         }
@@ -219,47 +216,46 @@ public partial class FileProcessor
         ctx.Add(systemname);
         await ctx.SaveChangesAsync(canceltoken);
 
-        SystemNames[name] = systemname;
-        SystemNamesById[systemname.Id] = systemname;
+        _systemNames[name] = systemname;
+        _systemNamesById[systemname.Id] = systemname;
 
         return -systemname.Id;
     }
 
     private long? TryGetNameModSystemAddress(long? nameid)
     {
-        if (nameid is not long nameId) return null;
+        if (nameid is not long nameId || nameId < 0)
+        {
+            return null;
+        }
 
-        if (nameId >= 0 && nameId < 0x1000_0000_0000_0000)
+        if (nameId < 0x1000_0000_0000_0000)
         {
             return nameId;
         }
-        else if (nameId >= 0x1000_0000_0000_0000)
+
+        long n2 = nameId & 0xFFFF;
+        long mid = (nameId >> 16) & 0x1FFFFF;
+        int masscode = (int)((nameId >> 37) & 7);
+        int sectorid = (int)((nameId >> 40) - 0x100000);
+
+        if (!_sectorsById.TryGetValue(sectorid, out var sector)
+            || sector.X0 == null
+            || sector.Y0 == null
+            || sector.Z0 == null)
         {
-            var n2 = nameId & 0xFFFF;
-            var mid = (nameId >> 16) & 0x1FFFFF;
-            var masscode = (int)((nameId >> 37) & 7);
-            var sectorid = (int)((nameId >> 40) - 0x100000);
-
-            if (!SectorsById.TryGetValue(sectorid, out var sector)
-                || sector.X0 == null
-                || sector.Y0 == null
-                || sector.Z0 == null)
-            {
-                return null;
-            }
-
-            var x0 = (int)((sector.X0 + 49985) / (10 << masscode));
-            var y0 = (int)((sector.Y0 + 40985) / (10 << masscode));
-            var z0 = (int)((sector.Z0 + 24105) / (10 << masscode));
-            var xv = (mid & 0x7F) + x0;
-            var yv = ((mid >> 7) & 0x7F) + y0;
-            var zv = ((mid >> 14) & 0x7F) + z0;
-            mid = (xv & (0x7F >> masscode)) | ((yv & (0x7F >> masscode)) << 7) | ((zv & (0x7F >> masscode)) << 14);
-            var sectorAddr = (xv >> (7 - masscode)) | ((yv >> (7 - masscode)) << 7) | ((zv >> (7 - masscode)) << 13);
-            return n2 | (mid << 16) | ((long)masscode << 37) | (sectorAddr << 40);
+            return null;
         }
 
-        return null;
+        int x0 = (int)((sector.X0 + 49985) / (10 << masscode));
+        int y0 = (int)((sector.Y0 + 40985) / (10 << masscode));
+        int z0 = (int)((sector.Z0 + 24105) / (10 << masscode));
+        long xv = (mid & 0x7F) + x0;
+        long yv = ((mid >> 7) & 0x7F) + y0;
+        long zv = ((mid >> 14) & 0x7F) + z0;
+        mid = (xv & (0x7F >> masscode)) | ((yv & (0x7F >> masscode)) << 7) | ((zv & (0x7F >> masscode)) << 14);
+        long sectorAddr = (xv >> (7 - masscode)) | ((yv >> (7 - masscode)) << 7) | ((zv >> (7 - masscode)) << 13);
+        return n2 | (mid << 16) | ((long)masscode << 37) | (sectorAddr << 40);
     }
 
     private static decimal? RoundCoords(decimal? v)
@@ -286,16 +282,16 @@ public partial class FileProcessor
             x = y = z = null;
         }
 
-        if (SystemCache.TryGetValue((name, systemAddress, x, y, z), out var system))
+        if (_systemCache.TryGetValue((name, systemAddress, x, y, z), out var system))
         {
             return system;
         }
 
-        var nameid = await GetOrAddSystemNameAsync(name, canceltoken);
-        var modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
-        var revsysaddr = SystemHelpers.ModSystemAddressToSystemAddress(modsysaddr);
+        long? nameid = await GetOrAddSystemNameAsync(name, canceltoken);
+        long? modsysaddr = SystemHelpers.SystemAddressToModSystemAddress(systemAddress);
+        long? revsysaddr = SystemHelpers.ModSystemAddressToSystemAddress(modsysaddr);
         Assert(systemAddress == revsysaddr, extraData: new { modsysaddr, systemAddress, revsysaddr });
-        var namemodsysaddr = TryGetNameModSystemAddress(nameid);
+        long? namemodsysaddr = TryGetNameModSystemAddress(nameid);
 
         DateTime? validFrom = null;
         DateTime? validTo = null;
@@ -340,8 +336,8 @@ public partial class FileProcessor
 
         modsysaddr ??= namemodsysaddr;
 
-        var namesysaddr = SystemHelpers.ModSystemAddressToSystemAddress(namemodsysaddr);
-        var revnamemodsysaddr = SystemHelpers.SystemAddressToModSystemAddress(namesysaddr);
+        long? namesysaddr = SystemHelpers.ModSystemAddressToSystemAddress(namemodsysaddr);
+        long? revnamemodsysaddr = SystemHelpers.SystemAddressToModSystemAddress(namesysaddr);
         Assert(namemodsysaddr == revnamemodsysaddr, extraData: new { namemodsysaddr, namesysaddr, revnamemodsysaddr });
 
         systemAddress ??= namesysaddr;
@@ -362,9 +358,9 @@ public partial class FileProcessor
 
         if (system != null)
         {
-            if (!SystemCacheById.TryGetValue(system.Id, out var byid))
+            if (!_systemCacheById.TryGetValue(system.Id, out var byid))
             {
-                SystemCacheById[system.Id] = byid = system;
+                _systemCacheById[system.Id] = byid = system;
             }
 
             system = byid;
@@ -384,11 +380,11 @@ public partial class FileProcessor
             };
         }
 
-        SystemCache.Add((name, systemAddress, x, y, z), system);
+        _systemCache.Add((name, systemAddress, x, y, z), system);
 
         if (systemAddress != null && modsysaddr == namemodsysaddr)
         {
-            SystemCache.Add((name, null, x, y, z), system);
+            _systemCache.Add((name, null, x, y, z), system);
         }
 
         return system;
