@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.IO.Abstractions;
 using EddnIndexLookup.DTO;
 using EddnIndexLookup.Filters;
 using EddnIndexLookup.Services;
@@ -11,9 +12,15 @@ namespace EddnIndexLookup.Controllers;
 [EnableCors]
 [Route("")]
 [ApiController]
-public class LookupController(EddnLookupService service) : ControllerBase
+public class LookupController(
+        EddnLookupService service,
+        ILogger<LookupController> logger,
+        IFileSystem fileSystem
+    ) : ControllerBase
 {
     private readonly EddnLookupService _service = service;
+    private readonly ILogger _logger = logger;
+    private readonly IFileSystem _fileSystem = fileSystem;
 
     /// <summary>Lookup systems</summary>
     /// <remarks>
@@ -922,9 +929,23 @@ public class LookupController(EddnLookupService service) : ControllerBase
     [HttpGet("events/{filename}/{lineno}")]
     [HttpHead("events/{filename}/{lineno}")]
     [ProducesResponseType<EDDNEvent>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<EDDNEvent>> ExtractLineAsync(string filename, int lineno)
+    public async Task<ActionResult<EDDNEvent>> ExtractLineAsync(
+            [Required] string filename,
+            [Required, Range(1, int.MaxValue)] int lineno
+        )
     {
+        if (filename.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
+        {
+            ModelState.AddModelError(nameof(filename), "Invalid filename");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return Problem();
+        }
+
         if (await _service.ExtractLineAsync(filename, lineno, HttpContext.RequestAborted) is not { } line)
         {
             return NotFound();

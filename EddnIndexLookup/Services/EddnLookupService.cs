@@ -39,7 +39,8 @@ public class EddnLookupService(
     private readonly LinkedList<(string Filename, int ChunkNo, List<string> Lines, DateTime LastUsed)> _lineCacheLRU = [];
     private readonly Lock _lineCacheLock = new();
 
-    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = options.Value.MaxExtractCacheSize ?? (128 * 1048576) });
+    private readonly IMemoryCache _cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = options.Value.MaxExtractCacheSize ?? (512 * 1048576) });
+    private readonly long _maxChunkSize = options.Value.MaxIndexChunkSize ?? (4 * 1048576);
 
     private readonly TimeSpan _maxCacheAge = TimeSpan.FromHours(1);
     private readonly int _maxCacheSize = 8192;
@@ -1367,12 +1368,18 @@ public class EddnLookupService(
     /// <returns></returns>
     public async Task<string?> ExtractLineAsync(string filename, int lineno, CancellationToken canceltoken)
     {
-        if (_settings.IndexedDir == null
-            || lineno <= 0
-            || string.IsNullOrWhiteSpace(filename)
-            || filename.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
+        if (_settings.IndexedDir == null)
         {
+            _logger.LogWarning("Indexed Directory is not set");
             return null;
+        }
+
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(lineno, 0);
+        ArgumentException.ThrowIfNullOrWhiteSpace(filename);
+
+        if (filename.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
+        {
+            throw new ArgumentException("Invalid filename", nameof(filename));
         }
 
         filename = filename.Trim();
@@ -1388,8 +1395,15 @@ public class EddnLookupService(
         {
             file = await ctx.Set<Models.FileInfo>().FirstOrDefaultAsync(e => e.FileName == filename, cancellationToken: canceltoken);
 
-            if (file == null || string.IsNullOrWhiteSpace(file.FileName) || file.FileName.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
+            if (file == null)
             {
+                _logger.LogInformation("File not found in database: {FileName}", filename);
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(file.FileName) || file.FileName.ContainsAny(_fileSystem.Path.GetInvalidFileNameChars()))
+            {
+                _logger.LogInformation("Invalid filename in database: {FileName}", filename);
                 return null;
             }
         }
@@ -1413,8 +1427,15 @@ public class EddnLookupService(
 
         string indexFilename = _fileSystem.Path.Join(_settings.IndexedDir, $"{file.Date:yyyy-MM}", file.FileName);
 
-        if (!_fileSystem.File.Exists(indexFilename) || !_fileSystem.File.Exists(indexFilename + ".index"))
+        if (!_fileSystem.File.Exists(indexFilename))
         {
+            _logger.LogWarning("Indexed file does not exist: {FileName}", filename);
+            return null;
+        }
+
+        if (!_fileSystem.File.Exists(indexFilename + ".index"))
+        {
+            _logger.LogWarning("Indexed file index does not exist: {FileName}", filename);
             return null;
         }
 
@@ -1423,7 +1444,7 @@ public class EddnLookupService(
         long dataSize = info.Length;
         Span<byte> ixStartEndPos = stackalloc byte[16];
 
-        for (int retries = 3; retries > 0; retries--)
+        for (int retries = 3; ; retries--)
         {
             using var indexStream = _fileSystem.File.Open(indexFilename + ".index", FileMode.Open, FileAccess.Read, FileShare.Read);
 
@@ -1436,6 +1457,7 @@ public class EddnLookupService(
 
             if (chunkNo >= (indexStream.Length / 8) - 1)
             {
+                _logger.LogInformation("Chunk {ChunkNo} is beyond end of file {FileName}", chunkNo, filename);
                 return null;
             }
 
@@ -1446,8 +1468,15 @@ public class EddnLookupService(
             startPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndPos);
             endPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndPos[8..]);
 
-            if (endPos < startPos || endPos - startPos > 1048576)
+            if (endPos < startPos)
             {
+                _logger.LogWarning("Malformed index - endPos less than startPos");
+                return null;
+            }
+
+            if (endPos - startPos > _maxChunkSize)
+            {
+                _logger.LogWarning("Chunk too large - {ChunkSize} > {MaxChunkSize}", endPos - startPos, _maxChunkSize);
                 return null;
             }
 
@@ -1468,8 +1497,11 @@ public class EddnLookupService(
             {
                 if (retries == 0)
                 {
+                    _logger.LogWarning("Retries exhausted due to indexed file update");
                     return null;
                 }
+
+                _logger.LogInformation("Indexed file updated - retrying");
 
                 dataSize = newSize;
                 dataLastMod = newLastMod;
@@ -1564,8 +1596,6 @@ public class EddnLookupService(
                 return itemNo < lines.Count ? lines[itemNo] : null;
             }
         }
-
-        return null;
     }
 
     /// <summary>Get systems in a sector</summary>

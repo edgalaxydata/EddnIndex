@@ -552,7 +552,7 @@ public partial class FileProcessor(
             startPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndData);
             endPos = BinaryPrimitives.ReadInt64LittleEndian(ixStartEndData[8..]);
 
-            if (endPos > startPos && endPos - startPos < 1048576)
+            if (endPos > startPos && endPos - startPos < 4 * 1048576)
             {
                 using var ixbzStream = _fileSystem.File.Open(indexFilename, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using (var ixmemStream = new MemoryStream())

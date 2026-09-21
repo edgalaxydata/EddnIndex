@@ -16,6 +16,11 @@ public class EddnLookupServiceSettings
     public long? MaxExtractCacheSize { get; set; }
 
     /// <summary>
+    /// Maximum index chunk size
+    /// </summary>
+    public long? MaxIndexChunkSize { get; set; }
+
+    /// <summary>
     /// Dump directories to enumerate for tableinfo
     /// </summary>
     public Dictionary<string, string> DumpDirs { get; set; } = [];
