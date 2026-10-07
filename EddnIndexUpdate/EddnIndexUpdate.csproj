@@ -12,7 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Csv" Version="2.0.245" />
     <PackageReference Include="DotNetZip.Original" Version="2025.2.15" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <PrivateAssets>all</PrivateAssets>
@@ -37,7 +37,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.12" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
-    <PackageReference Include="Testably.Abstractions" Version="10.3.0" />
+    <PackageReference Include="Testably.Abstractions" Version="10.4.0" />
   </ItemGroup>
 
   <ItemGroup>
