@@ -89,10 +89,10 @@ public class LookupController(
                         : [..
                             e.Bodies.Select(b => b with
                             {
-                                Matches = e.Matches is null
+                                Matches = b.Matches is null
                                         ? null
                                         : [..
-                                            e.Matches.Select(m => m with
+                                            b.Matches.Select(m => m with
                                             {
                                                 Extract = GetExtractUrl(m.FileName, m.LineNo)
                                             })
@@ -278,10 +278,10 @@ public class LookupController(
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out long systemId64) ? systemId64 : null;
         systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
 
-        if (systemAddress >= (1 << 55))
+        if (systemAddress >= (1L << 55) && bodyId == 0)
         {
             bodyId = (int)(systemAddress >> 55);
-            systemAddress &= (1 << 55) - 1;
+            systemAddress &= (1L << 55) - 1;
         }
 
         if (Request.Method == "HEAD")
