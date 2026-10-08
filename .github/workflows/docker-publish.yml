@@ -46,7 +46,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract base image for EddnIndexUpdate
-        id: base_update_extract
+        id: extract-base_update
         shell: python
         env:
           DOCKERFILE: EddnIndexUpdate.Dockerfile
@@ -108,7 +108,7 @@ jobs:
       - name: Pre-pull and inspect EddnIndexUpdate base image
         id: base_update
         env:
-          BASE_IMAGE: ${{ steps.extract_update.outputs.image }}
+          BASE_IMAGE: ${{ steps.extract-base_update.outputs.image }}
         run: |
           image="${BASE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
@@ -165,7 +165,7 @@ jobs:
           sbom: true
 
       - name: Extract base image for EddnIndexLookup
-        id: base_lookup_extract
+        id: extract-base_lookup
         shell: python
         env:
           DOCKERFILE: EddnIndexLookup.Dockerfile
@@ -227,7 +227,7 @@ jobs:
       - name: Pre-pull and inspect Lookup base image
         id: base_lookup
         env:
-          BASE_IMAGE: ${{ steps.extract_lookup.outputs.image }}
+          BASE_IMAGE: ${{ steps.extract-base_lookup.outputs.image }}
         run: |
           image="${BASE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
