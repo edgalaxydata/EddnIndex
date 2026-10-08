@@ -71,7 +71,7 @@ jobs:
             type=raw,value=${{ steps.version.outputs.app_version }}
           labels: |
             org.opencontainers.image.version=${{ steps.version.outputs.app_version }}
-            org.opencontainers.image.ref.name=${{ github.ref.name }}
+            org.opencontainers.image.ref.name=${{ github.ref_name }}
             org.opencontainers.image.base.name=${{ steps.base_update.outputs.image }}
             org.opencontainers.image.base.digest=${{ steps.base_update.outputs.digest }}
 
@@ -119,7 +119,7 @@ jobs:
             type=raw,value=${{ steps.version.outputs.app_version }}
           labels: |
             org.opencontainers.image.version=${{ steps.version.outputs.app_version }}
-            org.opencontainers.image.ref.name=${{ github.ref.name }}
+            org.opencontainers.image.ref.name=${{ github.ref_name }}
             org.opencontainers.image.base.name=${{ steps.base_lookup.outputs.image }}
             org.opencontainers.image.base.digest=${{ steps.base_lookup.outputs.digest }}
 
