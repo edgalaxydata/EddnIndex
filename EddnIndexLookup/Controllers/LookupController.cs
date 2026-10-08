@@ -278,7 +278,7 @@ public class LookupController(
         systemAddress ??= long.TryParse(Request.Query["systemId64"], out long systemId64) ? systemId64 : null;
         systemAddress ??= long.TryParse(Request.Query["systemAddress"], out systemId64) ? systemId64 : null;
 
-        if (systemAddress >= (1L << 55) && bodyId == 0)
+        if (systemAddress >= (1L << 55) && bodyId is null or 0)
         {
             bodyId = (int)(systemAddress >> 55);
             systemAddress &= (1L << 55) - 1;
