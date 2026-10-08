@@ -51,16 +51,28 @@ jobs:
           DOCKERFILE: EddnIndexUpdate.Dockerfile
           TARGET_STAGE: final
         run: |
+          echo "##[group]Extracting base image from $DOCKERFILE"
           image="$(python scripts/extract-dockerfile-base.py "$DOCKERFILE" "$TARGET_STAGE")"
+          echo "Image: $image"
+          echo "##[endgroup]"
           echo "image=$image" >> "$GITHUB_OUTPUT"
           image_inspect_log="$(mktemp "$RUNNER_TEMP/image_inspect.XXXXXX")"
+          echo "##[group]Pulling base image"
+          echo "[command]docker pull $image"
           docker pull "$image"
+          echo "##[endgroup]"
+          echo "##[group]Inspecting base image"
+          echo "[command]docker image inspect $image"
           docker image inspect "$image" | tee "$image_inspect_log"
+          echo "##[endgroup]"
+          echo "##[group]Extracting digest from base image"
           digest="$(jq -r '.[0].RepoDigests[0]' "$image_inspect_log")"
           if [[ "${digest}" =~ @(sha256:.*) ]]; then
             digest="${BASH_REMATCH[1]}"
           fi
+          echo "Digest: $digest"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "##[endgroup]"
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
@@ -102,16 +114,28 @@ jobs:
           DOCKERFILE: EddnIndexLookup.Dockerfile
           TARGET_STAGE: final
         run: |
+          echo "##[group]Extracting base image from $DOCKERFILE"
           image="$(python scripts/extract-dockerfile-base.py "$DOCKERFILE" "$TARGET_STAGE")"
+          echo "Image: $image"
+          echo "##[endgroup]"
           echo "image=$image" >> "$GITHUB_OUTPUT"
           image_inspect_log="$(mktemp "$RUNNER_TEMP/image_inspect.XXXXXX")"
+          echo "##[group]Pulling base image"
+          echo "[command]docker pull $image"
           docker pull "$image"
+          echo "##[endgroup]"
+          echo "##[group]Inspecting base image"
+          echo "[command]docker image inspect $image"
           docker image inspect "$image" | tee "$image_inspect_log"
+          echo "##[endgroup]"
+          echo "##[group]Extracting digest from base image"
           digest="$(jq -r '.[0].RepoDigests[0]' "$image_inspect_log")"
           if [[ "${digest}" =~ @(sha256:.*) ]]; then
             digest="${BASH_REMATCH[1]}"
           fi
+          echo "Digest: $digest"
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "##[endgroup]"
 
       # Extract metadata (tags, labels) for Docker
       # https://github.com/docker/metadata-action
