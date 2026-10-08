@@ -45,16 +45,72 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pre-pull and inspect Update base image
-        id: base_update
+      - name: Extract base image for EddnIndexUpdate
+        id: base_update_extract
+        shell: python
         env:
           DOCKERFILE: EddnIndexUpdate.Dockerfile
           TARGET_STAGE: final
         run: |
-          printf "\x23\x23\x5b%s\x5d%s\n" "group" "Extracting base image from $DOCKERFILE"
-          image="$(python scripts/extract-dockerfile-base.py "$DOCKERFILE" "$TARGET_STAGE")"
-          echo "Image: $image"
-          printf "\x23\x23\x5b%s\x5d%s\n" "endgroup" ""
+          import re
+          import shlex
+          import sys
+          import os
+          from pathlib import Path
+
+          dockerfile = Path(os.environ["DOCKERFILE"])
+          target = os.environ["TARGET_STAGE"]
+
+          # Join Dockerfile line continuations.
+          logical_lines = []
+          pending = ""
+          for raw_line in dockerfile.read_text().splitlines():
+              line = raw_line.strip()
+              if not line or line.startswith("#"):
+                  continue
+              pending = f"{pending} {line}".strip()
+              if pending.endswith("\\"):
+                  pending = pending[:-1].rstrip()
+                  continue
+              logical_lines.append(pending)
+              pending = ""
+
+          if pending:
+              logical_lines.append(pending)
+
+          stages = []
+          for line in logical_lines:
+              tokens = shlex.split(line, comments=True)
+              if not tokens or tokens[0].upper() != "FROM":
+                  continue
+
+              i = 1
+              while i < len(tokens) and tokens[i].startswith("--"):
+                  i += 1
+
+              image = tokens[i]
+              alias = tokens[i + 2] if len(tokens) > i + 2 and tokens[i + 1].upper() == "AS" else str(len(stages))
+              stages.append((alias.lower(), image))
+
+          stage_map = dict(stages)
+          if target.lower() not in stage_map:
+              raise SystemExit(f"Target stage not found: {target}")
+
+          image = stage_map[target.lower()]
+          while image.lower() in stage_map:
+              image = stage_map[image.lower()]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              print(f"image={image}", file=f)
+
+          print(f"Image: {image}")
+
+      - name: Pre-pull and inspect EddnIndexUpdate base image
+        id: base_update
+        env:
+          BASE_IMAGE: ${{ steps.extract_update.outputs.image }}
+        run: |
+          image="${BASE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
           image_inspect_log="$(mktemp "$RUNNER_TEMP/image_inspect.XXXXXX")"
           printf "\x23\x23\x5b%s\x5d%s\n" "group" "Pulling base image"
@@ -108,16 +164,72 @@ jobs:
           cache-to: type=gha,mode=max
           sbom: true
 
-      - name: Pre-pull and inspect Lookup base image
-        id: base_lookup
+      - name: Extract base image for EddnIndexLookup
+        id: base_lookup_extract
+        shell: python
         env:
           DOCKERFILE: EddnIndexLookup.Dockerfile
           TARGET_STAGE: final
         run: |
-          printf "\x23\x23\x5b%s\x5d%s\n" "group" "Extracting base image from $DOCKERFILE"
-          image="$(python scripts/extract-dockerfile-base.py "$DOCKERFILE" "$TARGET_STAGE")"
-          echo "Image: $image"
-          printf "\x23\x23\x5b%s\x5d%s\n" "endgroup" ""
+          import re
+          import shlex
+          import sys
+          import os
+          from pathlib import Path
+
+          dockerfile = Path(os.environ["DOCKERFILE"])
+          target = os.environ["TARGET_STAGE"]
+
+          # Join Dockerfile line continuations.
+          logical_lines = []
+          pending = ""
+          for raw_line in dockerfile.read_text().splitlines():
+              line = raw_line.strip()
+              if not line or line.startswith("#"):
+                  continue
+              pending = f"{pending} {line}".strip()
+              if pending.endswith("\\"):
+                  pending = pending[:-1].rstrip()
+                  continue
+              logical_lines.append(pending)
+              pending = ""
+
+          if pending:
+              logical_lines.append(pending)
+
+          stages = []
+          for line in logical_lines:
+              tokens = shlex.split(line, comments=True)
+              if not tokens or tokens[0].upper() != "FROM":
+                  continue
+
+              i = 1
+              while i < len(tokens) and tokens[i].startswith("--"):
+                  i += 1
+
+              image = tokens[i]
+              alias = tokens[i + 2] if len(tokens) > i + 2 and tokens[i + 1].upper() == "AS" else str(len(stages))
+              stages.append((alias.lower(), image))
+
+          stage_map = dict(stages)
+          if target.lower() not in stage_map:
+              raise SystemExit(f"Target stage not found: {target}")
+
+          image = stage_map[target.lower()]
+          while image.lower() in stage_map:
+              image = stage_map[image.lower()]
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              print(f"image={image}", file=f)
+
+          print(f"Image: {image}")
+
+      - name: Pre-pull and inspect Lookup base image
+        id: base_lookup
+        env:
+          BASE_IMAGE: ${{ steps.extract_lookup.outputs.image }}
+        run: |
+          image="${BASE_IMAGE}"
           echo "image=$image" >> "$GITHUB_OUTPUT"
           image_inspect_log="$(mktemp "$RUNNER_TEMP/image_inspect.XXXXXX")"
           printf "\x23\x23\x5b%s\x5d%s\n" "group" "Pulling base image"
