@@ -57,6 +57,9 @@ jobs:
           docker pull "$image"
           docker image inspect "$image" | tee "$image_inspect_log"
           digest="$(jq -r '.[0].RepoDigests[0]' "$image_inspect_log")"
+          if [[ "${digest}" =~ @(sha256:.*) ]]; then
+            digest="${BASH_REMATCH[1]}"
+          fi
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       # Extract metadata (tags, labels) for Docker
@@ -105,6 +108,9 @@ jobs:
           docker pull "$image"
           docker image inspect "$image" | tee "$image_inspect_log"
           digest="$(jq -r '.[0].RepoDigests[0]' "$image_inspect_log")"
+          if [[ "${digest}" =~ @(sha256:.*) ]]; then
+            digest="${BASH_REMATCH[1]}"
+          fi
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       # Extract metadata (tags, labels) for Docker
