@@ -18,7 +18,7 @@ updates:
     directory: "/" # Location of package manifests
     ignore:
       - dependency-name: '*'
-        update-types: ["version-update:semver-major"]    
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: "weekly"
     groups:
@@ -34,7 +34,7 @@ updates:
       - dependency-name: dotnet/aspnet
         update-types: ["version-update:semver-major"]
       - dependency-name: dotnet/sdk
-        update-types: ["version-update:semver-major"]    
+        update-types: ["version-update:semver-major"]
     schedule:
       interval: "weekly"
     groups:
