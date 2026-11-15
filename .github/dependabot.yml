@@ -9,13 +9,35 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "weekly"
-
+    groups:
+      weekly-batch:
+        patterns:
+          - "*"
+  
   - package-ecosystem: "docker" # See documentation for possible values
     directory: "/" # Location of package manifests
+    ignore:
+      - dependency-name: '*'
+        update-types: ["version-update:semver-major"]    
     schedule:
       interval: "weekly"
+    groups:
+      weekly-batch:
+        patterns:
+          - "*"
 
   - package-ecosystem: "github-actions" # See documentation for possible values
     directory: "/" # Location of package manifests
+    ignore:
+      - dependency-name: dotnet/runtime
+        update-types: ["version-update:semver-major"]
+      - dependency-name: dotnet/aspnet
+        update-types: ["version-update:semver-major"]
+      - dependency-name: dotnet/sdk
+        update-types: ["version-update:semver-major"]    
     schedule:
       interval: "weekly"
+    groups:
+      weekly-batch:
+        patterns:
+          - "*"
